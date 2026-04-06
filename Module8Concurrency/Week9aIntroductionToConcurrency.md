@@ -1,91 +1,62 @@
-Part I
-"Introduction to Concurrency"
+# Part I: Introduction to Concurrency
 
-Example:
-3 100 banknote
-3 people
+## 1. The Core Concept: A Simple Analogy
+Imagine a scenario: There are three $100 banknotes on a table and three people instructed to pick them up. 
+* If they don't communicate with each other and simply move to pick up the money, the process of distribution becomes a concurrent task.
+* The task can **fail** (e.g., two people grab the same note and tear it) if there is no communication. 
+* It could also be **inefficient** if they force a rule where only one person can enter the room and take one note at a time.
 
-Don't communicate with each other.
-Move to pick up.
+This provides a simple, basic, but accurate mental model of concurrent programming.
 
-Process of distribution is a task.
+---
 
-Can fail, if people not communicate
-or could be slower, if one person will take one note at a time
+## 2. A New Abstraction: The Thread
+Historically, a program consisted of a single point of execution. The introduction of threads means our program can now have **multiple points of execution**. 
 
-Simple, basic, but accurate image of concurrency programming.
+Think of each thread as an independent process, but with one critical distinction: **All threads within a process share the same address space and the same data.**
 
-Introduction:
+### The State of a Single Thread
+To maintain its own execution context (so that context switching still works), each thread has its own:
+* **Program Counter (PC)**
+* **Private Registers**
 
-=> New abstraction: Thread
-Our program will have many point of execution
+### Processes vs. Threads Memory Model
+To distinguish between threads and allow them to execute independently, each thread is allocated its own individual stack. The stack serves as thread-local storage, keeping track of local variables, parameters, and return values.
 
-Before it was one single thread.
+**Single Process, Single Thread:**
+> `[ Code | Heap | Stack ]`
 
-Each thread is like a separate process.
-Key idea: It shares the same address space and the same data
+**Single Process, Multiple Threads:**
+> `[ Code | Heap | Stack 1 | Stack 2 | Stack 3 ]`
 
-=> State of the single thread:
+---
 
-Program Counter
-Private registers(context switch still works)
+## 3. Why Use Threads?
 
-[Single Process:
-"Thread1" (individual thread control block),
-"Thread2",
-"Thread3",]
+### 1) Parallelism
+Imagine you need to process 10,000 distinct arrays to find their total sum. 
+* **Single-threaded:** The program processes one array at a time, sequentially.
+* **Multi-threaded:** You can divide the workload. For example, you can spawn 10 threads and assign each thread 1,000 arrays to process simultaneously. This is parallelization.
 
-Distinction with processes.
-All threads share the same address space as a parent process
+### 2) Interactivity (Preventing Blocking)
+When your program runs on the CPU, certain instructions—like opening a file or waiting for network data—cause the program to block. If you only have one thread, the entire program gives up the CPU and halts, which creates a slow, unresponsive experience. 
+Instead of relinquishing the CPU on every I/O operation, you can use multiple threads to ensure the CPU is still doing useful work while one specific thread waits.
 
-In addition, in order to distinguish threads, each one 
-will have individual stack
+---
 
-Single Process, Single Thread
-[Code,
-Heap,
-Stack]
+## 4. Thread Creation Concepts
+The two fundamental lifecycle operations for a thread are:
+1. **Spawn:** Create and start a new thread.
+2. **Join:** Wait for a spawned thread to finish its execution.
 
-Single Process, Multiple Thread
-[Code,
-Heap
-Stack1,
-Stack2,
-Stack3]
+### Example in Rust
+Here is what happens when we don't properly wait for a thread to finish.
 
-Stack becomes thread-local storage and keeps
-all variable, parameters and return values
-
-Why use Threads?
-
-1) Parallelism
-Imagine you need to process 10000 arrays.
-And you want a find total sum
-single threaded program one array at a time
-
-multi threaded program you can assign arrays let's say between 10 threads
-and assign each thread for 1000 arrays.
-This is a parallelization.
-
-2) Interactivity.
-
-So when you program run on CPU
-if at some point instructions says open the file
-you gave up CPU and become blocked, and this can be slow.
-
-So instead of relinquishing CPU on every IO operation, you want to have multiple threads, to utilize the usage of CPU by your program.
-
-=> Thread Creation Concepts
-
-->1 create a thread:-> spawn
-->2 wait thread to finish:->join
-
-
-=> Bad example
+**Bad Example (The spawned thread may not finish before `main` exits):**
+```rust
 use std::thread;
 use std::time::Duration;
 
-'''
 fn main() {
     thread::spawn(|| {
         for i in 1..10 {
@@ -99,9 +70,10 @@ fn main() {
         thread::sleep(Duration::from_millis(1));
     }
 }
+```
 
-'''
-=> Correct Example
+**Correct Example (Using `join` to ensure completion):**
+```rust
 use std::thread;
 use std::time::Duration;
 
@@ -118,75 +90,46 @@ fn main() {
         thread::sleep(Duration::from_millis(1));
     }
 
+    // Wait for the spawned thread to finish before exiting main
     handle.join().unwrap();
 }
-'''
+```
 
-Problems:
-Shared data.
-So we observed that data which lives on the heap will be shared by all threads.
-And here starts all the problems.
+---
 
-Namely it's called Data Race - Race Condition.
-In Rust it does not exist. Bu we need to discuss.
-To understand things at depth.
+## 5. The Problems: Shared Data & Scheduling
+Because all threads share the data that lives on the heap, problems begin to emerge when multiple threads try to interact with that data simultaneously.
 
-=> Uncontrolled Scheduling.
-a = a + 1 
+### Uncontrolled Scheduling and Data Races
+Consider a simple operation: `a = a + 1`. At the hardware level, this is not a single step. It involves:
+1. **Load:** Move the value of `a` into a register.
+2. **Update:** Perform the addition (add 1).
+3. **Store:** Put the new value back into memory.
 
-1) move value of a to register // load
-2) perform adding one (bad scenario arises when time interrupt occurs , exactly at this moment) // update
-3) Put back // store
+A critical failure occurs if a hardware timer interrupt triggers a context switch exactly in the middle of these steps. If two threads try to update the same shared data concurrently without protection, the final result becomes **nondeterministic**. 
 
-Which technically means if two threads try to update same shared data result will be not deteremnistic.
+This specific issue is known as a **Race Condition** (or Data Race). *Note: Rust's ownership and type system prevent data races at compile time, but understanding the underlying systems concept is essential for deep comprehension.*
 
-So this code which involves updating shared data on heap, refers as a critical section.
+---
 
-And solution is so called mutual exclusion.
-Edsger Dijkstra genious. Come up with this ideas. in 80s already.
+## 6. Synchronization Primitives
 
-Mutex -> Mutual exclusion
-Key idea: Allow to change the data only to one thread at a time
+Any section of code that involves updating shared heap data is referred to as a **Critical Section**. To safely navigate critical sections, we need synchronization and controlled access.
 
-Concept of Atomic Operation:
-Perform all or nothing.
-Simple example is a bank transaction.
-Operation Send Consists of Withdraw and Add technically.
-So it's a two operation and you want the execute either both or none.
+### Mutual Exclusion (Mutex)
+Pioneered by Edsger Dijkstra, the solution to data races is mutual exclusion.
+* **Key Idea:** Only allow one thread to access and modify the shared data at a time.
+* **Atomic Operations:** Operations must be "all or nothing." Think of a bank transfer: it consists of a *withdrawal* and a *deposit*. You want both to execute successfully, or neither. They cannot be split.
 
+### Condition Variables
+Sometimes, synchronization requires more than just locking data; it requires orchestrating the *order* of execution. 
+* If a thread cannot continue its execution until another thread finishes a specific task, it needs a way to go to sleep and be woken up only when the condition is met.
+* **Solution:** Condition Variables handle the signaling, sleeping, and waking of appropriate threads. *(Example problem: LeetCode "Print Zero Even Odd").*
 
-And everything we want to achieve in multithreaded programs is to access critical sections in synchronised and controlled maner.
+---
 
-Condition Variables
-So another idea.
-If we want to synchronize our threads.
-Let's say we cannot continue of execution of one thread
-till previous did not finish.
-
-There is a need for sleeping and waking aprropriate threads
-Solution is Condition Variables
-
-Example problem
-https://leetcode.com/problems/print-zero-even-odd/
-
-Key Takeways:
-
-=> A critical section
-=> Race condition
-=> Deterministic and indeterministic
-=> Mutual exclusion Mutex
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+## 7. Key Takeaways
+* **Critical Section:** A block of code that accesses shared resources and must not be executed by more than one thread at a time.
+* **Race Condition:** A flaw where the timing or order of thread scheduling changes the program's correctness.
+* **Deterministic vs. Nondeterministic:** Predictable output versus output that changes based on uncontrollable system scheduling.
+* **Mutex (Mutual Exclusion):** A primitive lock used to prevent simultaneous access to a shared resource.
