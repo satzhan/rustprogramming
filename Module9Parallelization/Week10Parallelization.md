@@ -1,50 +1,32 @@
+# A Practical Guide to Parallelism in Rust
 
-// Topic: Parallelism
+## The Three Pillars of Parallelism
 
-// Concepts of parallelism
+Before diving into code, we need to distinguish how we divide our workloads.
 
-#1) Data Paralelism
-Data parallelism involves dividing the data among multiple processing elements(aka threads) and performing the same operation on each piece of data concurrently.
+* **Data Parallelism:** Dividing the *data* among multiple threads and performing the same operation on each chunk concurrently. 
+* **Task Parallelism:** Dividing the *work* into independent, distinct tasks that can be executed concurrently.
+* **Pipeline Parallelism:** Dividing the work into a series of dependent stages, where the output of one stage becomes the input for the next. 
 
-#2) Task Parallelism:
-Task parallelism involves dividing the work into independent tasks that can be executed concurrently.
+> **Important Concepts:** > * **Computational Graphs:** A way to map out dependencies and reason about the time complexity of parallel programs (conceptually similar to [LeetCode 113: Path Sum II](https://leetcode.com/problems/path-sum-ii/)).
+> * **The Actor Model:** A design pattern where isolated "actors" communicate purely through message passing. This is highly suited for **Pipeline Parallelism**.
 
-#3) Pipeline Parallelism:
-Pipeline parallelism involves dividing the work into a series of stages, where the output of one stage becomes the input for the next stage.
+---
 
-This one is insanely complex:)
-But we are not in a charity business.
+## 1. Data Parallelism: The Locking Problem vs. Rayon
 
-========================================
+The most common mistake in native data parallelism is creating bottlenecks through over-locking. 
 
+### The Native Approach (And Its Flaw)
 
-Here exist very important concept of Computational Graph (leetcode loves this problems)
+```rust
+use std::sync::{Arc, Mutex};
+use std::thread;
 
-
-It's usually way to reason about time complexity of the program written in the style of parallel programming
-https://leetcode.com/problems/path-sum-ii/ 
-Not exact formulation, but same concept
-
-Another importanc concept is Actor model.
-Most suited for pipeline paralelism.
-
-
-
-
-// First with Rust built-in libraries
-
-// #1) Data Paralelism
-
-fn data_paralelism_native() {
-    
-    use std::sync::{Arc, Mutex};
-    use std::thread;
-    
-    
+fn data_parallelism_native() {
     let data = Arc::new(Mutex::new(vec![1, 2, 3, 4, 5]));
     let len = data.lock().unwrap().len();
     let mid = len / 2;
-
 
     let left_data = Arc::clone(&data);
     let left_handle = thread::spawn(move || {
@@ -66,109 +48,71 @@ fn data_paralelism_native() {
     right_handle.join().unwrap();
 
     println!("{:?}", *data.lock().unwrap()); // [2, 4, 6, 8, 10]
-    
-    
-    // the main problem, I want you to notice, even though it seems like
-    // a fine data paralelism, it has a huge problem.
-    // because you are locking data vector at the moment of updating the value
-    // it basically means, only one thread at a time can update value
-    // even though logically it seems correct it's a overhead
 }
+```
 
+> **The Problem:** Even though we conceptually split the data into a left and right half, both threads must acquire a lock on the *entire* vector to update their values. Only one thread can actually work at a time, creating unnecessary overhead. 
 
-fn data_paralelism_rayon() {
+### The Rayon Solution
 
-    use rayon::prelude::*;
+Rayon creates a separate scope to eliminate the need for locking entirely, and uses **work stealing** to dynamically balance the workload across threads.
 
+```rust
+use rayon::prelude::*;
+
+fn data_parallelism_rayon() {
     let mut data = vec![1, 2, 3, 4, 5];
 
+    // par_iter_mut() safely splits the data without requiring a Mutex
     data.par_iter_mut().for_each(|x| {
         *x *= 2;
     });
     
-    // from code perspective it seems trivial, but I want you to realize how much heavy lifting happens behind the hood:
-    //The Rayon library uses work stealing to dynamically balance the workload among threads, 
-    //providing better performance compared to a static division of work among threads.
-    
-    // on top it creates a separate scope to escape need to lock data
-    
-    
-    
-    // Concept of work stealing and separate scope.
-    
-    
-
     println!("{:?}", data); // [2, 4, 6, 8, 10]
 }
 
-
 fn rayon_iterators_real_power() {
-
-    // https://docs.rs/rayon/latest/rayon/
-    extern crate rayon; // 1.5.3
-    use rayon::prelude::*; // 1.5.3
+    let wiki_txt = "Parallel computing is a type of computation in which many calculations or processes are carried out simultaneously...";
     
-    let wiki_txt = " Parallel computing is a type of computation in which many calculations or processes are carried out simultaneously.
-    Large problems can often be divided into smaller ones, which can then be solved at the same time. 
-    There are several different forms of parallel computing: bit-level, instruction-level, data, and task parallelism. 
-    Parallelism has long been employed in high-performance computing, but has gained broader interest due to the physical 
-    constraints preventing frequency scaling.Parallel computing is closely related to concurrent computing—
-    they are frequently used together, and often conflated, though the two are distinct: 
-    it is possible to have parallelism without concurrency, and concurrency without parallelism 
-    (such as multitasking by time-sharing on a single-core CPU).
-    In parallel computing, a computational task is typically broken down into several, often many, 
-    very similar sub-tasks that can be processed independently and whose results are combined afterwards, upon completion. 
-    In contrast, in concurrent computing, the various processes often do not address related tasks; 
-    when they do, as is typical in distributed computing, the separate tasks may have a varied nature and often require some 
-    inter-process communication during execution.";
+    let words: Vec<_> = wiki_txt.split_whitespace().collect();
     
-    let words:Vec<_> = wiki_txt.split_whitespace().collect();
-    
-    // par_iter() -> parallel iterator
-    
-    words.par_iter().for_each(|val| println!("{}",val));
-    
-    // par_iterator can do everything as regular iterator, but can does it 
-    // in parallel
-    
+    // A parallel iterator does everything a regular iterator does, but concurrently.
     let words_with_p: Vec<_> = words
         .par_iter()
-        .filter(|val| val.find('p').is_some()) // of course notice the closure FN, which borrows for reading only
+        .filter(|val| val.find('p').is_some()) 
         .collect();
         
-        
-    println!("All words with letter p: {:?}",words_with_p);
-    
+    println!("All words with letter p: {:?}", words_with_p);
+}
+```
+
+---
+
+## 2. Task Parallelism: Independent Workloads
+
+When you have completely different tasks (like downloading a file vs. resizing an image), you can run them at the same time and join the results later.
+
+### Native Task Parallelism (Using `mpsc`)
+
+```rust
+use std::thread;
+use std::time::{Duration, Instant};
+use std::sync::mpsc;
+
+fn download_file(file: &str) -> String {
+    thread::sleep(Duration::from_millis(100));
+    format!("{} downloaded", file)
 }
 
-#[allow(unused_variables)]
-fn task_paralelism_native() {
+fn resize_image(image: &str) -> String {
+    thread::sleep(Duration::from_millis(100));
+    format!("{} resized", image)
+}
 
-    use std::thread;
-    use std::time::{Duration, Instant};
-    use std::sync::mpsc;
-    
-    fn download_file(file: &str) -> String {
-        thread::sleep(Duration::from_millis(100));
-        format!("{} downloaded", file)
-    }
-    
-    fn resize_image(image: &str) -> String {
-        thread::sleep(Duration::from_millis(100));
-        format!("{} resized", image)
-    }
-
+fn task_parallelism_native() {
     let files = vec!["file1.txt", "file2.txt", "file3.txt"];
     let images = vec!["image1.jpg", "image2.jpg", "image3.jpg"];
 
-    // Sequential execution
-    let start = Instant::now();
-    let downloaded_files: Vec<String> = files.iter().map(|file| download_file(file)).collect();
-    let resized_images: Vec<String> = images.iter().map(|image| resize_image(image)).collect();
-    let duration = start.elapsed();
-    println!("Time elapsed in sequential execution: {:?}", duration);
-
-    // Parallel execution using task parallelism with native Rust threads
     let start = Instant::now();
     
     let (tx1, rx1) = mpsc::channel();
@@ -184,218 +128,137 @@ fn task_paralelism_native() {
         tx2.send(result).unwrap();
     });
     
+    // Wait for both tasks to send their data
     let downloaded_files = rx1.recv().unwrap();
     let resized_images = rx2.recv().unwrap();
 
     download_handle.join().unwrap();
     resize_handle.join().unwrap();
 
-    let duration = start.elapsed();
-    println!("Time elapsed in parallel execution (native Rust threads): {:?}", duration);
-
-    println!("Downloaded files: {:?}", downloaded_files);
-    println!("Resized images: {:?}", resized_images);
+    println!("Time elapsed (native): {:?}", start.elapsed());
 }
+```
 
-#[allow(unused_variables)]
-fn task_paralelism_rayon(){
-    extern crate rayon;
-    use rayon::prelude::*;
-    use std::time::{Duration, Instant};
-    use std::thread;
-    
-    fn download_file(file: &str) -> String {
-        thread::sleep(Duration::from_millis(100));
-        format!("{} downloaded", file)
-    }
-    
-    fn resize_image(image: &str) -> String {
-        thread::sleep(Duration::from_millis(100));
-        format!("{} resized", image)
-    }
-    
+### Rayon Task Parallelism (Using `join`)
 
+Rayon simplifies this dramatically with `rayon::join`, which takes two closures and executes them concurrently.
+
+```rust
+use rayon::prelude::*;
+
+fn task_parallelism_rayon() {
     let files = vec!["file1.txt", "file2.txt", "file3.txt"];
     let images = vec!["image1.jpg", "image2.jpg", "image3.jpg"];
 
-    // Sequential execution
     let start = Instant::now();
-    let downloaded_files: Vec<String> = files.iter().map(|file| download_file(file)).collect();
-    let resized_images: Vec<String> = images.iter().map(|image| resize_image(image)).collect();
-    let duration = start.elapsed();
-    println!("Time elapsed in sequential execution: {:?}", duration);
-
-    // Parallel execution using task parallelism
-    let start = Instant::now();
-    let (downloaded_files, resized_images): (Vec<String>, Vec<String>) = rayon::join(
-        || files.par_iter().map(|file| download_file(file)).collect(),
-        || images.par_iter().map(|image| resize_image(image)).collect(),
+    
+    // Join blocks until both closures complete
+    let (downloaded_files, resized_images) = rayon::join(
+        || files.par_iter().map(|file| download_file(file)).collect::<Vec<_>>(),
+        || images.par_iter().map(|image| resize_image(image)).collect::<Vec<_>>(),
     );
-    let duration = start.elapsed();
-    println!("Time elapsed in parallel execution: {:?}", duration);
+    
+    println!("Time elapsed (rayon): {:?}", start.elapsed());
+}
+```
 
-    println!("Downloaded files: {:?}", downloaded_files);
-    println!("Resized images: {:?}", resized_images);
+---
+
+## 3. Pipeline Parallelism: The Actor Model approach
+
+Pipeline parallelism is the most complex. It requires building an assembly line where workers (threads) pass data to the next stage as soon as they finish their specific task. We achieve this using message-passing channels (`mpsc`).
+
+```rust
+use std::sync::mpsc::{channel, Sender, Receiver};
+use std::thread;
+use std::time::{Duration, Instant};
+
+enum Message {
+    Download(String),
+    Process(String),
+    Exit,
 }
 
-#[allow(dead_code)]
-fn pipeline_paralelism()
-    {
-        use std::sync::mpsc::{channel, Sender, Receiver};
-        use std::thread;
-        use std::time::Duration;
-        use std::time::Instant;
-        
-        
-        enum Message {
-            Download(String),
-            Process(String),
-            Upload(String),
-            Exit,
+// STAGE 1: Downloader
+struct Downloader { tx: Sender<Message> }
+impl Downloader {
+    fn run(&self, files: &[&str]) {
+        for file in files {
+            thread::sleep(Duration::from_millis(100)); 
+            self.tx.send(Message::Download(format!("{} downloaded", file))).unwrap();
         }
-        
-        struct Downloader {
-            tx: Sender<Message>,
-        }
-        
-        impl Downloader {
-            fn run(&self, files: &[&str]) {
-                for file in files {
-                    thread::sleep(Duration::from_millis(100)); // Simulate download time
-                    let downloaded_file = format!("{} downloaded", file);
-                    self.tx.send(Message::Download(downloaded_file)).unwrap();
-                }
-                self.tx.send(Message::Exit).unwrap();
-            }
-        }
-        
-        struct Processor {
-            tx: Sender<Message>,
-            rx: Receiver<Message>,
-        }
-        
-        impl Processor {
-            fn run(&self) {
-                loop {
-                    match self.rx.recv().unwrap() {
-                        Message::Download(file) => {
-                            thread::sleep(Duration::from_millis(100)); // Simulate processing time
-                            let processed_file = format!("{} processed", file);
-                            self.tx.send(Message::Process(processed_file)).unwrap();
-                        }
-                        Message::Exit => {
-                            self.tx.send(Message::Exit).unwrap();
-                            break;
-                        }
-                        _ => {}
-                    }
-                }
-            }
-        }
-        
-        struct Uploader {
-            rx: Receiver<Message>,
-        }
-        
-        impl Uploader {
-            fn run(&self) -> Vec<String> {
-                let mut uploaded_files = Vec::new();
-        
-                loop {
-                    match self.rx.recv().unwrap() {
-                        Message::Process(file) => {
-                            thread::sleep(Duration::from_millis(100)); // Simulate upload time
-                            let uploaded_file = format!("{} uploaded", file);
-                            uploaded_files.push(uploaded_file);
-                        }
-                        Message::Exit => {
-                            break;
-                        }
-                        _ => {}
-                    }
-                }
-        
-                uploaded_files
-            }
-        }
-        
-        fn sequential(files: &[&str]) -> Vec<String> {
-            let mut uploaded_files = Vec::new();
-        
-            for file in files {
-                thread::sleep(Duration::from_millis(100)); // Simulate download time
-                let downloaded_file = format!("{} downloaded", file);
-        
-                thread::sleep(Duration::from_millis(100)); // Simulate processing time
-                let processed_file = format!("{} processed", downloaded_file);
-        
-                thread::sleep(Duration::from_millis(100)); // Simulate upload time
-                let uploaded_file = format!("{} uploaded", processed_file);
-        
-                uploaded_files.push(uploaded_file);
-            }
-        
-            uploaded_files
-        }
-        
-        let files = vec!["file1.txt", "file2.txt", "file3.txt"];
-    
-        // Sequential version
-        let start = Instant::now();
-        let uploaded_files_sequential = sequential(&files);
-        let duration_sequential = start.elapsed();
-        println!("Sequential duration: {:?}", duration_sequential);
-        println!("Sequential uploaded files: {:?}", uploaded_files_sequential);
-    
-        // Parallel version
-        let start = Instant::now();
-    
-        let (downloader_tx, processor_rx) = channel();
-        let (processor_tx, uploader_rx) = channel();
-    
-        let downloader = Downloader { tx: downloader_tx };
-        let processor = Processor { tx: processor_tx, rx: processor_rx };
-        let uploader = Uploader { rx: uploader_rx };
-    
-        let files_clone = files.clone();
-        let downloader_thread = thread::spawn(move || downloader.run(&files_clone));
-        let processor_thread = thread::spawn(move || processor.run());
-    
-        let uploaded_files_parallel = uploader.run();
-    
-        downloader_thread.join().unwrap();
-        processor_thread.join().unwrap();
-    
-        let duration_parallel = start.elapsed();
-        println!("Parallel duration: {:?}", duration_parallel);
-        println!("Parallel uploaded files: {:?}", uploaded_files_parallel);
+        self.tx.send(Message::Exit).unwrap();
     }
-
-fn main() {
-    //#1) Data Paralelism
-    data_paralelism_native();
-    data_paralelism_rayon();
-    rayon_iterators_real_power();
-
-    //#2 Task Paralelism
-    task_paralelism_native();
-    task_paralelism_rayon();
-
-    //#3 Pipeline Parallelism: Most challenging:)
-    pipeline_paralelism();
-
-    // It's just first approach. But good for starter.
-    // You gonna laugh, but it's just a surface
-    // To really being implement pipeline paralellism, we need to learn
-    // asynchronious programming concepts
 }
 
-// Next.
+// STAGE 2: Processor
+struct Processor {
+    tx: Sender<Message>,
+    rx: Receiver<Message>,
+}
+impl Processor {
+    fn run(&self) {
+        loop {
+            match self.rx.recv().unwrap() {
+                Message::Download(file) => {
+                    thread::sleep(Duration::from_millis(100)); 
+                    self.tx.send(Message::Process(format!("{} processed", file))).unwrap();
+                }
+                Message::Exit => {
+                    self.tx.send(Message::Exit).unwrap();
+                    break;
+                }
+                _ => {}
+            }
+        }
+    }
+}
 
-// Concurrency Problems -> Liveness
-// Deadlock
-// Livelock
-// Starvation
-// Classical Concurrency Problem : Dinning Phylosophers
-https://leetcode.com/problems/the-dining-philosophers/
+// STAGE 3: Uploader
+struct Uploader { rx: Receiver<Message> }
+impl Uploader {
+    fn run(&self) -> Vec<String> {
+        let mut uploaded_files = Vec::new();
+        loop {
+            match self.rx.recv().unwrap() {
+                Message::Process(file) => {
+                    thread::sleep(Duration::from_millis(100)); 
+                    uploaded_files.push(format!("{} uploaded", file));
+                }
+                Message::Exit => break,
+                _ => {}
+            }
+        }
+        uploaded_files
+    }
+}
 
+fn pipeline_parallelism() {
+    let files = vec!["file1.txt", "file2.txt", "file3.txt"];
+    let start = Instant::now();
+
+    // Wire up the assembly line
+    let (downloader_tx, processor_rx) = channel();
+    let (processor_tx, uploader_rx) = channel();
+
+    let downloader = Downloader { tx: downloader_tx };
+    let processor = Processor { tx: processor_tx, rx: processor_rx };
+    let uploader = Uploader { rx: uploader_rx };
+
+    let files_clone = files.clone();
+    
+    // Start the threads
+    let downloader_thread = thread::spawn(move || downloader.run(&files_clone));
+    let processor_thread = thread::spawn(move || processor.run());
+
+    // The main thread acts as the final uploader stage
+    let uploaded_files_parallel = uploader.run();
+
+    downloader_thread.join().unwrap();
+    processor_thread.join().unwrap();
+
+    println!("Pipeline duration: {:?}", start.elapsed());
+}
+```
+
+> **The Next Step:** While threads and channels work for this assembly line, to build *true* pipeline parallelism at scale, you eventually need to transition into asynchronous programming.
