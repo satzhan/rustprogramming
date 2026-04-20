@@ -1,0 +1,1 @@
+/workspaces/rustprogramming/Module5_1SimpleTesting/struct_testing_lab/target/debug/struct_testing_lab: /workspaces/rustprogramming/Module5_1SimpleTesting/struct_testing_lab/src/main.rs /workspaces/rustprogramming/Module5_1SimpleTesting/struct_testing_lab/src/rectangle.rs

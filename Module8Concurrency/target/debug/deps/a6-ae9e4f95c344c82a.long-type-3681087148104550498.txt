@@ -1,0 +1,1 @@
+Arc<std::sync::Mutex<{integer}>>

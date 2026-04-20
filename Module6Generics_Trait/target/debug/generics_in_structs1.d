@@ -1,0 +1,1 @@
+/workspaces/rustprogramming/Module6Generics_Trait/target/debug/generics_in_structs1: /workspaces/rustprogramming/Module6Generics_Trait/src/bin/generics_in_structs1.rs
