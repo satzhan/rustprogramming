@@ -1,3 +1,12 @@
+# Handling Concurrent State in Rust with Atomics
+
+Below is an example demonstrating how to handle concurrent state in Rust using `AtomicI32`. We start with a flawed implementation that suffers from race conditions, and then provide a more robust solution using atomic `fetch_add` and `compare_exchange` operations.
+
+## Flawed Implementation (Race Condition Vulnerability)
+
+In this first attempt, `load` and `store` are used separately. Because these are two distinct operations, another thread can modify the balance in between them, leading to lost updates.
+
+```rust
 use std::sync::atomic::{AtomicI32, Ordering};
 use rand::Rng;
 use std::sync::Arc;
@@ -77,23 +86,26 @@ fn main() {
         handle.join().unwrap();
     }
     
-    //The Ordering enum in Rust's standard library helps us specify the 
-    //desired ordering guarantees  operations
-    
-    // When using SeqCst, Rust guarantees that:
-
-    //--> All operations appear to execute in the same order for all threads.
-    //--> It provides the strongest ordering guarantees.
-    
-    //load(Ordering::SeqCst) is a method you can call on an atomic type to read its value
-    
-
     println!("Final balance of source: {}", source.balance.load(Ordering::SeqCst));
     println!("Final balance of destination: {}", destination.balance.load(Ordering::SeqCst));
 }
+```
 
+### Understanding `Ordering` and `SeqCst`
 
-// More robust 
+* **`load(Ordering::SeqCst)`** is a method you can call on an atomic type to read its value.
+* The `Ordering` enum in Rust's standard library helps us specify the desired memory ordering guarantees for operations.
+* When using `SeqCst` (Sequential Consistency), Rust guarantees that:
+  * All operations appear to execute in the exact same order for all threads.
+  * It provides the strongest possible ordering guarantees.
+
+---
+
+## More Robust Implementation
+
+To fix the race conditions, we must ensure that reading and modifying the state happens as a single, indivisible step. We can achieve this using `fetch_add` and `compare_exchange`.
+
+```rust
 use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::Arc;
 use std::thread;
@@ -191,3 +203,4 @@ fn main() {
     println!("Final balance of source: {}", source.balance.load(Ordering::SeqCst));
     println!("Final balance of destination: {}", destination.balance.load(Ordering::SeqCst));
 }
+```
