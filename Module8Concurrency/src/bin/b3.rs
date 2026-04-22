@@ -83,13 +83,13 @@ fn main() {
     // Create the worker pool using the square_data function
     // Now we get the task sender back from the function
     const N:usize = 5; // workers
-    const M:i32 = 10; // tasks
+    const M:i32 = 1000; // tasks
     let (handles, task_tx, results) = create_worker_pool(N, square_data);
     
     // Generate some test data
     for i in 1..=M {
         task_tx.send(i).unwrap(); // instant
-        // sleep(20) ms
+        // thread::sleep(Duration::from_millis(20));
         println!("Main: Sent value {} for processing", i);
     }
     

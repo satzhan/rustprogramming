@@ -1,0 +1,1 @@
+/workspaces/rustprogramming/SmallProjectsGoodForPractice/target/debug/monitor10: /workspaces/rustprogramming/SmallProjectsGoodForPractice/src/bin/monitor10.rs

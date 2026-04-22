@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::thread;
 use std::time::{Duration, Instant};
 
-fn main() {
+fn main() { // added more workers
     let start = Instant::now();
     let completed = Arc::new(AtomicUsize::new(0));
     let cpu_usage = Arc::new(AtomicUsize::new(0));
