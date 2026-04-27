@@ -49,7 +49,7 @@ fn main() { // added condition to not exceed CPU limit
         
         let handle = thread::spawn(move || {
             for i in 0..6 {
-                let kind = if rng.random_bool(0.5) { TaskKind::Io } else { TaskKind::Cpu };
+                let kind = if rng.random_bool(0.3) { TaskKind::Io } else { TaskKind::Cpu };
                 let duration_ms = rng.random_range(20..=40);
                 let cost = kind.cpu_cost();
                 
@@ -60,7 +60,7 @@ fn main() { // added condition to not exceed CPU limit
                         Ordering::Relaxed,
                         Ordering::Relaxed,
                         |current| {
-                            if current + cost <= CPU_BUDGET {
+                            if current + cost <= 100 {
                                 Some(current + cost)    // reservation succeeded
                             } else {
                                 None                    // no room, refuse
@@ -75,6 +75,7 @@ fn main() { // added condition to not exceed CPU limit
                 }
                 
                 // Past the gate. Now run the task.
+                
                 worker_active.fetch_add(1, Ordering::Relaxed);
                 thread::sleep(Duration::from_millis(duration_ms));
                 worker_cpu.fetch_sub(cost, Ordering::Relaxed);

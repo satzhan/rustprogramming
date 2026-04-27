@@ -11,7 +11,7 @@ fn main() { // added monitor automatic shutdown
     // Fake worker — does a fixed amount of work, then we'll signal shutdown
     let worker_counter = Arc::clone(&completed);
     let worker = thread::spawn(move || {
-        for _ in 0..8 {
+        for _ in 0..16 {
             thread::sleep(Duration::from_millis(15));
             worker_counter.fetch_add(1, Ordering::Relaxed);
         }

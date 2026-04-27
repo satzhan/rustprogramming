@@ -1,0 +1,22 @@
+"Vec expansion is done in powers of 2" — basically right, with a footnote.
+Vec doubles when it grows (so you see 4 → 8 → 16 → 32 …), but only after the first allocation. It doesn't have to start at a power of 2 — Vec::with_capacity(7) gives you exactly 7 slots. The doubling kicks in when a push overflows capacity. The reason is amortized O(1): doubling means each element gets copied at most ~once on average across many pushes, no matter how many you do.
+"VecDeque [grows] in powers of 2 too" — also basically right, with a stricter footnote.
+VecDeque is more committed to powers of two than Vec is. Its capacity is essentially always rounded up to a power of two. The reason is the wraparound trick: computing buffer[(head + i) % capacity] is dirt cheap when capacity is a power of two, because % capacity collapses into a single bitmask operation (& (capacity - 1)). If capacity were 7, you'd need a real modulo — slower. So VecDeque accepts a little wasted space to keep that index math fast.
+"Deque has 2 pointers of head and tail" — this is the half I want to refine.
+It has two indices, not two pointers. Pointers point into memory; indices are just integers (usize) that label a slot in the buffer. The distinction matters because:
+
+The buffer itself has one base pointer (the start of the heap allocation).
+head and tail (or head + len, depending on the implementation) are integers that tell you where in the ring the logical front and back currently sit.
+When the ring grows, the base pointer changes (new allocation), but head and tail don't need updating in the same way — they get rebased so that the data starts cleanly at index 0 again.
+
+This is why LinkedList is the structure that actually has two pointers per element (a prev and a next on every node, plus head/tail pointers on the list header). VecDeque's "two-endedness" is bookkeeping on a flat array, not extra plumbing on each item.
+
+A Vec is a one-way escalator — you can only board at the bottom and exit at the top, so when it fills, you build a taller escalator and re-place everyone in the same order.
+A VecDeque is a carousel with a moving "front-of-line" sign. People board and leave from either end; the carousel itself doesn't move, but the sign does. When all the seats fill up, the operator builds a bigger carousel and seats everyone starting from seat 0 — but the carousel is still one continuous ring, not a chain of separate cars linked together.
+A LinkedList, by contrast, is a freight train: each car is a separate chunk of metal welded to the next by physical couplings. Lighter to add a car at the end (no rebuilding), but every car carries the weight of two coupling pieces, and walking the train means stepping car-to-car-to-car.
+The correction worth carrying forward
+When you teach this or explain it on the audio, the cleanest one-liner is:
+
+"VecDeque doesn't have two pointers — it has two indices into one allocation. The 'doubly' in 'double-ended' is about which ends you can touch, not about how the structure is built underneath."
+
+That distinction is what trips students up the most, because the textbook pairing of "queue = singly linked, deque = doubly linked" plants the wrong picture.

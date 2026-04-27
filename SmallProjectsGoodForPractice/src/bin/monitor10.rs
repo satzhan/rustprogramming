@@ -51,7 +51,7 @@ fn main() { // added RNG for task distribution
         let handle = thread::spawn(move || {
             for i in 0..6 {
                 // Roll the dice for task type: 70% IO, 30% CPU
-                let kind = if rng.random_bool(0.5) {
+                let kind = if rng.random_bool(0.7) {
                     TaskKind::Io
                 } else {
                     TaskKind::Cpu
