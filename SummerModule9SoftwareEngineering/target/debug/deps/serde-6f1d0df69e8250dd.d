@@ -1,0 +1,14 @@
+/workspaces/rustprogramming/SummerModule9SoftwareEngineering/target/debug/deps/serde-6f1d0df69e8250dd.d: /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /workspaces/rustprogramming/SummerModule9SoftwareEngineering/target/debug/build/serde-252a9bbeccb60cd9/out/private.rs
+
+/workspaces/rustprogramming/SummerModule9SoftwareEngineering/target/debug/deps/libserde-6f1d0df69e8250dd.rlib: /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /workspaces/rustprogramming/SummerModule9SoftwareEngineering/target/debug/build/serde-252a9bbeccb60cd9/out/private.rs
+
+/workspaces/rustprogramming/SummerModule9SoftwareEngineering/target/debug/deps/libserde-6f1d0df69e8250dd.rmeta: /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /workspaces/rustprogramming/SummerModule9SoftwareEngineering/target/debug/build/serde-252a9bbeccb60cd9/out/private.rs
+
+/home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs:
+/home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs:
+/home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs:
+/home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs:
+/home/codespace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs:
+/workspaces/rustprogramming/SummerModule9SoftwareEngineering/target/debug/build/serde-252a9bbeccb60cd9/out/private.rs:
+
+# env-dep:OUT_DIR=/workspaces/rustprogramming/SummerModule9SoftwareEngineering/target/debug/build/serde-252a9bbeccb60cd9/out

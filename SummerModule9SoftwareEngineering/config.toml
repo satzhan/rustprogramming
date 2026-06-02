@@ -1,0 +1,14 @@
+# ---- Dispatcher FIFO config ----
+# Edit these and re-run; no recompile needed.
+
+total_tasks      = 1000
+io_fraction      = 0.80    # 0.70 -> ~70% IO, ~30% CPU. Try 0.80 for the other variant.
+arrival_interval_ms = 20   # gap between successive arrivals from the generator
+num_workers      = 8
+task_duration_ms = 200     # both IO and CPU sleep this long
+io_cpu_pct       = 10      # CPU% an IO task consumes while running
+cpu_cpu_pct      = 35      # CPU% a CPU task consumes while running
+cpu_cap_pct      = 100     # global CPU ceiling
+monitor_interval_ms = 10   # how often the monitor samples
+rng_seed         = 1
+csv_path         = "monitor_log.csv"

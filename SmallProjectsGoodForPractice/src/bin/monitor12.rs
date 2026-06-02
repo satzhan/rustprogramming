@@ -38,9 +38,9 @@ impl Config {
     // A sensible default — our current "baseline" workload
     fn balanced() -> Self {
         Config {
-            num_workers: 5,
+            num_workers: 8,
             tasks_per_worker: 6,
-            io_probability: 0.5,
+            io_probability: 0.7,
             duration_min_ms: 20,
             duration_max_ms: 40,
             cpu_budget: 100,
