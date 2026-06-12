@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Memory Lab — Rust Ownership &amp; Borrowing</title>
+<style>
+  :root{
+    --paper:#F6F7F3; --grid:#E1E7E0; --ink:#21302B; --faint:#5C6B64;
+    --rust:#C14E27; --rust-dark:#963A1B;
+    --stack:#38626B; --stack-bg:#E8EFF0;
+    --heap:#C98A1B; --heap-bg:#F8F0DD;
+    --ok:#2F7D5A; --err:#B23A2F;
+    --card:#FFFFFF; --line:#CDD6CE;
+    --mono:ui-monospace,"Cascadia Code","SF Mono",Menlo,Consolas,monospace;
+    --disp:Futura,"Century Gothic","Avenir Next","Trebuchet MS",sans-serif;
+    --body:Charter,"Bitstream Charter",Georgia,"Times New Roman",serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto} *{transition:none!important;animation:none!important}}
+  body{
+    font-family:var(--body); color:var(--ink); background:var(--paper);
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size:28px 28px;
+    line-height:1.6;
+  }
+  .wrap{max-width:1060px;margin:0 auto;padding:0 20px}
+  a{color:var(--rust)}
+  code,pre{font-family:var(--mono)}
+  :focus-visible{outline:3px solid var(--rust);outline-offset:2px;border-radius:3px}
+
+  /* ---------- hero ---------- */
+  header.hero{padding:64px 0 36px;border-bottom:3px solid var(--ink)}
+  .eyebrow{font-family:var(--disp);letter-spacing:.18em;text-transform:uppercase;font-size:.78rem;color:var(--faint)}
+  h1{font-family:var(--disp);font-weight:700;font-size:clamp(2.1rem,5.5vw,3.4rem);line-height:1.08;margin:.35em 0 .3em}
+  h1 .ox{color:var(--rust)}
+  .hero p.lede{font-size:1.12rem;max-width:46rem}
+  .rules{display:flex;gap:12px;flex-wrap:wrap;margin-top:22px}
+  .rule{
+    font-family:var(--mono);font-size:.86rem;background:var(--card);
+    border:1.5px solid var(--ink);padding:8px 12px;border-radius:4px;
+    box-shadow:3px 3px 0 var(--ink);
+  }
+  .rule b{color:var(--rust)}
+
+  nav.chips{position:sticky;top:0;z-index:30;background:rgba(246,247,243,.94);backdrop-filter:blur(3px);
+    border-bottom:1px solid var(--line);padding:9px 0}
+  nav.chips .wrap{display:flex;gap:8px;flex-wrap:wrap}
+  nav.chips a{
+    font-family:var(--disp);font-size:.78rem;letter-spacing:.05em;text-transform:uppercase;
+    text-decoration:none;color:var(--ink);border:1px solid var(--line);background:var(--card);
+    padding:4px 10px;border-radius:999px;
+  }
+  nav.chips a:hover{border-color:var(--rust);color:var(--rust)}
+
+  /* ---------- sections styled as lab-notebook entries ---------- */
+  section{padding:52px 0 14px}
+  .entry{display:flex;align-items:baseline;gap:14px;border-bottom:2px solid var(--ink);padding-bottom:8px;margin-bottom:22px}
+  .entry .tag{font-family:var(--mono);font-size:.78rem;color:var(--paper);background:var(--ink);padding:3px 8px;border-radius:3px;white-space:nowrap}
+  .entry h2{font-family:var(--disp);font-size:1.5rem;letter-spacing:.01em}
+  .entry .src{margin-left:auto;font-family:var(--mono);font-size:.72rem;color:var(--faint);white-space:nowrap}
+
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:26px;align-items:start}
+  @media(max-width:880px){.cols{grid-template-columns:1fr}}
+
+  .card{background:var(--card);border:1.5px solid var(--ink);border-radius:6px;box-shadow:4px 4px 0 rgba(33,48,43,.18);padding:18px}
+  .note{font-size:.95rem;color:var(--faint)}
+  .callout{border-left:4px solid var(--rust);background:#FBEFE8;padding:10px 14px;border-radius:0 6px 6px 0;margin:14px 0;font-size:.97rem}
+
+  pre.code{background:#1E2A26;color:#E8EFE9;border-radius:6px;padding:14px 0;font-size:.86rem;line-height:1.55;overflow-x:auto}
+  pre.code .ln{display:block;padding:0 16px;white-space:pre}
+  pre.code .ln.hl{background:#3A4A40;border-left:3px solid var(--heap)}
+  pre.code .cm{color:#8AA496}
+  pre.code .kw{color:#E8A06A}
+
+  button{
+    font-family:var(--disp);font-size:.85rem;letter-spacing:.04em;cursor:pointer;
+    border:1.5px solid var(--ink);background:var(--card);color:var(--ink);
+    padding:7px 14px;border-radius:5px;box-shadow:2px 2px 0 var(--ink);
+  }
+  button:hover{background:#EFF3EE}
+  button:active{transform:translate(2px,2px);box-shadow:none}
+  button.primary{background:var(--rust);border-color:var(--rust-dark);color:#fff;box-shadow:2px 2px 0 var(--rust-dark)}
+  button.primary:hover{background:var(--rust-dark)}
+  button:disabled{opacity:.45;cursor:not-allowed;box-shadow:none;transform:none}
+  .btnrow{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}
+
+  /* ---------- memory bench ---------- */
+  .bench{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .memcol{border:1.5px dashed var(--line);border-radius:6px;padding:10px;min-height:230px;background:rgba(255,255,255,.6)}
+  .memcol h4{font-family:var(--disp);font-size:.74rem;letter-spacing:.14em;text-transform:uppercase;margin-bottom:8px;display:flex;justify-content:space-between}
+  .memcol.stackc h4{color:var(--stack)} .memcol.heapc h4{color:var(--heap)}
+  .frame{border:2px solid var(--stack);background:var(--stack-bg);border-radius:5px;margin-bottom:8px;overflow:hidden}
+  .frame .fname{font-family:var(--mono);font-size:.72rem;background:var(--stack);color:#fff;padding:2px 8px}
+  .vrow{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:.8rem;padding:5px 8px;border-top:1px dashed #B6C8CB}
+  .vrow .vn{min-width:2.2em;font-weight:700}
+  .vbox{background:#fff;border:1px solid var(--stack);border-radius:3px;padding:1px 7px}
+  .vrow.moved .vbox{position:relative;color:#9AA8A2;border-style:dashed}
+  .stamp{font-family:var(--disp);font-size:.6rem;letter-spacing:.08em;color:#fff;background:var(--err);
+    padding:1px 6px;border-radius:2px;transform:rotate(-4deg);display:inline-block}
+  .hblock{border:2px solid var(--heap);background:var(--heap-bg);border-radius:5px;margin-bottom:8px;padding:7px 10px;
+    font-family:var(--mono);font-size:.82rem;display:flex;gap:10px;align-items:center}
+  .hblock .hid{background:var(--heap);color:#fff;border-radius:50%;width:20px;height:20px;display:grid;place-items:center;font-size:.7rem;flex:none}
+  .hblock.freed{opacity:.45;border-style:dashed}
+  .hblock.freed .hval{text-decoration:line-through}
+  .ptr{color:var(--heap);font-weight:700}
+  .stepnote{min-height:3.2em;font-size:.95rem;margin-top:6px;padding:8px 12px;background:#F0F4EE;border-radius:5px;border:1px solid var(--line)}
+  .stepnote b{color:var(--rust)}
+
+  /* ---------- bug cards ---------- */
+  .bugs{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px;margin-top:6px}
+  .bug{background:var(--card);border:1.5px solid var(--ink);border-radius:6px;padding:14px;box-shadow:4px 4px 0 rgba(33,48,43,.18)}
+  .bug h3{font-family:var(--mono);font-size:.95rem;color:var(--err);margin-bottom:6px}
+  .bug p{font-size:.92rem}
+  .bug .who{margin-top:8px;font-family:var(--disp);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+
+  /* ---------- strategy table ---------- */
+  table.strat{width:100%;border-collapse:collapse;background:var(--card);border:1.5px solid var(--ink);font-size:.92rem}
+  table.strat th,table.strat td{border:1px solid var(--line);padding:9px 11px;text-align:left;vertical-align:top}
+  table.strat th{font-family:var(--disp);font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;background:#EDF1EB}
+  table.strat td.own{background:#FBEFE8}
+  table.strat .rowh{font-family:var(--mono);font-size:.8rem;color:var(--faint);white-space:nowrap}
+
+  /* ---------- borrow game ---------- */
+  .vault{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:10px 0}
+  .valuebox{font-family:var(--mono);font-size:1rem;border:2px solid var(--ink);background:#fff;border-radius:6px;padding:10px 16px;box-shadow:3px 3px 0 var(--ink)}
+  .badges{display:flex;gap:8px;flex-wrap:wrap}
+  .badge{font-family:var(--mono);font-size:.78rem;border-radius:999px;padding:4px 11px;border:1.5px solid}
+  .badge.r{border-color:var(--stack);color:var(--stack);background:var(--stack-bg)}
+  .badge.w{border-color:var(--err);color:var(--err);background:#F9E7E4;font-weight:700}
+  .verdict{font-family:var(--mono);font-size:.8rem;border-radius:5px;padding:10px 12px;margin-top:10px;white-space:pre-wrap;min-height:4.4em}
+  .verdict.ok{background:#E7F3EC;border:1px solid var(--ok);color:#1F5C42}
+  .verdict.bad{background:#F9E7E4;border:1px solid var(--err);color:#7E2A21}
+  .lawline{font-family:var(--disp);font-size:.9rem;letter-spacing:.03em;margin-top:14px;padding:8px 12px;border:1.5px dashed var(--ink);border-radius:6px;background:#fff}
+
+  /* ---------- quiz ---------- */
+  .q{margin-bottom:22px}
+  .q .qhead{font-family:var(--disp);font-size:.8rem;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin-bottom:6px}
+  .q .why{display:none;margin-top:10px;padding:10px 13px;border-radius:5px;font-size:.93rem}
+  .q.answered .why{display:block}
+  .q .why.ok{background:#E7F3EC;border:1px solid var(--ok)}
+  .q .why.bad{background:#F9E7E4;border:1px solid var(--err)}
+  .scorebar{font-family:var(--disp);font-size:.95rem;border:1.5px solid var(--ink);background:var(--card);display:inline-block;padding:7px 14px;border-radius:6px;box-shadow:3px 3px 0 rgba(33,48,43,.18)}
+
+  /* ---------- page fault sim ---------- */
+  .pages{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+  .page{font-family:var(--mono);font-size:.84rem;border:1.5px solid var(--ink);background:#fff;border-radius:5px;padding:8px 12px;cursor:pointer;box-shadow:2px 2px 0 var(--ink)}
+  .page.in{background:var(--stack-bg);border-color:var(--stack);color:var(--stack);font-weight:700}
+  .frames{display:flex;gap:10px;margin:8px 0}
+  .pframe{width:86px;height:54px;border:2px solid var(--heap);background:var(--heap-bg);border-radius:5px;display:grid;place-items:center;font-family:var(--mono);font-size:.82rem}
+  .pframe.empty{border-style:dashed;color:var(--faint);background:transparent}
+  .faultlog{font-family:var(--mono);font-size:.78rem;background:#1E2A26;color:#CFE3D6;border-radius:6px;padding:10px 14px;min-height:5.4em;margin-top:8px;white-space:pre-wrap}
+  .counters{font-family:var(--disp);font-size:.85rem;display:flex;gap:16px;margin-top:8px}
+  .counters span b{color:var(--rust)}
+
+  /* ---------- ladder ---------- */
+  ol.ladder{list-style:none;counter-reset:rung}
+  ol.ladder li{counter-increment:rung;position:relative;padding:10px 0 10px 52px;border-bottom:1px dashed var(--line)}
+  ol.ladder li::before{content:counter(rung);position:absolute;left:8px;top:10px;width:28px;height:28px;border:1.5px solid var(--ink);
+    border-radius:50%;display:grid;place-items:center;font-family:var(--disp);font-size:.85rem;background:#fff}
+  ol.ladder code{background:#EDF1EB;padding:1px 6px;border-radius:3px;font-size:.84rem}
+
+  footer{margin-top:60px;border-top:3px solid var(--ink);padding:26px 0 50px;font-size:.9rem;color:var(--faint)}
+  .small{font-size:.82rem;color:var(--faint)}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="eyebrow">Week 2 · Memory Management · A Hands-On Lab</div>
+    <h1>Every value has exactly <span class="ox">one owner</span>.<br>Everything else follows.</h1>
+    <p class="lede">C trusts you to free memory. Java hires a janitor to do it at runtime. Rust does something stranger: it proves at <em>compile time</em> that memory is freed exactly once, at exactly the right moment. This lab lets you push the buttons and watch it happen.</p>
+    <div class="rules">
+      <div class="rule"><b>Rule 1</b> — every value has an owner</div>
+      <div class="rule"><b>Rule 2</b> — only one owner at a time</div>
+      <div class="rule"><b>Rule 3</b> — owner leaves scope ⇒ value is dropped</div>
+    </div>
+  </div>
+</header>
+
+<nav class="chips" aria-label="Sections">
+  <div class="wrap">
+    <a href="#why">1 · The problem</a>
+    <a href="#strategies">2 · Three strategies</a>
+    <a href="#bench">3 · Ownership bench</a>
+    <a href="#borrow">4 · Borrow checker</a>
+    <a href="#ref">5 · ref</a>
+    <a href="#vm">6 · Zoom out: VM</a>
+    <a href="#quiz">7 · Predict the compiler</a>
+    <a href="#practice">8 · Practice ladder</a>
+  </div>
+</nav>
+
+<!-- ============ 1 THE PROBLEM ============ -->
+<section id="why">
+  <div class="wrap">
+    <div class="entry"><span class="tag">ENTRY 01</span><h2>The problem nobody escapes</h2><span class="src">from: 01-intro, 03-approaches</span></div>
+    <p>Every program needs memory; the only question is <em>who returns it, and when</em>. Get the timing wrong and you don't get a polite error — you get one of these three classics. Rust's entire ownership system exists to make all three <strong>impossible to compile</strong>.</p>
+    <div class="bugs">
+      <div class="bug">
+        <h3>use-after-free</h3>
+        <p>You return a book to the library, then keep reading it on the bus. Someone else has checked it out — now you're both scribbling in the same margins.</p>
+        <div class="who">memory freed, then read</div>
+      </div>
+      <div class="bug">
+        <h3>double free</h3>
+        <p>You return the same book twice. The librarian's records are now corrupted, and the next person's checkout is built on lies.</p>
+        <div class="who">memory freed twice</div>
+      </div>
+      <div class="bug">
+        <h3>memory leak</h3>
+        <p>You never return the book at all. One book is fine. A long-running server "borrowing" books for six months empties the library.</p>
+        <div class="who">memory never freed</div>
+      </div>
+    </div>
+    <div class="callout"><strong>Hold this question</strong> while you scroll: <em>could a compiler catch these bugs before the program ever runs?</em> C says no. Java dodges the question. Rust's answer is the rest of this page.</div>
+  </div>
+</section>
+
+<!-- ============ 2 STRATEGIES ============ -->
+<section id="strategies">
+  <div class="wrap">
+    <div class="entry"><span class="tag">ENTRY 02</span><h2>Three answers to "who frees the memory?"</h2><span class="src">from: 03-approaches</span></div>
+    <table class="strat">
+      <thead><tr><th></th><th>Manual (C / C++)</th><th>Garbage collected (Java / Python)</th><th>Ownership (Rust)</th></tr></thead>
+      <tbody>
+        <tr><td class="rowh">who frees</td><td>You, by hand (<code>free</code>)</td><td>A runtime janitor, eventually</td><td class="own">The compiler inserts the free for you</td></tr>
+        <tr><td class="rowh">when</td><td>Whenever you remember</td><td>Whenever the GC feels like pausing</td><td class="own">The instant the owner leaves scope — deterministic</td></tr>
+        <tr><td class="rowh">cost</td><td>Your sanity (bugs above)</td><td>CPU + unpredictable pauses</td><td class="own">Arguing with the borrow checker while you learn</td></tr>
+        <tr><td class="rowh">bugs caught</td><td>At 3 a.m. in production</td><td>Leaks mostly handled; data races not</td><td class="own">At compile time, before the program exists</td></tr>
+      </tbody>
+    </table>
+    <p class="note" style="margin-top:10px">Rust isn't "manual" and isn't "GC" — it's a third category: the rules a careful C programmer follows in their head, promoted to compiler-enforced law.</p>
+  </div>
+</section>
+
+<!-- ============ 3 OWNERSHIP BENCH ============ -->
+<section id="bench">
+  <div class="wrap">
+    <div class="entry"><span class="tag">ENTRY 03</span><h2>The ownership bench</h2><span class="src">from: 04-ownership · stack/heap from 03</span></div>
+    <p>Step through real code and watch both regions of memory. The <span style="color:var(--stack);font-weight:700">stack</span> is a tower of trays — last in, first out, sizes known up front. The <span style="color:var(--heap);font-weight:700">heap</span> is a coat check — any size, any time, but somebody must remember to claim the coat. A <code>String</code> lives in both: the claim ticket on the stack, the coat on the heap.</p>
+    <p class="note"><strong>Before each step, predict:</strong> what changes on the stack? On the heap? Then press the button and check yourself.</p>
+    <div class="cols" style="margin-top:14px">
+      <div class="card">
+        <pre class="code" id="benchCode"></pre>
+        <div class="btnrow">
+          <button id="bPrev">◀ Back</button>
+          <button id="bNext" class="primary">Step ▶</button>
+          <button id="bReset">Reset</button>
+        </div>
+        <div class="stepnote" id="benchNote">Press <b>Step</b> to push <code>main</code>'s frame onto the stack.</div>
+      </div>
+      <div class="card">
+        <div class="bench">
+          <div class="memcol stackc"><h4><span>Stack</span><span>↑ grows</span></h4><div id="stackView"></div></div>
+          <div class="memcol heapc"><h4><span>Heap</span><span>coat check</span></h4><div id="heapView"></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="callout">The move at line 4 is the whole ballgame: the claim ticket is handed to <code>grow</code>, and <code>s</code> is stamped <span class="stamp">moved</span>. There is never a moment with two valid tickets for one coat — which is exactly why double frees can't happen.</div>
+  </div>
+</section>
+
+<!-- ============ 4 BORROW CHECKER ============ -->
+<section id="borrow">
+  <div class="wrap">
+    <div class="entry"><span class="tag">ENTRY 04</span><h2>Be the borrow checker</h2><span class="src">from: 05-borrowing</span></div>
+    <p>Moving ownership everywhere would be exhausting, so Rust lets you <em>lend</em> a value: <code>&amp;x</code> is a reading pass, <code>&amp;mut x</code> is an editing pass. One law governs the whole library:</p>
+    <div class="lawline">📜 At any moment: <strong>many readers</strong> <em>or</em> <strong>one writer</strong> — never both.</div>
+    <p style="margin-top:12px">Try to break it. The verdicts below are the real error codes rustc would give you.</p>
+    <div class="cols" style="margin-top:12px">
+      <div class="card">
+        <div class="btnrow">
+          <button id="addR" class="primary">+ &amp;x &nbsp;(reader)</button>
+          <button id="addW" class="primary">+ &amp;mut x &nbsp;(writer)</button>
+          <button id="endB">End all borrows</button>
+        </div>
+        <div class="verdict ok" id="verdict">No borrows yet. x is free as a bird.</div>
+        <p class="small" style="margin-top:10px">Real-world nuance: since 2018, a borrow ends at its <em>last use</em>, not at the closing brace. So readers that are finished quietly leave the room before a writer arrives. (This trips up older tutorials — see quiz Q3.)</p>
+      </div>
+      <div class="card">
+        <div class="vault">
+          <div class="valuebox">let mut x = 5</div>
+          <div class="badges" id="badges"><span class="note">no active borrows</span></div>
+        </div>
+        <p class="note">Why this law? Because "two people editing one Google Doc with no sync" is a data race. Rust refuses to compile the race instead of debugging it later.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 5 REF ============ -->
+<section id="ref">
+  <div class="wrap">
+    <div class="entry"><span class="tag">ENTRY 05</span><h2><code>ref</code>: borrowing inside a pattern</h2><span class="src">from: 06-ref-keyword</span></div>
+    <div class="cols">
+      <div class="card">
+        <p><code>match</code> normally <em>moves</em> non-Copy values into its arms. <code>ref</code> says "bind a reference instead" — same idea as <code>&amp;</code>, but written on the <em>pattern</em> side of the <code>=</code> instead of the value side.</p>
+        <pre class="code"><span class="ln"><span class="kw">let</span> name = String::from(<span class="cm">"Alice"</span>);</span><span class="ln"><span class="kw">match</span> name {</span><span class="ln">    <span class="kw">ref</span> n =&gt; println!(<span class="cm">"{n}"</span>), <span class="cm">// borrows</span></span><span class="ln">}</span><span class="ln">println!(<span class="cm">"{name}"</span>); <span class="cm">// still alive ✓</span></span></pre>
+      </div>
+      <div class="card">
+        <p><strong>Honest footnote:</strong> modern Rust's "match ergonomics" (2018+) auto-borrow when you match on <code>&amp;name</code>, so day-to-day code rarely writes <code>ref</code> anymore. Teach it as a decoder ring for older code and a precision tool — not a daily driver.</p>
+        <p class="note" style="margin-top:8px">Mental hook: <code>&amp;</code> creates a reference to a <em>value</em>; <code>ref</code> requests a reference from a <em>pattern</em>. Same coat-check ticket, issued at a different window.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 6 VIRTUAL MEMORY ============ -->
+<section id="vm">
+  <div class="wrap">
+    <div class="entry"><span class="tag">ENTRY 06</span><h2>Zoom out: where does the heap even come from?</h2><span class="src">from: 01-intro, 02-virtual-memory</span></div>
+    <p>Everything above happened inside <em>one process's</em> address space — a polite fiction maintained by the OS. Your program sees a vast private street of addresses; the OS maps the few addresses you actually touch onto scarce physical RAM, one page at a time. Touch a page that isn't resident and you get a <strong>page fault</strong>: the OS pauses you, fetches the page, and resumes as if nothing happened.</p>
+    <p class="note" style="margin:8px 0 4px"><strong>Click virtual pages</strong> to access them. 3 physical frames, 6 virtual pages, least-recently-used eviction. Try to discover an access pattern that never faults after warm-up — then one that <em>always</em> faults (that pathological case is called thrashing).</p>
+    <div class="card" style="margin-top:10px">
+      <div><span class="small" style="font-family:var(--disp);letter-spacing:.1em;text-transform:uppercase">Virtual pages (your program's view)</span></div>
+      <div class="pages" id="pages"></div>
+      <div><span class="small" style="font-family:var(--disp);letter-spacing:.1em;text-transform:uppercase">Physical frames (reality)</span></div>
+      <div class="frames" id="framesView"></div>
+      <div class="counters"><span>Hits: <b id="hits">0</b></span><span>Faults: <b id="faults">0</b></span><button id="vmReset" style="margin-left:auto">Reset</button></div>
+      <div class="faultlog" id="faultlog">— click a page —</div>
+    </div>
+    <div class="callout"><strong>Connection back to Rust:</strong> the heap is "slow" partly because allocation may wander through this machinery, and cache/page locality is why one contiguous <code>[u8; N]</code> frame buffer (your week 1 graphics code!) beats a tangle of pointers. Stack frames, by contrast, are almost always hot in cache — that's the performance story behind "prefer the stack."</div>
+  </div>
+</section>
+
+<!-- ============ 7 QUIZ ============ -->
+<section id="quiz">
+  <div class="wrap">
+    <div class="entry"><span class="tag">ENTRY 07</span><h2>Predict the compiler</h2><span class="src">all files · every answer verified with rustc 1.75</span></div>
+    <p>The real skill isn't writing Rust — it's predicting what rustc will say before it says it. Commit to an answer, <em>then</em> reveal. A wrong confident guess teaches you more than a right timid one.</p>
+    <div id="quizBox" style="margin-top:14px"></div>
+    <div class="scorebar" id="score">Score: 0 / 0</div>
+  </div>
+</section>
+
+<!-- ============ 8 PRACTICE ============ -->
+<section id="practice">
+  <div class="wrap">
+    <div class="entry"><span class="tag">ENTRY 08</span><h2>Practice ladder</h2><span class="src">from: 07-practice, 08-assignment</span></div>
+    <p>Climb in order; each rung uses only what's below it. If a rung feels easy, say <em>out loud</em> why the borrow checker accepts your code — if you can't narrate it, you got lucky, not fluent.</p>
+    <ol class="ladder">
+      <li><strong>Narrate the bench.</strong> Re-run Entry 03 and narrate every step without reading the notes. (Free competence check, zero code.)</li>
+      <li><strong>concat_strings</strong> — borrow two <code>&amp;String</code>s, return a new <code>String</code>. Question to answer: why must the return value be owned, not borrowed?</li>
+      <li><strong>clone_and_modify</strong> — prove the original survives. When is <code>clone()</code> the right call vs. a cop-out?</li>
+      <li><strong>sum / sum_with_step</strong> — mutate through <code>&amp;mut i32</code>. Notice: the function returns nothing; the <em>side effect travels through the reference</em>.</li>
+      <li><strong>most_frequent_word</strong> — the boss fight: <code>&amp;str</code> slices, ownership of the returned <code>String</code>, and loops, no HashMap allowed.</li>
+      <li><strong>Design twist (beyond the handout):</strong> change <code>sum_with_step</code> to <em>return</em> an <code>i32</code> instead of using <code>&amp;mut</code>. Which API is better Rust style, and why? (Opinion question — defend either side.)</li>
+    </ol>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <p>Built as a companion to your week 2 notes (files 01–08). Compiler claims verified against rustc 1.75. The library-book, coat-check, and Google-Doc analogies are load-bearing — steal them for lecture.</p>
+  </div>
+</footer>
+
+<script>
+/* ================= ownership bench ================= */
+const CODE = [
+ 'fn main() {',
+ '    let a = 7;',
+ '    let s = String::from("hi");',
+ '    let t = grow(s);',
+ '    println!("{t}");',
+ '}',
+ 'fn grow(mut w: String) -> String {',
+ '    w.push(\'!\');',
+ '    w',
+ '}'
+];
+/* each step: {hl, note, stack:[{f, vars:[[name,val,kind,moved]]}], heap:[[id,val,freed]]} ; kind: 'v'|'p' */
+const STEPS = [
+ {hl:0, note:'<b>main</b>\u2019s frame is pushed onto the stack. Nothing owned yet.',
+  stack:[{f:'main()',vars:[]}], heap:[]},
+ {hl:1, note:'<code>a = 7</code> — an integer\u2019s size is known at compile time, so it lives entirely <b>in the frame</b>. No heap involved.',
+  stack:[{f:'main()',vars:[['a','7','v',0]]}], heap:[]},
+ {hl:2, note:'<code>String::from</code> rents heap space for the bytes. The stack holds only the <b>claim ticket</b> (pointer + len + capacity). <code>s</code> is the owner.',
+  stack:[{f:'main()',vars:[['a','7','v',0],['s','\u2776','p',0]]}], heap:[['\u2776','"hi"',0]]},
+ {hl:3, note:'Calling <code>grow(s)</code> <b>moves</b> ownership: the ticket is handed to <code>w</code> in a new frame. <code>s</code> is stamped moved — using it now is a compile error (E0382), not a runtime crash.',
+  stack:[{f:'main()',vars:[['a','7','v',0],['s','\u2776','p',1]]},{f:'grow()',vars:[['w','\u2776','p',0]]}], heap:[['\u2776','"hi"',0]]},
+ {hl:7, note:'<code>w.push(\'!\')</code> mutates the heap bytes through the one-and-only owner. No copy was ever made — moving a String never copies the coat, only the ticket.',
+  stack:[{f:'main()',vars:[['a','7','v',0],['s','\u2776','p',1]]},{f:'grow()',vars:[['w','\u2776','p',0]]}], heap:[['\u2776','"hi!"',0]]},
+ {hl:8, note:'<code>w</code> is the last expression — ownership <b>moves out</b> as the return value. <code>grow</code>\u2019s frame pops; nothing is dropped because <code>w</code> no longer owns anything.',
+  stack:[{f:'main()',vars:[['a','7','v',0],['s','\u2776','p',1],['t','\u2776','p',0]]}], heap:[['\u2776','"hi!"',0]]},
+ {hl:4, note:'<code>println!</code> only <b>borrows</b> <code>t</code> for a moment. Output: <code>hi!</code>',
+  stack:[{f:'main()',vars:[['a','7','v',0],['s','\u2776','p',1],['t','\u2776','p',0]]}], heap:[['\u2776','"hi!"',0]]},
+ {hl:5, note:'<code>main</code> ends. Its owner <code>t</code> leaves scope \u21D2 Rust inserts <code>drop</code> \u21D2 heap block \u2776 is <b>freed exactly once</b>. That compiler-inserted free is Rule 3 — and the whole trick.',
+  stack:[], heap:[['\u2776','"hi!"',1]]}
+];
+let bi = -1;
+const codeEl = document.getElementById('benchCode'),
+      stackEl = document.getElementById('stackView'),
+      heapEl = document.getElementById('heapView'),
+      noteEl = document.getElementById('benchNote');
+function renderCode(hl){
+  codeEl.innerHTML = CODE.map((l,i)=>'<span class="ln'+(i===hl?' hl':'')+'">'+(i+1+'').padStart(2,' ')+'  '+l.replace(/</g,'&lt;')+'</span>').join('');
+}
+function renderBench(){
+  const st = bi>=0 ? STEPS[bi] : {stack:[],heap:[]};
+  renderCode(bi>=0?st.hl:-1);
+  stackEl.innerHTML = st.stack.slice().reverse().map(fr=>
+    '<div class="frame"><div class="fname">'+fr.f+'</div>'+
+    fr.vars.map(v=>'<div class="vrow'+(v[3]?' moved':'')+'"><span class="vn">'+v[0]+'</span>'+
+      '<span class="vbox">'+(v[2]==='p'?'<span class="ptr">\u2192 '+v[1]+'</span>':v[1])+'</span>'+
+      (v[3]?'<span class="stamp">moved</span>':'')+'</div>').join('')+
+    '</div>').join('') || '<p class="note">stack empty</p>';
+  heapEl.innerHTML = st.heap.map(h=>
+    '<div class="hblock'+(h[2]?' freed':'')+'"><span class="hid">'+h[0]+'</span><span class="hval">'+h[1]+'</span>'+(h[2]?'<span class="stamp">freed</span>':'')+'</div>'
+  ).join('') || '<p class="note">heap empty</p>';
+  if(bi>=0) noteEl.innerHTML = STEPS[bi].note;
+  else noteEl.innerHTML = 'Press <b>Step</b> to push <code>main</code>\u2019s frame onto the stack.';
+  document.getElementById('bPrev').disabled = bi<0;
+  document.getElementById('bNext').disabled = bi>=STEPS.length-1;
+}
+document.getElementById('bNext').onclick = ()=>{ if(bi<STEPS.length-1){bi++;renderBench();} };
+document.getElementById('bPrev').onclick = ()=>{ if(bi>=0){bi--;renderBench();} };
+document.getElementById('bReset').onclick = ()=>{ bi=-1; renderBench(); };
+renderBench();
+
+/* ================= borrow game ================= */
+let readers=0, writer=false;
+const badges=document.getElementById('badges'), verdict=document.getElementById('verdict');
+function renderBorrow(msg, ok){
+  let h='';
+  for(let i=0;i<readers;i++) h+='<span class="badge r">&amp;x reader '+(i+1)+'</span>';
+  if(writer) h+='<span class="badge w">&amp;mut x WRITER</span>';
+  badges.innerHTML = h || '<span class="note">no active borrows</span>';
+  verdict.textContent = msg;
+  verdict.className = 'verdict ' + (ok?'ok':'bad');
+}
+document.getElementById('addR').onclick=()=>{
+  if(writer){ renderBorrow('error[E0502]: cannot borrow `x` as immutable\nbecause it is also borrowed as mutable\n\nThe writer holds an exclusive editing pass. Readers must wait until it\u2019s done.', false); }
+  else { readers++; renderBorrow('ok \u2713  '+readers+' reader'+(readers>1?'s':'')+' active.\nReaders can\u2019t step on each other — nobody is editing.', true); }
+};
+document.getElementById('addW').onclick=()=>{
+  if(writer){ renderBorrow('error[E0499]: cannot borrow `x` as mutable\nmore than once at a time\n\nTwo editing passes = two people typing over each other. Denied.', false); }
+  else if(readers>0){ renderBorrow('error[E0502]: cannot borrow `x` as mutable\nbecause it is also borrowed as immutable\n\nA writer would change the page mid-sentence for '+readers+' reader'+(readers>1?'s':'')+'. Denied.', false); }
+  else { writer=true; renderBorrow('ok \u2713  one writer holds exclusive access.\nIt can mutate freely — provably nobody is watching.', true); }
+};
+document.getElementById('endB').onclick=()=>{ readers=0; writer=false; renderBorrow('All borrows ended (in real code: last use reached). x is free again.', true); };
+
+/* ================= quiz ================= */
+const QS = [
+ {code:'let s1 = String::from("hi");\nlet s2 = s1;\nprintln!("{}", s1);',
+  ok:false,
+  why:'error[E0382]: borrow of moved value. `s2 = s1` moved the claim ticket; `s1` is stamped. If both compiled, both would drop the same heap block — a double free. The error IS the safety.'},
+ {code:'let x = 5;\nlet y = x;\nprintln!("{x} {y}");',
+  ok:true,
+  why:'Compiles. Integers are Copy types: they live entirely on the stack, so assignment duplicates the bits. Two independent 5s, nothing to double-free. Move semantics only bite for heap-owning types.'},
+ {code:'let mut s = String::from("hi");\nlet r1 = &s;\nlet r2 = &s;\nprintln!("{r1} {r2}");\nlet w = &mut s;\nw.push(\'!\');',
+  ok:true,
+  why:'Compiles! (Verified on rustc 1.75.) Surprised? Since 2018, a borrow ends at its LAST USE, not the closing brace. r1 and r2 retire after the println, so the writer arrives in an empty room. Note: your course notes\u2019 \u00a78.1 example predates this rule — compile it and see.'},
+ {code:'let mut s = String::from("hi");\nlet w = &mut s;\nlet r = &s;\nprintln!("{w}");',
+  ok:false,
+  why:'error[E0502]. The writer w is still live (used in the println) when reader r is created. One writer XOR many readers — this overlaps them, so it\u2019s refused.'},
+ {code:'fn make() -> &String {\n    let s = String::from("hi");\n    &s\n}',
+  ok:false,
+  why:'error[E0106]: missing lifetime specifier — but the deeper crime is returning a reference to s, which is dropped when make() ends. A claim ticket for a coat that\u2019s already been incinerated. Fix: return the owned String and move it out.'}
+];
+let answered=0, correct=0;
+const quizBox=document.getElementById('quizBox'), scoreEl=document.getElementById('score');
+QS.forEach((q,i)=>{
+  const d=document.createElement('div'); d.className='q card';
+  d.innerHTML='<div class="qhead">Question '+(i+1)+' of '+QS.length+'</div>'+
+   '<pre class="code">'+q.code.split('\n').map(l=>'<span class="ln">'+l.replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</span>').join('')+'</pre>'+
+   '<div class="btnrow"><button data-a="1" class="primary">Compiles</button><button data-a="0" class="primary">Does not compile</button></div>'+
+   '<div class="why"></div>';
+  d.querySelectorAll('button').forEach(b=>{
+    b.onclick=()=>{
+      if(d.classList.contains('answered'))return;
+      d.classList.add('answered'); answered++;
+      const guess = b.dataset.a==='1';
+      const right = guess===q.ok;
+      if(right) correct++;
+      const w=d.querySelector('.why');
+      w.className='why '+(right?'ok':'bad');
+      w.innerHTML='<strong>'+(right?'\u2713 Correct':'\u2717 Not quite')+' — it '+(q.ok?'compiles.':'does not compile.')+'</strong> '+q.why;
+      d.querySelectorAll('button').forEach(x=>x.disabled=true);
+      scoreEl.textContent='Score: '+correct+' / '+answered+(answered===QS.length?(correct===QS.length?'  — clean compile! 🎉':'  — recompile the misses above'):'');
+    };
+  });
+  quizBox.appendChild(d);
+});
+
+/* ================= page fault sim ================= */
+const NPAGES=6, NFRAMES=3;
+let frames, clock, hits, faults;
+const pagesEl=document.getElementById('pages'), framesEl=document.getElementById('framesView'),
+      logEl=document.getElementById('faultlog'), hitsEl=document.getElementById('hits'), faultsEl=document.getElementById('faults');
+function vmInit(){
+  frames = new Array(NFRAMES).fill(null); /* {page, last} */
+  clock=0; hits=0; faults=0;
+  logEl.textContent='— click a page —';
+  vmRender();
+}
+function vmRender(){
+  pagesEl.innerHTML='';
+  for(let p=0;p<NPAGES;p++){
+    const inMem = frames.some(f=>f&&f.page===p);
+    const b=document.createElement('button');
+    b.className='page'+(inMem?' in':''); b.textContent='P'+p+(inMem?' \u2713':'');
+    b.onclick=()=>vmAccess(p);
+    pagesEl.appendChild(b);
+  }
+  framesEl.innerHTML = frames.map((f,i)=>'<div class="pframe'+(f?'':' empty')+'">'+(f?('F'+i+': P'+f.page):('F'+i+' —'))+'</div>').join('');
+  hitsEl.textContent=hits; faultsEl.textContent=faults;
+}
+function vmAccess(p){
+  clock++;
+  const f = frames.find(f=>f&&f.page===p);
+  if(f){ f.last=clock; hits++; logEl.textContent='P'+p+' \u2192 HIT. Already resident; the MMU translates instantly. (~nanoseconds)'; }
+  else{
+    faults++;
+    let slot = frames.findIndex(x=>x===null);
+    let evicted=null;
+    if(slot===-1){
+      slot=0;
+      for(let i=1;i<NFRAMES;i++) if(frames[i].last<frames[slot].last) slot=i;
+      evicted=frames[slot].page;
+    }
+    frames[slot]={page:p,last:clock};
+    logEl.textContent='P'+p+' \u2192 PAGE FAULT. OS pauses the program, '+(evicted!==null?('evicts P'+evicted+' (least recently used), '):'')+'loads P'+p+' from disk into F'+slot+', updates the page table, resumes. (~milliseconds — a million\u00d7 slower than a hit)';
+  }
+  vmRender();
+}
+document.getElementById('vmReset').onclick=vmInit;
+vmInit();
+</script>
+</body>
+</html>
