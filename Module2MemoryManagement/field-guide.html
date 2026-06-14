@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>A Field Guide to Working a Problem</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#EAEEF0;
+    --card:#F7F9FA;
+    --ink:#191C1F;
+    --ink-soft:#59636B;
+    --rule:#CDD5D9;
+    --accent:#136F66;       /* pen teal */
+    --accent-deep:#0C534C;
+    --mark:#F4D35E;         /* highlighter */
+    --mark-wash:rgba(244,211,94,.42);
+    --maxw:980px;
+    --serif:"Source Serif 4",Georgia,serif;
+    --disp:"Space Grotesk",system-ui,sans-serif;
+    --mono:"Space Mono","SFMono-Regular",ui-monospace,monospace;
+  }
+
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0;
+    background-color:var(--paper);
+    background-image:radial-gradient(var(--rule) 0.8px, transparent 0.8px);
+    background-size:22px 22px;
+    background-position:-11px -11px;
+    color:var(--ink);
+    font-family:var(--serif);
+    font-size:18px;
+    line-height:1.62;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}
+
+  /* ---------- type ---------- */
+  h1,h2,h3,.eyebrow,.chip,.phase-num,.tracecell,.movetitle{font-family:var(--disp)}
+  .eyebrow{
+    font-size:13px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--accent);font-weight:500;margin:0 0 14px;
+  }
+  h1{
+    font-weight:700;font-size:clamp(2.2rem,5.4vw,3.7rem);line-height:1.04;
+    letter-spacing:-.015em;margin:0 0 18px;
+  }
+  h1 .soft{color:var(--ink-soft);font-weight:400}
+  .lede{font-size:clamp(1.05rem,2.3vw,1.28rem);color:var(--ink-soft);max-width:60ch;margin:0}
+  h2{font-family:var(--disp);font-weight:500;font-size:clamp(1.5rem,3.6vw,2.05rem);letter-spacing:-.01em;margin:0 0 10px}
+  a{color:var(--accent)}
+
+  /* ---------- hero ---------- */
+  header{padding:84px 0 36px;position:relative}
+  .hero-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:40px;align-items:center}
+  @media(max-width:760px){.hero-grid{grid-template-columns:1fr;gap:8px}}
+  .spiral-box{position:relative}
+  .spiral-box svg{width:100%;height:auto;overflow:visible}
+  .spiral-path{fill:none;stroke:var(--rule);stroke-width:1.4}
+  .spiral-live{fill:none;stroke:var(--accent);stroke-width:2.2;stroke-linecap:round}
+  .node circle{fill:var(--card);stroke:var(--accent);stroke-width:2}
+  .node text{font-family:var(--mono);font-size:11px;fill:var(--ink);letter-spacing:.02em}
+  .node .ph-n{font-family:var(--disp);font-weight:700;font-size:13px;fill:var(--accent)}
+  .runner{fill:var(--accent)}
+  .carry{font-family:var(--mono);font-size:10.5px;fill:var(--ink-soft);letter-spacing:.04em}
+
+  /* ---------- trace strip (signature) ---------- */
+  .trace{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 2px}
+  .tracecell{
+    font-family:var(--mono);font-size:14px;
+    min-width:38px;height:38px;display:grid;place-items:center;
+    border:1.5px solid var(--rule);border-radius:7px;background:var(--card);
+    color:var(--ink-soft);opacity:.35;transform:translateY(4px);
+    transition:opacity .4s ease,transform .4s ease,border-color .4s ease,color .4s ease;
+  }
+  .trace.lit .tracecell{opacity:1;transform:none}
+  .trace.lit .tracecell.hit{border-color:var(--accent);color:var(--accent);box-shadow:0 0 0 3px rgba(19,111,102,.10)}
+  .trace .annot{align-self:center;font-family:var(--mono);font-size:12px;color:var(--ink-soft);opacity:0;transition:opacity .5s ease .35s}
+  .trace.lit .annot{opacity:1}
+
+  /* ---------- intro band ---------- */
+  .intro{padding:8px 0 30px}
+  .intro p{max-width:64ch}
+  .rule-row{display:flex;align-items:center;gap:14px;margin:34px 0;color:var(--ink-soft);font-family:var(--mono);font-size:12px;letter-spacing:.06em}
+  .rule-row::before,.rule-row::after{content:"";height:1px;background:var(--rule);flex:1}
+
+  /* ---------- phases ---------- */
+  .phase{padding:30px 0 8px;scroll-margin-top:20px}
+  .phase-head{display:flex;align-items:baseline;gap:16px;border-bottom:1.5px solid var(--ink);padding-bottom:14px;margin-bottom:8px}
+  .phase-num{font-weight:700;font-size:clamp(1.4rem,3vw,1.9rem);color:var(--accent);line-height:1}
+  .phase-for{color:var(--ink-soft);font-style:italic;margin:14px 0 24px;max-width:66ch}
+  .tier-label{font-family:var(--mono);font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft);margin:18px 0 12px;display:flex;align-items:center;gap:10px}
+  .tier-label::after{content:"";flex:1;height:1px;background:var(--rule)}
+
+  .moves{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:680px){.moves{grid-template-columns:1fr}}
+  .move{
+    position:relative;background:var(--card);border:1.5px solid var(--rule);border-radius:12px;
+    padding:18px 18px 14px;overflow:hidden;transition:border-color .25s ease,transform .25s ease;
+  }
+  .move:hover{transform:translateY(-2px)}
+  .move.mine{border-color:var(--accent)}
+  .move .wash{position:absolute;inset:0;background:var(--mark-wash);transform:scaleX(0);transform-origin:left;transition:transform .42s cubic-bezier(.2,.7,.2,1);pointer-events:none;z-index:0;mix-blend-mode:multiply}
+  .move.mine .wash{transform:scaleX(1)}
+  .move > *{position:relative;z-index:1}
+  .movetitle{font-weight:500;font-size:1.06rem;line-height:1.25;margin:0 0 6px;letter-spacing:-.005em}
+  .move p{margin:0 0 12px;font-size:.95rem;color:var(--ink-soft);line-height:1.5}
+  .move .eg{font-family:var(--mono);font-size:12px;color:var(--ink);background:rgba(19,111,102,.07);border-left:2.5px solid var(--accent);padding:7px 10px;border-radius:0 6px 6px 0;margin:0 0 14px;display:block}
+  .chips{display:flex;gap:8px;flex-wrap:wrap}
+  .chip{
+    font-size:12px;letter-spacing:.02em;border:1.4px solid var(--rule);background:transparent;color:var(--ink-soft);
+    padding:6px 11px;border-radius:20px;cursor:pointer;font-weight:500;transition:all .18s ease;
+  }
+  .chip:hover{border-color:var(--accent);color:var(--accent)}
+  .chip[aria-pressed="true"].mine-chip{background:var(--mark);border-color:var(--mark);color:#3a2e00}
+  .chip[aria-pressed="true"].try-chip{background:var(--accent);border-color:var(--accent);color:#fff}
+  .chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+  .discuss{margin:26px 0 6px;background:transparent;border:1.5px dashed var(--rule);border-radius:12px;padding:16px 18px}
+  .discuss .d-lab{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin:0 0 6px}
+  .discuss p{margin:0;font-size:1rem}
+
+  /* ---------- travel section ---------- */
+  .travel{padding:46px 0 8px}
+  .travel .three{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:22px}
+  @media(max-width:680px){.travel .three{grid-template-columns:1fr}}
+  .costume{background:var(--card);border:1.5px solid var(--rule);border-radius:12px;padding:16px}
+  .costume h3{font-family:var(--disp);font-weight:500;font-size:1rem;margin:0 0 10px}
+  .costume .cap{font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);margin:10px 0 0}
+
+  /* ---------- pick one ---------- */
+  .pickone{margin:50px 0;padding:32px 28px;border:2px solid var(--ink);border-radius:16px;background:var(--card)}
+  .pickone h2{margin-bottom:6px}
+  .pickone .sub{color:var(--ink-soft);margin:0 0 20px;max-width:60ch}
+  #tryList{list-style:none;padding:0;margin:0 0 8px;display:grid;gap:10px}
+  #tryList li{
+    display:flex;align-items:center;gap:12px;padding:12px 14px;border:1.5px solid var(--rule);border-radius:10px;
+    background:var(--paper);cursor:pointer;font-size:.98rem;transition:all .2s ease;
+  }
+  #tryList li:hover{border-color:var(--accent)}
+  #tryList li.starred{border-color:var(--mark);background:linear-gradient(0deg,var(--mark-wash),var(--mark-wash)),var(--paper)}
+  #tryList li .star{font-family:var(--disp);font-weight:700;color:var(--rule);font-size:1.1rem;width:18px;text-align:center}
+  #tryList li.starred .star{color:#b78a00}
+  .empty{font-style:italic;color:var(--ink-soft);font-size:.98rem;margin:0}
+  .confirm{margin:14px 0 0;font-family:var(--mono);font-size:13px;color:var(--accent);min-height:20px}
+  .reset{margin-top:18px;background:transparent;border:1.4px solid var(--rule);color:var(--ink-soft);font-family:var(--mono);font-size:12px;padding:7px 13px;border-radius:8px;cursor:pointer}
+  .reset:hover{border-color:var(--ink-soft)}
+
+  footer{padding:40px 0 70px;color:var(--ink-soft);font-family:var(--mono);font-size:12.5px;border-top:1px solid var(--rule);margin-top:30px}
+
+  @media(prefers-reduced-motion:reduce){
+    *{animation:none!important;transition:none!important}
+    html{scroll-behavior:auto}
+    .trace .tracecell{opacity:1;transform:none}
+    .trace .annot{opacity:1}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap hero-grid">
+    <div>
+      <p class="eyebrow">Some field notes</p>
+      <h1>The best part of a hard problem<br><span class="soft">is usually the part</span><br>where you're still stuck.</h1>
+      <p class="lede">These are some of the things people actually do when they work a problem out. You're probably doing half of them already without thinking about it. The rest are here in case they turn out to be useful to you. None of it is a rule.</p>
+    </div>
+    <div class="spiral-box" aria-hidden="true">
+      <svg id="spiral" viewBox="0 0 360 320" role="img"></svg>
+    </div>
+  </div>
+</header>
+
+<section class="intro">
+  <div class="wrap">
+    <p>Here's something worth knowing early. Almost nobody reads a problem, sees the answer, and just types it in. What really happens is messier: you read it, you try the first thing that comes to mind, it doesn't quite work, and then you figure out why. That &ldquo;why&rdquo; is usually where the understanding actually shows up. The four parts below follow the shape you already work in: read it, try it, see how other people did it, then look back. Each one has a couple of extra things you can do. Read it on your own, or use it to compare notes with someone who solved the same problem a different way.</p>
+    <div class="rule-row">below: one real example, worked a step at a time</div>
+    <div class="trace" data-trace>
+      <span class="tracecell" data-hit>2</span>
+      <span class="tracecell">7</span>
+      <span class="tracecell" data-hit>11</span>
+      <span class="tracecell">15</span>
+      <span class="annot">&nbsp;&larr; when in doubt, run a real case. it sits underneath everything else here.</span>
+    </div>
+  </div>
+</section>
+
+<main class="wrap" id="phases"></main>
+
+<section class="travel">
+  <div class="wrap">
+    <p class="eyebrow">How an idea travels</p>
+    <h2>One idea, three problems that don't look alike</h2>
+    <p style="max-width:64ch;color:var(--ink-soft);margin:10px 0 0">Here's the nice thing. An idea you pick up on one problem doesn't stay put. Take this one: keep track of what you've already seen, so you never have to go back and look at it again. It quietly turns up in three problems that look completely unrelated at first.</p>
+    <div class="three">
+      <div class="costume">
+        <h3>Find two that sum to a target</h3>
+        <div class="trace" data-trace>
+          <span class="tracecell" data-hit>2</span><span class="tracecell">7</span><span class="tracecell">11</span>
+        </div>
+        <p class="cap">Instead of checking every pair, jot down the numbers you've already seen. One pass through.</p>
+      </div>
+      <div class="costume">
+        <h3>Biggest rise in a sequence</h3>
+        <div class="trace" data-trace>
+          <span class="tracecell" data-hit>54</span><span class="tracecell">50</span><span class="tracecell" data-hit>65</span>
+        </div>
+        <p class="cap">Don't compare every pair. Just hang onto the smallest value you've seen so far.</p>
+      </div>
+      <div class="costume">
+        <h3>Matching brackets</h3>
+        <div class="trace" data-trace>
+          <span class="tracecell" data-hit>(</span><span class="tracecell">[</span><span class="tracecell" data-hit>]</span>
+        </div>
+        <p class="cap">Keep whatever's still open in a small pile. The most recent one is what a closing bracket has to answer to.</p>
+      </div>
+    </div>
+    <p style="margin:22px 0 0;color:var(--ink-soft);font-size:.96rem;max-width:64ch">Same idea every time: <span class="eg" style="display:inline-block;padding:4px 9px">spend a little memory so you can throw away a whole loop</span>. The thing worth keeping was never the answer to any one of these problems. It's the idea itself, which you can carry straight to the next one.</p>
+  </div>
+</section>
+
+<section class="wrap">
+  <div class="pickone">
+    <p class="eyebrow" style="color:var(--ink)">One last thing</p>
+    <h2>Pick one.</h2>
+    <p class="sub">Anything you marked <strong>&ldquo;I'll try this&rdquo;</strong> collects here. You don't need all of them, and honestly you shouldn't try. Pick one to carry into your next problem and click it to star it. One change you actually use beats a long list you don't.</p>
+    <ul id="tryList"></ul>
+    <p class="empty" id="emptyMsg">Nothing marked yet. As you read, tap <strong>&ldquo;I'll try this&rdquo;</strong> on anything that looks worth a shot.</p>
+    <p class="confirm" id="confirmMsg"></p>
+    <button class="reset" id="resetBtn">clear my marks</button>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">None of this is a checklist. Take what's useful to you and leave the rest. Whatever you mark stays on this device, nowhere else.</div>
+</footer>
+
+<script>
+/* ----------------------------------------------------------
+   CONTENT
+---------------------------------------------------------- */
+const PHASES = [
+  {
+    n:"01", name:"Understand the problem",
+    forIt:"Get the whole problem into your head before you touch the keyboard. A misunderstanding you catch here costs you nothing. The same one caught after fifty lines of code costs you an afternoon.",
+    first:[
+      {t:"Say it back with the page closed", p:"Close the problem and say what it's asking in your own words. If you can't, you don't quite understand it yet, and now at least you know that.", eg:"\u201cFind two positions whose values add to the target.\u201d"},
+      {t:"Write down the given and the asked", p:"What are you handed to start with, and what are you supposed to hand back? Be specific about the shapes.", eg:"given: a list of ints + a target  \u2192  return: two positions"},
+    ],
+    deeper:[
+      {t:"Separate what's fixed from what's free", p:"Some things about the problem you're allowed to change, and some you're stuck with. Knowing which is which throws out bad ideas before they cost you time.", eg:"order matters here \u2192 so sorting is off the table"},
+      {t:"Work a tiny example by hand first", p:"Make up a small case and figure out the answer yourself, before you write any code. Then you've got something honest to check the code against later.", eg:"[2,7,11], target 9  \u2192  expect positions 0,1"},
+      {t:"Ask how many answers there are", p:"Could there be none? Exactly one? A whole pile of them? And are you even given enough to tell? Worth asking before you assume.", eg:"\u201cis one solution guaranteed, or should I handle zero?\u201d"},
+    ]
+  },
+  {
+    n:"02", name:"Try things",
+    forIt:"This is where you try things, and where you get stuck. Getting stuck isn't a problem to avoid. The wall tends to stand right where the idea you need is hiding, so don't rush past it.",
+    first:[
+      {t:"Write down the plain, obvious idea", p:"The first approach that comes to mind, even if it's slow or clumsy. Write it down anyway. You can't improve an idea that never left your head.", eg:"\u201ccheck every pair, keep the one that works\u201d"},
+      {t:"Walk it through your example", p:"Take that idea and run it over your small case by hand, one step at a time, and watch what it actually does.", eg:"pair(2,7)=9 \u2713 \u2026 stop"},
+    ],
+    deeper:[
+      {t:"Find the spot that feels wasteful", p:"Notice exactly where it feels like you're doing the same work over and over, and put it into words. That feeling is information.", eg:"\u201cI keep re-scanning the earlier items every step\u201d"},
+      {t:"Keep two ideas going at once", p:"Don't marry the first idea. Hold a second one next to it and let them compete for a bit before you pick.", eg:"brute pairs  vs.  remember-as-you-go"},
+      {t:"Go looking for what breaks it", p:"Hunt for the case that makes your idea fail, not the one that makes it pass. It's easy to fool yourself with an example you already know works. The one that breaks it is the one that teaches you something.", eg:"sorting passes [50,54,65]\u2026 but breaks on [60,50]"},
+      {t:"Notice what you keep recomputing", p:"If you find yourself working out the same thing again and again, that's usually a sign you could just remember it once instead.", eg:"\u201ccould I store what I've already seen?\u201d"},
+    ]
+  },
+  {
+    n:"03", name:"See how others solved it",
+    forIt:"Look at how other people solved it: your group, a tool, whoever. But there's a real difference between having someone's solution and understanding it. Only the second one is yours, and only the second one is still around next week.",
+    first:[
+      {t:"Write down their main idea", p:"Take a solution you found and put its core idea into a line or two of your own words.", eg:"\u201ctheirs pushes opens onto a pile, pops on close\u201d"},
+      {t:"Say how it differs from yours", p:"In one sentence, how is their idea different from what you were doing? Naming the difference is most of the value.", eg:"\u201cmine re-scanned; theirs just remembers\u201d"},
+    ],
+    deeper:[
+      {t:"Run it on your own example", p:"Take their solution, run it on your small case, and write down what it actually produces. Not what it's supposed to produce. What it does when you turn the crank.", eg:"feed [60,50] through it \u2192 outputs 0 \u2713"},
+      {t:"Name one gain and one cost", p:"Everything trades something for something. Say what their approach buys you (speed, fewer lines) and what it costs (more memory, a bit of cleverness you'll forget by Friday).", eg:"+ one pass   \u2212 needs extra storage"},
+      {t:"Figure out why it works", p:"Understand it well enough that you could throw the original away and build it again from scratch. If you can't, you've got the answer but not the idea.", eg:"\u201ccould I rebuild this tomorrow, on my own?\u201d"},
+    ]
+  },
+  {
+    n:"04", name:"Look back",
+    forIt:"This is the part most people skip, and it's the part that pays. A right answer is where this step starts, not where it ends. A problem you solved and then actually thought about is worth ten you solved and forgot.",
+    first:[
+      {t:"Write down what you actually checked", p:"Which cases did you run it on? \u201cIt works\u201d means a lot more when you can say what you checked it against.", eg:"\u201cworked on the example and on the empty case\u201d"},
+    ],
+    deeper:[
+      {t:"Check the thinking, not just the output", p:"Passing a few examples isn't the same as being right. Ask yourself whether it would survive a case you never thought to try.", eg:"\u201cwhat happens if all the values are equal?\u201d"},
+      {t:"Look for a cleaner second way", p:"Now that you know where you ended up, is there a shorter or simpler road there? The second solution is often a good deal better than the first.", eg:"\u201cthe loop and the map do the same job \u2014 drop one?\u201d"},
+      {t:"Finish: this is shaped like\u2026", p:"Complete the sentence: \u201cThis is shaped like ___ I've seen before, because ___.\u201d That one line is what ties today's problem to all the others, instead of leaving it sitting by itself.", eg:"\u201clike the pair problem \u2014 both remember as they go\u201d"},
+      {t:"Keep one thing for next time", p:"Pick one thing you did here that you'd want to do again, and put it somewhere you'll find it. Do that for a while and you stop solving every problem from scratch.", eg:"kept: \u201cspend memory to delete a loop\u201d"},
+    ]
+  }
+];
+
+const DISCUSS = [
+  "Which of these do you already do without thinking about it? And which one might actually change how you start?",
+  "Where did you get most usefully stuck lately? What did that wall turn out to be telling you?",
+  "Last time you borrowed a solution, how did you know it really worked, beyond it just running?",
+  "What's one thing you figured out recently that you could use again on a completely different problem?"
+];
+
+/* ----------------------------------------------------------
+   STATE  (saved to this device only, gracefully)
+---------------------------------------------------------- */
+const KEY="fieldguide_marks_v1";
+let state={mine:{},try:{},star:null};
+try{const s=localStorage.getItem(KEY); if(s) state=Object.assign(state,JSON.parse(s));}catch(e){}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(state));}catch(e){}}
+
+/* ----------------------------------------------------------
+   BUILD PHASES
+---------------------------------------------------------- */
+const main=document.getElementById("phases");
+function moveCard(id,m){
+  const mine=!!state.mine[id], tryd=!!state.try[id];
+  return `
+  <div class="move ${mine?'mine':''}" data-move="${id}">
+    <span class="wash"></span>
+    <h3 class="movetitle">${m.t}</h3>
+    <p>${m.p}</p>
+    <span class="eg">${m.eg}</span>
+    <div class="chips">
+      <button class="chip mine-chip" data-kind="mine" aria-pressed="${mine}">I do this</button>
+      <button class="chip try-chip" data-kind="try" aria-pressed="${tryd}">I'll try this</button>
+    </div>
+  </div>`;
+}
+PHASES.forEach((ph,i)=>{
+  const sec=document.createElement("section");
+  sec.className="phase";
+  sec.id="p"+ph.n;
+  let html=`
+    <div class="phase-head">
+      <span class="phase-num">${ph.n}</span>
+      <h2>${ph.name}</h2>
+    </div>
+    <p class="phase-for">${ph.forIt}</p>
+    <div class="tier-label">A first pass</div>
+    <div class="moves">`;
+  ph.first.forEach((m,j)=> html+=moveCard(`${ph.n}-f${j}`,m));
+  html+=`</div><div class="tier-label">Going further (optional)</div><div class="moves">`;
+  ph.deeper.forEach((m,j)=> html+=moveCard(`${ph.n}-d${j}`,m));
+  html+=`</div>
+    <div class="discuss">
+      <p class="d-lab">To talk about</p>
+      <p>${DISCUSS[i]}</p>
+    </div>`;
+  sec.innerHTML=html;
+  main.appendChild(sec);
+});
+
+/* label lookup for the "pick one" list */
+const LABELS={};
+PHASES.forEach(ph=>{
+  ph.first.forEach((m,j)=>LABELS[`${ph.n}-f${j}`]={t:m.t,ph:ph.n});
+  ph.deeper.forEach((m,j)=>LABELS[`${ph.n}-d${j}`]={t:m.t,ph:ph.n});
+});
+
+/* ----------------------------------------------------------
+   CHIP INTERACTION
+---------------------------------------------------------- */
+main.addEventListener("click",e=>{
+  const chip=e.target.closest(".chip"); if(!chip) return;
+  const card=chip.closest(".move"); const id=card.dataset.move; const kind=chip.dataset.kind;
+  const bucket = kind==="mine"?state.mine:state.try;
+  const now=!bucket[id];
+  if(now) bucket[id]=true; else delete bucket[id];
+  chip.setAttribute("aria-pressed",now);
+  if(kind==="mine") card.classList.toggle("mine",now);
+  if(kind==="try" && !now && state.star===id){state.star=null;}
+  save(); renderTry();
+});
+
+/* ----------------------------------------------------------
+   PICK-ONE LIST
+---------------------------------------------------------- */
+const tryList=document.getElementById("tryList");
+const emptyMsg=document.getElementById("emptyMsg");
+const confirmMsg=document.getElementById("confirmMsg");
+function renderTry(){
+  const ids=Object.keys(state.try);
+  tryList.innerHTML="";
+  if(ids.length===0){emptyMsg.style.display="block"; confirmMsg.textContent=""; return;}
+  emptyMsg.style.display="none";
+  ids.forEach(id=>{
+    const li=document.createElement("li");
+    li.dataset.id=id;
+    if(state.star===id) li.classList.add("starred");
+    li.innerHTML=`<span class="star">${state.star===id?'\u2605':'\u2606'}</span>
+      <span><strong style="font-family:var(--mono);font-size:12px;color:var(--accent)">${LABELS[id].ph}</strong>&nbsp;&nbsp;${LABELS[id].t}</span>`;
+    tryList.appendChild(li);
+  });
+  confirmMsg.textContent = state.star && LABELS[state.star] ? `Taking \u201c${LABELS[state.star].t}\u201d into your next problem.` : "";
+}
+tryList.addEventListener("click",e=>{
+  const li=e.target.closest("li"); if(!li) return;
+  state.star = state.star===li.dataset.id ? null : li.dataset.id;
+  save(); renderTry();
+});
+document.getElementById("resetBtn").addEventListener("click",()=>{
+  state={mine:{},try:{},star:null}; save();
+  document.querySelectorAll(".chip").forEach(c=>c.setAttribute("aria-pressed","false"));
+  document.querySelectorAll(".move").forEach(c=>c.classList.remove("mine"));
+  renderTry();
+});
+renderTry();
+
+/* ----------------------------------------------------------
+   SPIRAL (hero)
+---------------------------------------------------------- */
+(function(){
+  const svg=document.getElementById("spiral");
+  const cx=180, cy=160, NS="http://www.w3.org/2000/svg";
+  const turns=2.6, steps=420, a=8, b=15;
+  let pts=[], d="";
+  for(let i=0;i<=steps;i++){
+    const th=(i/steps)*turns*2*Math.PI;
+    const r=a+b*th/(2*Math.PI)*2.4;
+    const x=cx+r*Math.cos(th-Math.PI/2);
+    const y=cy+r*Math.sin(th-Math.PI/2);
+    pts.push([x,y,th,r]);
+    d+=(i===0?"M":"L")+x.toFixed(1)+" "+y.toFixed(1)+" ";
+  }
+  const base=document.createElementNS(NS,"path");
+  base.setAttribute("d",d); base.setAttribute("class","spiral-path"); svg.appendChild(base);
+  const live=document.createElementNS(NS,"path");
+  live.setAttribute("d",d); live.setAttribute("class","spiral-live"); svg.appendChild(live);
+  const len=live.getTotalLength();
+  const reduce=window.matchMedia("(prefers-reduced-motion:reduce)").matches;
+  live.style.strokeDasharray=len; live.style.strokeDashoffset=reduce?0:len;
+
+  const labels=[["01","read"],["02","try"],["03","learn"],["04","look back"]];
+  const nodeAt=[0.50,0.66,0.82,0.97];
+  nodeAt.forEach((frac,k)=>{
+    const p=pts[Math.floor(frac*steps)];
+    const g=document.createElementNS(NS,"g"); g.setAttribute("class","node");
+    const c=document.createElementNS(NS,"circle");
+    c.setAttribute("cx",p[0]); c.setAttribute("cy",p[1]); c.setAttribute("r",16);
+    const n=document.createElementNS(NS,"text");
+    n.setAttribute("x",p[0]); n.setAttribute("y",p[1]-1); n.setAttribute("text-anchor","middle");
+    n.setAttribute("class","ph-n"); n.textContent=labels[k][0];
+    const t=document.createElementNS(NS,"text");
+    t.setAttribute("x",p[0]); t.setAttribute("y",p[1]+10); t.setAttribute("text-anchor","middle");
+    t.textContent=labels[k][1];
+    g.appendChild(c); g.appendChild(n); g.appendChild(t); svg.appendChild(g);
+  });
+  const end=pts[steps];
+  const carry=document.createElementNS(NS,"text");
+  carry.setAttribute("x",end[0]+8); carry.setAttribute("y",end[1]);
+  carry.setAttribute("class","carry"); carry.textContent="\u2192 into the next problem";
+  svg.appendChild(carry);
+
+  const dot=document.createElementNS(NS,"circle");
+  dot.setAttribute("r",4.5); dot.setAttribute("class","runner");
+  svg.appendChild(dot);
+  const p0=pts[0]; dot.setAttribute("cx",p0[0]); dot.setAttribute("cy",p0[1]);
+
+  if(!reduce){
+    const dur=2600; let start=null;
+    function frame(ts){
+      if(!start) start=ts;
+      const e=Math.min((ts-start)/dur,1);
+      const ease=1-Math.pow(1-e,3);
+      live.style.strokeDashoffset=len*(1-ease);
+      const pp=live.getPointAtLength(len*ease);
+      dot.setAttribute("cx",pp.x); dot.setAttribute("cy",pp.y);
+      if(e<1) requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  } else {
+    const pp=live.getPointAtLength(len);
+    dot.setAttribute("cx",pp.x); dot.setAttribute("cy",pp.y);
+  }
+})();
+
+/* ----------------------------------------------------------
+   TRACE STRIPS reveal on scroll
+---------------------------------------------------------- */
+(function(){
+  const strips=document.querySelectorAll("[data-trace]");
+  strips.forEach(s=>{
+    s.querySelectorAll(".tracecell").forEach(c=>{ if(c.hasAttribute("data-hit")) c.classList.add("hit"); });
+  });
+  if(!("IntersectionObserver" in window)){strips.forEach(s=>s.classList.add("lit"));return;}
+  const io=new IntersectionObserver((es)=>{
+    es.forEach(en=>{ if(en.isIntersecting){en.target.classList.add("lit"); io.unobserve(en.target);} });
+  },{threshold:.5});
+  strips.forEach(s=>io.observe(s));
+})();
+</script>
+</body>
+</html>
