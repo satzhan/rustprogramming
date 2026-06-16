@@ -1,0 +1,1049 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Underneath a Rust struct</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0D1417;
+    --ink-2:#0A1013;
+    --panel:#131E22;
+    --panel-2:#17262B;
+    --line:#24383E;
+    --blueprint:#5BC8D6;   /* structure / schematic ink */
+    --blueprint-dim:#2E5D66;
+    --phosphor:#F0A53C;    /* the live signal — what is actually happening */
+    --phosphor-dim:#6E5230;
+    --danger:#E5654B;      /* the boundary, the kernel, the unsafe */
+    --safe:#86C98A;        /* user space / the calm side */
+    --chalk:#E8EEEC;
+    --dim:#84999C;
+    --dimmer:#5A6E72;
+    --maxw:1040px;
+  }
+
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0;
+    background:
+      radial-gradient(1200px 600px at 78% -8%, rgba(91,200,214,.06), transparent 60%),
+      radial-gradient(900px 500px at 10% 100%, rgba(240,165,60,.05), transparent 55%),
+      var(--ink);
+    color:var(--chalk);
+    font-family:"Spectral", Georgia, serif;
+    font-size:18px;
+    line-height:1.68;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  /* faint blueprint grid */
+  body::before{
+    content:"";
+    position:fixed; inset:0; z-index:0; pointer-events:none;
+    background-image:
+      linear-gradient(rgba(91,200,214,.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(91,200,214,.035) 1px, transparent 1px);
+    background-size:34px 34px;
+    mask-image:radial-gradient(circle at 50% 30%, black, transparent 90%);
+  }
+
+  .wrap{position:relative; z-index:1; max-width:var(--maxw); margin:0 auto; padding:0 24px}
+
+  /* ---------- type ---------- */
+  h1,h2,h3,.eyebrow,.mono,code,.label,.btn,nav,.tag,.counter{font-family:"Space Grotesk",system-ui,sans-serif}
+  .mono,code,pre,.bytefield,.steplog,.tag,.counter{font-family:"JetBrains Mono",ui-monospace,monospace}
+  h2{font-size:clamp(28px,4.4vw,42px); line-height:1.08; letter-spacing:-.02em; font-weight:700; margin:0 0 6px}
+  h3{font-size:20px; letter-spacing:-.01em; color:var(--blueprint); margin:34px 0 10px; font-weight:500}
+  .eyebrow{font-size:12.5px; letter-spacing:.22em; text-transform:uppercase; color:var(--phosphor); font-weight:500; margin-bottom:14px}
+  p{margin:0 0 18px}
+  em{color:#fff; font-style:italic}
+  strong{color:#fff; font-weight:600}
+  a{color:var(--blueprint)}
+  .lead{font-size:21px; color:#cfe0e2}
+  .aside{color:var(--dim); font-size:16.5px}
+  code{background:var(--panel-2); border:1px solid var(--line); padding:.06em .4em; border-radius:5px; font-size:.82em; color:var(--blueprint)}
+
+  /* ---------- hero ---------- */
+  header.hero{padding:88px 0 40px; position:relative}
+  .hero .eyebrow{margin-bottom:20px}
+  h1{
+    font-size:clamp(40px,8.5vw,82px); line-height:.98; letter-spacing:-.035em;
+    font-weight:700; margin:0 0 20px;
+  }
+  h1 .glow{color:var(--phosphor)}
+  h1 .struct{color:var(--blueprint)}
+  .hero p.lead{max-width:62ch}
+  .signoff{margin-top:26px; color:var(--dim); font-size:15px; font-style:italic}
+  .signoff::before{content:"— "; color:var(--phosphor)}
+
+  /* hero schematic */
+  .hero-fig{margin:46px 0 8px; border:1px solid var(--line); border-radius:14px; background:linear-gradient(180deg,var(--panel),var(--ink-2)); padding:8px}
+  .hero-fig svg{display:block; width:100%; height:auto}
+
+  /* ---------- contents rail ---------- */
+  .toc{
+    display:flex; flex-wrap:wrap; gap:8px; margin:34px 0 8px; padding:16px;
+    border:1px solid var(--line); border-radius:12px; background:rgba(19,30,34,.55);
+  }
+  .toc a{
+    font-family:"JetBrains Mono",monospace; font-size:12.5px; text-decoration:none;
+    color:var(--dim); border:1px solid var(--line); padding:6px 11px; border-radius:999px;
+    transition:.18s;
+  }
+  .toc a:hover{color:var(--ink); background:var(--blueprint); border-color:var(--blueprint)}
+  .toc a b{color:var(--phosphor); font-weight:700}
+  .toc a:hover b{color:var(--ink)}
+
+  /* ---------- sections ---------- */
+  section{padding:62px 0; border-top:1px solid var(--line)}
+  .secnum{font-family:"JetBrains Mono",monospace; color:var(--phosphor); font-size:13px; letter-spacing:.1em; display:block; margin-bottom:10px}
+
+  /* ---------- figure / widget shell ---------- */
+  .fig{
+    margin:30px 0; border:1px solid var(--line); border-radius:14px; overflow:hidden;
+    background:linear-gradient(180deg,var(--panel),var(--ink-2));
+  }
+  .fig-head{
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+    padding:13px 18px; border-bottom:1px solid var(--line); background:rgba(0,0,0,.18);
+  }
+  .fig-title{font-family:"Space Grotesk",sans-serif; font-size:13px; letter-spacing:.04em; color:var(--dim); text-transform:uppercase}
+  .fig-body{padding:22px 18px 24px}
+  .fig svg{display:block; width:100%; height:auto; overflow:visible}
+
+  .controls{display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-top:18px}
+  .btn{
+    font-family:"Space Grotesk",sans-serif; font-size:14px; font-weight:500;
+    color:var(--chalk); background:var(--panel-2); border:1px solid var(--line);
+    padding:9px 16px; border-radius:9px; cursor:pointer; transition:.15s; letter-spacing:.01em;
+  }
+  .btn:hover{border-color:var(--blueprint); color:#fff}
+  .btn:focus-visible{outline:2px solid var(--phosphor); outline-offset:2px}
+  .btn.primary{background:var(--phosphor); color:#1a1205; border-color:var(--phosphor); font-weight:700}
+  .btn.primary:hover{filter:brightness(1.08)}
+  .btn.active{border-color:var(--blueprint); color:var(--blueprint); box-shadow:inset 0 0 0 1px var(--blueprint)}
+  .btn[disabled]{opacity:.4; cursor:not-allowed}
+  .seg{display:inline-flex; border:1px solid var(--line); border-radius:9px; overflow:hidden}
+  .seg .btn{border:none; border-radius:0; border-right:1px solid var(--line)}
+  .seg .btn:last-child{border-right:none}
+
+  .hint{color:var(--dimmer); font-size:13.5px; font-family:"JetBrains Mono",monospace; margin-top:14px}
+
+  /* fact-check / honesty flags */
+  .flag{
+    margin:24px 0; padding:14px 16px 14px 18px; border-radius:10px; font-size:16px;
+    border-left:3px solid; background:rgba(0,0,0,.18);
+  }
+  .flag .tagk{font-family:"Space Grotesk",sans-serif; font-size:11px; letter-spacing:.16em; text-transform:uppercase; display:block; margin-bottom:5px; font-weight:500}
+  .flag.fact{border-color:var(--blueprint)} .flag.fact .tagk{color:var(--blueprint)}
+  .flag.opinion{border-color:var(--phosphor)} .flag.opinion .tagk{color:var(--phosphor)}
+  .flag.gap{border-color:var(--danger)} .flag.gap .tagk{color:var(--danger)}
+  .flag p{margin:0}
+
+  /* code block */
+  pre{
+    background:var(--ink-2); border:1px solid var(--line); border-radius:10px;
+    padding:16px 18px; overflow-x:auto; font-size:13.5px; line-height:1.62; margin:18px 0;
+  }
+  pre .kw{color:var(--danger)} pre .fn{color:var(--blueprint)} pre .ty{color:var(--phosphor)}
+  pre .cm{color:var(--dimmer)} pre .st{color:var(--safe)} pre .am{color:#c79bff}
+
+  /* byte field (memory layout widget) */
+  .bytefield{display:flex; flex-wrap:wrap; gap:3px; margin:8px 0 4px}
+  .byte{
+    width:30px; height:30px; border-radius:4px; display:flex; align-items:center; justify-content:center;
+    font-size:10px; color:rgba(0,0,0,.55); font-weight:700; position:relative; transition:.2s;
+  }
+  .byte.pad{
+    background:repeating-linear-gradient(45deg,var(--panel-2),var(--panel-2) 4px,#1d2e33 4px,#1d2e33 8px);
+    color:var(--dimmer); border:1px dashed var(--blueprint-dim);
+  }
+  .fieldrow{display:flex; align-items:center; gap:10px; padding:7px 10px; border:1px solid var(--line); border-radius:8px; margin:6px 0; background:var(--panel)}
+  .fieldrow .swatch{width:14px; height:14px; border-radius:3px; flex:none}
+  .fieldrow .fname{font-family:"JetBrains Mono",monospace; font-size:13px; color:var(--chalk)}
+  .fieldrow .fmeta{font-family:"JetBrains Mono",monospace; font-size:11.5px; color:var(--dim); margin-left:auto}
+  .fieldrow .ord{display:flex; gap:4px}
+  .ordbtn{width:26px; height:26px; border-radius:6px; border:1px solid var(--line); background:var(--panel-2); color:var(--chalk); cursor:pointer; font-family:"JetBrains Mono",monospace; line-height:1}
+  .ordbtn:hover{border-color:var(--blueprint); color:var(--blueprint)}
+  .ordbtn:disabled{opacity:.3; cursor:not-allowed}
+  .sizeout{font-family:"JetBrains Mono",monospace; font-size:14px; margin-top:14px; color:var(--dim)}
+  .sizeout b{color:var(--phosphor); font-size:22px}
+  .sizeout .waste{color:var(--danger)}
+
+  /* counter */
+  .counter{font-size:46px; font-weight:700; color:var(--phosphor); line-height:1; font-family:"JetBrains Mono",monospace}
+  .counter .lab{font-size:12px; color:var(--dim); letter-spacing:.14em; display:block; margin-top:6px; font-weight:500}
+  .vs-grid{display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:18px}
+  @media(max-width:640px){.vs-grid{grid-template-columns:1fr}}
+  .vs-cell{border:1px solid var(--line); border-radius:10px; padding:14px; background:var(--panel)}
+  .vs-cell h4{margin:0 0 4px; font-family:"Space Grotesk",sans-serif; font-size:13px; letter-spacing:.05em; text-transform:uppercase; color:var(--dim)}
+
+  /* step log */
+  .steplog{margin-top:16px; border:1px solid var(--line); border-radius:10px; background:var(--ink-2); padding:12px 14px; min-height:118px; font-size:13px; color:var(--dim)}
+  .steplog .ln{padding:3px 0; opacity:.32; transition:.2s; display:flex; gap:10px}
+  .steplog .ln.on{opacity:1; color:var(--chalk)}
+  .steplog .ln .k{color:var(--phosphor); flex:none; width:18px}
+  .steplog .ln.kernel.on .k{color:var(--danger)}
+
+  /* svg helpers */
+  text{font-family:"JetBrains Mono",monospace}
+  .mlabel{fill:var(--dim); font-size:11px}
+  .mlabel.b{fill:var(--blueprint)} .mlabel.p{fill:var(--phosphor)} .mlabel.d{fill:var(--danger)} .mlabel.s{fill:var(--safe)}
+
+  footer{padding:64px 0 90px; border-top:1px solid var(--line); color:var(--dim); font-size:16px}
+  footer .eyebrow{color:var(--blueprint)}
+
+  @media(max-width:640px){
+    body{font-size:17px}
+    .fig-body{padding:18px 12px 20px}
+    .byte{width:26px;height:26px}
+  }
+  @media (prefers-reduced-motion: reduce){
+    *{animation-duration:.001ms !important; transition-duration:.001ms !important}
+    html{scroll-behavior:auto}
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <!-- ============ HERO ============ -->
+  <header class="hero">
+    <div class="eyebrow">Rust, underneath the syntax</div>
+    <h1>A <span class="struct">struct</span> is a name for some bytes.<br>Running it sets a lot of <span class="glow">machinery</span> in motion.</h1>
+    <p class="lead">Bundling a few values together and naming them looks like nothing happens at runtime. In fact the bytes get arranged in a specific order, a pointer reaches out to a separate allocation, and requests cross a guarded boundary into the part of the machine a program isn't allowed to touch directly. None of it is visible in the code. The diagrams below show each piece on its own.</p>
+
+    <div class="hero-fig" aria-hidden="true">
+      <svg viewBox="0 0 920 230" role="img">
+        <!-- the one line of code -->
+        <rect x="20" y="22" width="290" height="40" rx="7" fill="#0A1013" stroke="#24383E"/>
+        <text x="36" y="47" font-size="14" fill="#E8EEEC">let u = User::new("Alice");</text>
+        <text x="20" y="86" class="mlabel">what you typed</text>
+
+        <!-- arrow -->
+        <path d="M330 42 H392" stroke="#F0A53C" stroke-width="2" fill="none" marker-end="url(#ah)"/>
+        <defs><marker id="ah" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#F0A53C"/></marker></defs>
+
+        <!-- the layers underneath -->
+        <g>
+          <rect x="410" y="14" width="490" height="30" rx="6" fill="#131E22" stroke="#2E5D66"/>
+          <text x="424" y="34" font-size="12.5" fill="#5BC8D6">STACK · the struct's bytes, laid out & padded</text>
+
+          <rect x="410" y="52" width="490" height="30" rx="6" fill="#131E22" stroke="#2E5D66"/>
+          <text x="424" y="72" font-size="12.5" fill="#5BC8D6">HEAP · the actual characters of "Alice"</text>
+
+          <rect x="410" y="90" width="490" height="30" rx="6" fill="#131E22" stroke="#6E5230"/>
+          <text x="424" y="110" font-size="12.5" fill="#F0A53C">SYSCALL · a request crosses into the kernel</text>
+
+          <rect x="410" y="128" width="490" height="30" rx="6" fill="#131E22" stroke="#6E5230"/>
+          <text x="424" y="148" font-size="12.5" fill="#F0A53C">BUFFER · many small writes, batched into one trip</text>
+
+          <rect x="410" y="166" width="490" height="30" rx="6" fill="#131E22" stroke="#5a2f25"/>
+          <text x="424" y="186" font-size="12.5" fill="#E5654B">PROCESS · a child is forked, then replaced by a new program</text>
+        </g>
+        <text x="410" y="218" class="mlabel">what actually happened</text>
+      </svg>
+    </div>
+
+    <nav class="toc" aria-label="Contents">
+      <a href="#stack-heap"><b>01</b> &nbsp;Where data lives</a>
+      <a href="#layout"><b>02</b> &nbsp;Size, alignment, padding</a>
+      <a href="#syscall"><b>03</b> &nbsp;The guarded border</a>
+      <a href="#buffer"><b>04</b> &nbsp;Why BufReader exists</a>
+      <a href="#process"><b>05</b> &nbsp;Forking a child</a>
+      <a href="#self"><b>06</b> &nbsp;self, &amp;self, &amp;mut self</a>
+    </nav>
+  </header>
+
+
+  <!-- ============ 1 · STACK / HEAP ============ -->
+  <section id="stack-heap">
+    <span class="secnum">01 / WHERE A STRING LIVES</span>
+    <h2>A handle on the stack, bytes on the heap</h2>
+    <p class="lead">Write <code>let name = String::from("Alice")</code> and it feels like the word <em>Alice</em> is sitting in the variable. It isn't.</p>
+
+    <p>What sits in the variable, on the <em>stack</em>, is three machine words — twenty-four bytes on a 64-bit machine:</p>
+
+    <ul style="color:#cfe0e2; margin:0 0 18px 0; padding-left:22px">
+      <li><strong>a pointer</strong> — an address out on the heap</li>
+      <li><strong>a length</strong> — how many bytes are in use (here, 5)</li>
+      <li><strong>a capacity</strong> — how large the allocation is (say 8, leaving room to grow)</li>
+    </ul>
+
+    <p>The characters <em>A&#8202;l&#8202;i&#8202;c&#8202;e</em> live somewhere else, out on the <em>heap</em>, where space of any size can be allocated at runtime. The variable is a small fixed-size handle; the data it points to is a separate, variable-size allocation.</p>
+
+    <p>That split is what makes a move cheap. Assign the String to another variable and Rust copies the handle — twenty-four bytes — and marks the original invalid. The heap data isn't touched. Two handles pointing at one allocation would set up a double-free, so Rust doesn't allow it: after the move, <code>name</code> is gone. A clone is the other option — it allocates a second buffer and copies the bytes, leaving two independent strings.</p>
+
+    <div class="fig">
+      <div class="fig-head"><span class="fig-title">The fat pointer ↔ heap buffer</span><span class="fig-title" id="sh-state">owner: name</span></div>
+      <div class="fig-body">
+        <svg viewBox="0 0 880 300" id="sh-svg" role="img" aria-label="A String handle on the stack pointing to its character data on the heap.">
+          <!-- stack panel -->
+          <rect x="10" y="36" width="380" height="234" rx="10" fill="#0A1013" stroke="#2E5D66"/>
+          <text x="26" y="26" class="mlabel b">STACK — fast, fixed-size, right by the function</text>
+
+          <!-- handle A -->
+          <g id="handleA">
+            <rect x="34" y="60" width="330" height="78" rx="8" fill="#131E22" stroke="#5BC8D6"/>
+            <text x="48" y="80" font-size="12" fill="#5BC8D6">name : String  (24 bytes)</text>
+            <rect x="48" y="92" width="96" height="34" rx="5" fill="#0e2a30" stroke="#2E5D66"/>
+            <text x="60" y="108" font-size="10" fill="#84999C">ptr</text>
+            <text x="60" y="120" font-size="11" fill="#5BC8D6" id="ptrA">0x7f…a0</text>
+            <rect x="150" y="92" width="96" height="34" rx="5" fill="#0e2a30" stroke="#2E5D66"/>
+            <text x="162" y="108" font-size="10" fill="#84999C">len</text>
+            <text x="162" y="120" font-size="11" fill="#E8EEEC">5</text>
+            <rect x="252" y="92" width="96" height="34" rx="5" fill="#0e2a30" stroke="#2E5D66"/>
+            <text x="264" y="108" font-size="10" fill="#84999C">cap</text>
+            <text x="264" y="120" font-size="11" fill="#E8EEEC">8</text>
+          </g>
+
+          <!-- handle B (hidden until move/clone) -->
+          <g id="handleB" style="opacity:0">
+            <rect x="34" y="168" width="330" height="78" rx="8" fill="#131E22" stroke="#F0A53C"/>
+            <text x="48" y="188" font-size="12" fill="#F0A53C" id="handleBname">owner2 : String</text>
+            <rect x="48" y="200" width="96" height="34" rx="5" fill="#2a1f0e" stroke="#6E5230"/>
+            <text x="60" y="216" font-size="10" fill="#84999C">ptr</text>
+            <text x="60" y="228" font-size="11" fill="#F0A53C" id="ptrB">0x7f…a0</text>
+            <rect x="150" y="200" width="96" height="34" rx="5" fill="#2a1f0e" stroke="#6E5230"/>
+            <text x="162" y="216" font-size="10" fill="#84999C">len</text>
+            <text x="162" y="228" font-size="11" fill="#E8EEEC">5</text>
+            <rect x="252" y="200" width="96" height="34" rx="5" fill="#2a1f0e" stroke="#6E5230"/>
+            <text x="264" y="216" font-size="10" fill="#84999C">cap</text>
+            <text x="264" y="228" font-size="11" fill="#E8EEEC">8</text>
+          </g>
+
+          <!-- heap panel -->
+          <rect x="500" y="36" width="370" height="120" rx="10" fill="#0A1013" stroke="#2E5D66"/>
+          <text x="516" y="26" class="mlabel b">HEAP — big, slow, rent any size at runtime</text>
+          <g id="heapA">
+            <text x="516" y="60" font-size="11" fill="#84999C">0x7f…a0 →</text>
+            <g id="cellsA"></g>
+          </g>
+          <!-- heap buffer B (clone only) -->
+          <g id="heapB" style="opacity:0">
+            <text x="516" y="120" font-size="11" fill="#84999C">0x9c…14 →</text>
+            <g id="cellsB"></g>
+          </g>
+
+          <!-- arrows -->
+          <path id="arrA" d="M150 109 C 430 109, 430 60, 502 60" stroke="#5BC8D6" stroke-width="2" fill="none" marker-end="url(#ahb)"/>
+          <path id="arrB" d="M150 217 C 430 217, 430 120, 502 120" stroke="#F0A53C" stroke-width="2" fill="none" marker-end="url(#ahp)" style="opacity:0"/>
+          <defs>
+            <marker id="ahb" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#5BC8D6"/></marker>
+            <marker id="ahp" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#F0A53C"/></marker>
+          </defs>
+        </svg>
+
+        <div class="controls">
+          <button class="btn primary" id="sh-move">Move it →</button>
+          <button class="btn" id="sh-clone">Clone it (deep copy)</button>
+          <button class="btn" id="sh-reset">Reset</button>
+        </div>
+        <p class="hint" id="sh-hint">A move copies the 24-byte handle and invalidates the original. A clone allocates a second buffer and copies the bytes.</p>
+      </div>
+    </div>
+
+    <div class="flag fact">
+      <p><code>std::mem::size_of::&lt;String&gt;()</code> returns <strong>24</strong> on any 64-bit target — three <code>usize</code> words, regardless of the string's length, since the characters are on the heap rather than in the handle. <code>Vec&lt;T&gt;</code> has the same pointer/length/capacity shape and is also 24 bytes.</p>
+    </div>
+  </section>
+
+
+  <!-- ============ 2 · LAYOUT ============ -->
+  <section id="layout">
+    <span class="secnum">02 / ALIGNMENT AND PADDING</span>
+    <h2>Why field order can change a struct's size</h2>
+    <p class="lead">A field has to sit at an address its type is aligned to. An 8-byte value wants an address that's a multiple of 8; a 2-byte value, a multiple of 2. Aligned reads are a single fetch; unaligned ones cost extra.</p>
+
+    <p>To satisfy that, the compiler inserts <em>padding</em> — unused bytes between fields — so each field lands on an address it accepts. Padding is dead space. If a one-byte field comes right before an eight-byte field, seven bytes of padding go in between. Arrange the fields poorly and a struct holding 12 bytes of data can take up 24.</p>
+
+    <p>By default, under <code>repr(Rust)</code>, the compiler reorders the fields itself — largest alignment first — to remove most of that padding. Rearranging the declaration changes nothing, because the compiler has already chosen a good order; the exact layout isn't guaranteed and can differ between compiler versions. Field order only matters once you opt out with <code>#[repr(C)]</code>, which keeps fields in declared order so the bytes line up with a C struct, a file format, or data on the wire. The two modes are below.</p>
+
+    <div class="fig">
+      <div class="fig-head">
+        <span class="fig-title">Struct packing — declared order vs. what the compiler does</span>
+        <div class="seg" role="tablist" aria-label="Representation">
+          <button class="btn active" id="rep-rust" role="tab" aria-selected="true">repr(Rust) · default</button>
+          <button class="btn" id="rep-c" role="tab" aria-selected="false">#[repr(C)]</button>
+        </div>
+      </div>
+      <div class="fig-body">
+        <p class="mono" style="font-size:13px;color:var(--dim);margin:0 0 12px">struct Packet { … }  &nbsp;·&nbsp; reorder the declaration with ↑ ↓</p>
+        <div id="field-list"></div>
+
+        <h3 style="margin:22px 0 6px;color:var(--dim);font-size:13px;letter-spacing:.05em;text-transform:uppercase">Bytes in memory</h3>
+        <div class="bytefield" id="bytefield" aria-label="Byte layout of the struct in memory"></div>
+        <div class="sizeout" id="sizeout"></div>
+        <p class="hint" id="layout-hint"></p>
+      </div>
+    </div>
+
+    <div class="flag fact">
+      <p>The familiar advice to order fields largest-to-smallest applies to C and to <code>#[repr(C)]</code> Rust. Under default <code>repr(Rust)</code> it has no effect, because the compiler already reorders for minimal padding — measuring <code>size_of</code> before and after a reorder gives the same number. Switch to <code>#[repr(C)]</code> and the same reorder does change the size.</p>
+    </div>
+  </section>
+
+
+  <!-- ============ 3 · SYSCALL ============ -->
+  <section id="syscall">
+    <span class="secnum">03 / THE USER–KERNEL BOUNDARY</span>
+    <h2>The boundary your program can't cross directly</h2>
+    <p class="lead">A program can't touch the disk, the network card, or the screen on its own. Every <code>println!</code>, every file read, every byte that reaches the screen goes through one route.</p>
+
+    <p>The CPU runs in two modes. In <span style="color:var(--safe)">user mode</span>, where the program runs, those operations are off-limits. In <span style="color:var(--danger)">kernel mode</span>, the operating system can do them — talk to hardware, hand out memory, end processes. The hardware enforces the wall between the two.</p>
+
+    <p>To get work done on the other side, the program makes a <em>system call</em>. It loads a number identifying the operation into a register — on x86-64 Linux, 1 is <code>write</code> — points at the data, and runs a <em>trap</em> instruction. The trap is the only sanctioned way through the wall. The CPU switches to kernel mode, the kernel runs the handler for that number, does the work, and switches back to user mode at the instruction right after the call. <code>mov rax, 1; syscall</code> is the bare form of this. <code>println!</code> is the same call with the standard library filling in the register setup — there's no other path to the screen.</p>
+
+    <div class="fig">
+      <div class="fig-head"><span class="fig-title">A write() crossing the user / kernel boundary</span><span class="fig-title" id="sc-mode">mode: USER</span></div>
+      <div class="fig-body">
+        <svg viewBox="0 0 880 300" id="sc-svg" role="img" aria-label="An animated diagram of a system call crossing from user space into kernel space and returning.">
+          <!-- user band -->
+          <rect x="10" y="20" width="860" height="110" rx="10" fill="#0d1a14" stroke="#2c4a36"/>
+          <text x="26" y="42" font-size="12" fill="#86C98A">USER SPACE — your program, limited privileges</text>
+          <rect x="40" y="58" width="150" height="54" rx="8" fill="#10231a" stroke="#86C98A"/>
+          <text x="60" y="82" font-size="12" fill="#E8EEEC">your code</text>
+          <text x="60" y="100" font-size="10" fill="#84999C">wants to write()</text>
+
+          <!-- the boundary line — the signature element -->
+          <line x1="10" y1="150" x2="870" y2="150" stroke="#E5654B" stroke-width="2.5" stroke-dasharray="2 6" id="boundary"/>
+          <rect x="360" y="138" width="160" height="24" rx="12" fill="#1a0f0c" stroke="#E5654B" id="gate"/>
+          <text x="440" y="154" font-size="11" fill="#E5654B" text-anchor="middle" id="gate-label">trap gate</text>
+
+          <!-- kernel band -->
+          <rect x="10" y="170" width="860" height="110" rx="10" fill="#1a0f0c" stroke="#5a2f25"/>
+          <text x="26" y="192" font-size="12" fill="#E5654B">KERNEL SPACE — the OS, can touch hardware</text>
+          <rect x="690" y="206" width="150" height="54" rx="8" fill="#241410" stroke="#E5654B"/>
+          <text x="710" y="230" font-size="12" fill="#E8EEEC">disk / screen</text>
+          <text x="710" y="248" font-size="10" fill="#84999C">the real device</text>
+
+          <!-- traveller -->
+          <g id="packet" style="opacity:0">
+            <circle cx="115" cy="85" r="13" fill="#F0A53C"/>
+            <text x="115" y="89" font-size="11" fill="#1a1205" text-anchor="middle" font-weight="700">1</text>
+          </g>
+        </svg>
+
+        <div class="controls">
+          <button class="btn primary" id="sc-go">Call write()</button>
+          <button class="btn" id="sc-step">Step through ▸</button>
+          <button class="btn" id="sc-reset2">Reset</button>
+        </div>
+
+        <div class="steplog" id="sc-log">
+          <div class="ln" data-s="0"><span class="k">1</span><span>load syscall number into rax (1 = write), point rsi at the data</span></div>
+          <div class="ln kernel" data-s="1"><span class="k">2</span><span>execute <b>trap</b> — the CPU switches USER → KERNEL mode</span></div>
+          <div class="ln kernel" data-s="2"><span class="k">3</span><span>kernel looks up handler #1, performs the privileged write to the device</span></div>
+          <div class="ln" data-s="3"><span class="k">4</span><span>return-from-trap — CPU switches KERNEL → USER, you resume exactly where you stopped</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="flag fact">
+      <p>The system-call number, the registers used to pass arguments, and the calling convention are all platform-specific. <code>1 = write</code> holds on x86-64 Linux; the numbers differ on other architectures. The inline-assembly form also requires <code>unsafe</code> and won't assemble on ARM.</p>
+    </div>
+  </section>
+
+
+  <!-- ============ 4 · BUFFERING ============ -->
+  <section id="buffer">
+    <span class="secnum">04 / BUFFERED I/O</span>
+    <h2>Why buffering makes I/O fast</h2>
+    <p class="lead">Crossing into the kernel and back has a fixed cost: save registers, switch modes, run the handler, switch back. Pay it once for a large chunk of data and it's negligible. Pay it per byte and the same work takes hundreds of crossings instead of one.</p>
+
+    <p>That cost is the whole reason buffered I/O exists. A buffered writer keeps a block of memory in front of the system call. Writes go into that block — no crossing, just a memory copy. When the block fills, or <code>flush()</code> is called, it makes a single system call and sends everything at once.</p>
+
+    <p><code>BufReader</code> does the reverse: it reads a large block in one call and hands it back in small pieces, so a loop reading a line at a time isn't making a system call per line. In both cases the number of boundary crossings is what changes. The counter below shows it for a 13-character write.</p>
+
+    <div class="fig">
+      <div class="fig-head"><span class="fig-title">Writing a 13-character message — unbuffered vs. buffered</span><span class="fig-title" id="bf-msg">"Hello, world!"</span></div>
+      <div class="fig-body">
+        <div class="vs-grid">
+          <div class="vs-cell">
+            <h4>Unbuffered — one syscall per byte</h4>
+            <svg viewBox="0 0 380 110" id="bf-svg-u" role="img" aria-label="Unbuffered writing crosses the kernel boundary once per character.">
+              <line x1="0" y1="62" x2="380" y2="62" stroke="#E5654B" stroke-width="2" stroke-dasharray="2 5"/>
+              <text x="6" y="20" font-size="10" fill="#86C98A">USER</text>
+              <text x="6" y="92" font-size="10" fill="#E5654B">KERNEL</text>
+              <g id="bf-u-chars"></g>
+            </svg>
+            <div style="margin-top:10px"><span class="counter" id="bf-u-count">0</span><span class="lab">border crossings</span></div>
+          </div>
+          <div class="vs-cell">
+            <h4>Buffered — fill the bucket, one flush</h4>
+            <svg viewBox="0 0 380 110" id="bf-svg-b" role="img" aria-label="Buffered writing collects characters then crosses the kernel boundary once.">
+              <line x1="0" y1="62" x2="380" y2="62" stroke="#E5654B" stroke-width="2" stroke-dasharray="2 5"/>
+              <text x="6" y="20" font-size="10" fill="#86C98A">USER</text>
+              <text x="6" y="92" font-size="10" fill="#E5654B">KERNEL</text>
+              <rect x="120" y="30" width="140" height="22" rx="5" fill="#0e2a30" stroke="#5BC8D6"/>
+              <text x="190" y="45" font-size="9" fill="#5BC8D6" text-anchor="middle">BufWriter bucket</text>
+              <g id="bf-b-chars"></g>
+            </svg>
+            <div style="margin-top:10px"><span class="counter" id="bf-b-count">0</span><span class="lab">border crossings</span></div>
+          </div>
+        </div>
+        <div class="controls">
+          <button class="btn primary" id="bf-go">Send the message both ways</button>
+          <button class="btn" id="bf-reset">Reset</button>
+        </div>
+        <p class="hint" id="bf-hint">The same 13 characters reach the device either way. Unbuffered makes 13 system calls; buffered makes 1.</p>
+      </div>
+    </div>
+
+  </section>
+
+
+  <!-- ============ 5 · PROCESS ============ -->
+  <section id="process">
+    <span class="secnum">05 / SPAWNING A PROCESS</span>
+    <h2>fork, then exec</h2>
+    <p class="lead">When a Rust program runs <code>Command::new("python").spawn()</code>, two older system calls do the work on Unix.</p>
+
+    <p>First <strong>fork</strong>: the operating system makes a near-exact copy of the calling process. For a moment two processes exist with the same code and memory, told apart by their process IDs. Then <strong>exec</strong>: the child replaces its own program image with a different one — same process, new program. After fork and then exec, the child is running Python.</p>
+
+    <p>The two processes still need to exchange data, and a file is one way to do it. The Rust parent writes <code>log_summary.txt</code>; the Python child reads it and draws a chart. The file is the channel — two separate processes coordinating through a shared resource, which is what inter-process communication is at its simplest.</p>
+
+    <div class="fig">
+      <div class="fig-head"><span class="fig-title">fork → exec → talk through a file → wait</span><span class="fig-title" id="pr-stage">ready</span></div>
+      <div class="fig-body">
+        <svg viewBox="0 0 880 280" id="pr-svg" role="img" aria-label="A parent process forks a child, the child execs into Python, they communicate via a file, then the parent waits on the child.">
+          <!-- parent -->
+          <rect x="40" y="40" width="180" height="80" rx="10" fill="#0e2a30" stroke="#5BC8D6"/>
+          <text x="130" y="70" font-size="13" fill="#5BC8D6" text-anchor="middle">Rust</text>
+          <text x="130" y="90" font-size="10" fill="#84999C" text-anchor="middle">parent process</text>
+          <text x="130" y="106" font-size="9" fill="#84999C" text-anchor="middle" id="pr-parent-pid">pid 4021</text>
+
+          <!-- child -->
+          <g id="pr-child" style="opacity:0">
+            <rect x="40" y="170" width="180" height="80" rx="10" fill="#241410" stroke="#E5654B" id="pr-child-box"/>
+            <text x="130" y="200" font-size="13" fill="#E5654B" text-anchor="middle" id="pr-child-name">Rust (clone)</text>
+            <text x="130" y="220" font-size="10" fill="#84999C" text-anchor="middle" id="pr-child-sub">forked copy</text>
+            <text x="130" y="236" font-size="9" fill="#84999C" text-anchor="middle">pid 4022</text>
+          </g>
+
+          <!-- fork arrow -->
+          <path id="pr-fork-arrow" d="M130 122 V 168" stroke="#E5654B" stroke-width="2" fill="none" marker-end="url(#ahp2)" style="opacity:0"/>
+
+          <!-- file -->
+          <g id="pr-file" style="opacity:0">
+            <rect x="380" y="100" width="150" height="86" rx="10" fill="#131E22" stroke="#F0A53C"/>
+            <text x="455" y="128" font-size="12" fill="#F0A53C" text-anchor="middle">log_summary</text>
+            <text x="455" y="144" font-size="12" fill="#F0A53C" text-anchor="middle">.txt</text>
+            <text x="455" y="168" font-size="9" fill="#84999C" text-anchor="middle">the shared channel</text>
+          </g>
+          <path id="pr-write" d="M222 95 C 300 95, 320 120, 378 128" stroke="#5BC8D6" stroke-width="2" fill="none" marker-end="url(#ahb2)" style="opacity:0"/>
+          <text id="pr-write-l" x="270" y="92" font-size="10" fill="#5BC8D6" style="opacity:0">writes</text>
+          <path id="pr-read" d="M378 158 C 320 175, 300 205, 222 210" stroke="#E5654B" stroke-width="2" fill="none" marker-end="url(#ahp2)" style="opacity:0"/>
+          <text id="pr-read-l" x="262" y="205" font-size="10" fill="#E5654B" style="opacity:0">reads</text>
+
+          <!-- output -->
+          <g id="pr-out" style="opacity:0">
+            <rect x="690" y="170" width="150" height="80" rx="10" fill="#10231a" stroke="#86C98A"/>
+            <text x="765" y="205" font-size="12" fill="#86C98A" text-anchor="middle">dashboard</text>
+            <text x="765" y="222" font-size="12" fill="#86C98A" text-anchor="middle">.png</text>
+          </g>
+          <path id="pr-draw" d="M222 215 C 420 270, 560 250, 688 220" stroke="#86C98A" stroke-width="2" fill="none" marker-end="url(#ahs)" style="opacity:0"/>
+
+          <defs>
+            <marker id="ahp2" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#E5654B"/></marker>
+            <marker id="ahb2" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#5BC8D6"/></marker>
+            <marker id="ahs" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#86C98A"/></marker>
+          </defs>
+        </svg>
+
+        <div class="controls">
+          <button class="btn primary" id="pr-go">Run the sequence</button>
+          <button class="btn" id="pr-reset">Reset</button>
+        </div>
+        <p class="hint" id="pr-hint">fork clones the process · exec swaps the child's program for Python · the file carries the data between them · wait reaps the child.</p>
+      </div>
+    </div>
+
+    <div class="flag fact">
+      <p>On Unix, <code>spawn()</code> calls <code>fork()</code> then <code>exec</code>; on Windows it's <code>CreateProcess</code>. A child that has exited but hasn't been <code>wait</code>-ed on stays around as a <strong>zombie</strong>, keeping its process-ID entry until the parent reaps it. The standard library doesn't reap automatically — not even when the <code>Child</code> handle is dropped — so leaked zombies can eventually exhaust the available process IDs.</p>
+    </div>
+  </section>
+
+
+  <!-- ============ 6 · SELF ============ -->
+  <section id="self">
+    <span class="secnum">06 / METHOD RECEIVERS</span>
+    <h2>Three kinds of self</h2>
+    <p class="lead">A method's first parameter says what it does with the struct it belongs to. There are three choices, and each is a different arrangement about who keeps the struct afterward.</p>
+
+    <p><code>&amp;self</code> borrows it to read. <code>&amp;mut self</code> borrows it to change a field. <code>self</code> takes it — the struct moves into the method, and the caller's variable is invalid once the call returns. It's the same borrowing the compiler applies to any other value; here the value happens to be the receiver. After <code>&amp;self</code> or <code>&amp;mut self</code> the caller still owns the struct; after <code>self</code> it doesn't.</p>
+
+    <div class="fig">
+      <div class="fig-head"><span class="fig-title">Method receivers, as a deal about ownership</span><span class="fig-title" id="self-state">caller still owns: yes</span></div>
+      <div class="fig-body">
+        <svg viewBox="0 0 880 220" id="self-svg" role="img" aria-label="A struct on the caller's side; depending on the receiver it is read, mutated, or consumed by the method.">
+          <!-- caller -->
+          <rect x="30" y="40" width="300" height="150" rx="12" fill="#0A1013" stroke="#2E5D66"/>
+          <text x="46" y="30" class="mlabel b">CALLER</text>
+          <g id="self-struct">
+            <rect x="70" y="70" width="220" height="92" rx="10" fill="#131E22" stroke="#5BC8D6" id="self-box"/>
+            <text x="180" y="98" font-size="13" fill="#5BC8D6" text-anchor="middle">agent : LLMAgent</text>
+            <text x="180" y="122" font-size="11" fill="#E8EEEC" text-anchor="middle" id="self-temp">temperature: 0.7</text>
+            <text x="180" y="142" font-size="10" fill="#84999C" text-anchor="middle" id="self-tag">owned here</text>
+          </g>
+
+          <!-- method -->
+          <rect x="550" y="40" width="300" height="150" rx="12" fill="#0A1013" stroke="#6E5230"/>
+          <text x="566" y="30" class="mlabel p">METHOD BODY</text>
+          <g id="self-inside" style="opacity:0">
+            <rect x="590" y="70" width="220" height="92" rx="10" fill="#2a1f0e" stroke="#F0A53C"/>
+            <text x="700" y="98" font-size="13" fill="#F0A53C" text-anchor="middle" id="self-inside-l">borrowed view</text>
+            <text x="700" y="122" font-size="11" fill="#E8EEEC" text-anchor="middle" id="self-inside-temp">temperature: 0.7</text>
+          </g>
+
+          <!-- link -->
+          <path id="self-link" d="M292 116 H 588" stroke="#84999C" stroke-width="2" fill="none" stroke-dasharray="4 4" style="opacity:0" marker-end="url(#ahd)"/>
+          <text id="self-link-l" x="440" y="106" font-size="11" fill="#84999C" text-anchor="middle" style="opacity:0">&self</text>
+          <defs><marker id="ahd" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#84999C"/></marker></defs>
+        </svg>
+
+        <div class="controls">
+          <div class="seg" role="group" aria-label="Receiver">
+            <button class="btn active" id="rc-ref">&amp;self · read</button>
+            <button class="btn" id="rc-mut">&amp;mut self · change</button>
+            <button class="btn" id="rc-own">self · consume</button>
+          </div>
+          <button class="btn" id="rc-call">Call the method</button>
+          <button class="btn" id="rc-reset">Reset</button>
+        </div>
+        <p class="hint" id="self-hint">&self borrows the struct to read. The caller keeps it, unchanged.</p>
+      </div>
+    </div>
+
+    <pre><span class="cm">// the same struct, three receivers</span>
+<span class="kw">impl</span> <span class="ty">LLMAgent</span> {
+    <span class="kw">fn</span> <span class="fn">get_info</span>(&<span class="kw">self</span>) -> <span class="ty">String</span> { <span class="cm">// reads a field; caller keeps the struct</span> }
+    <span class="kw">fn</span> <span class="fn">warm_up</span>(&<span class="kw">mut</span> <span class="kw">self</span>)        { <span class="cm">// changes a field; caller keeps the struct</span> }
+    <span class="kw">fn</span> <span class="fn">retire</span>(<span class="kw">self</span>)              { <span class="cm">// consumes it; caller's variable is now invalid</span> }
+}</pre>
+  </section>
+
+
+  <!-- ============ FOOTER ============ -->
+  <footer>
+    <div class="eyebrow">Scope</div>
+    <p style="max-width:64ch">Everything above stays within safe Rust except the inline-assembly system call. The heap is reached through <code>String</code>, <code>Vec</code>, and <code>Box</code> rather than raw allocation, and lifetimes, <code>unsafe</code> beyond that one call, and manual pointer work aren't covered here.</p>
+    <p class="aside" style="margin-top:22px">The diagrams simplify real byte offsets, system-call numbers, and process behavior, all of which depend on platform and compiler version. <code>std::mem::size_of</code> and a debugger give the exact numbers for a given machine.</p>
+  </footer>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function $(id){return document.getElementById(id);}
+  function setOpacity(el,v){ if(el) el.style.opacity = v; }
+
+  /* ============================================================
+     1 · STACK / HEAP  — fat pointer, move vs clone
+  ============================================================ */
+  (function(){
+    var letters = ["A","l","i","c","e"];
+    function drawCells(groupId, color){
+      var g = $(groupId); if(!g) return;
+      g.innerHTML = "";
+      var x = 600;
+      letters.forEach(function(ch){
+        var r = document.createElementNS("http://www.w3.org/2000/svg","rect");
+        r.setAttribute("x",x); r.setAttribute("y",groupId==="cellsA"?44:104);
+        r.setAttribute("width",26); r.setAttribute("height",26); r.setAttribute("rx",4);
+        r.setAttribute("fill","#0e2a30"); r.setAttribute("stroke",color);
+        g.appendChild(r);
+        var t = document.createElementNS("http://www.w3.org/2000/svg","text");
+        t.setAttribute("x",x+13); t.setAttribute("y",(groupId==="cellsA"?44:104)+18);
+        t.setAttribute("font-size","13"); t.setAttribute("fill","#E8EEEC");
+        t.setAttribute("text-anchor","middle"); t.textContent = ch;
+        g.appendChild(t);
+        x += 30;
+      });
+    }
+    drawCells("cellsA","#5BC8D6");
+    drawCells("cellsB","#F0A53C");
+
+    var hB=$("handleB"), arrB=$("arrB"), heapB=$("heapB"), state=$("sh-state"), hint=$("sh-hint"), hBname=$("handleBname"), ptrA=$("ptrA");
+
+    function reset(){
+      setOpacity(hB,0); setOpacity(arrB,0); setOpacity(heapB,0);
+      $("handleA").style.opacity = 1;
+      ptrA.textContent="0x7f…a0";
+      state.textContent="owner: name";
+      hint.textContent='A move copies the 24-byte handle and invalidates the original. A clone allocates a second buffer and copies the bytes.';
+    }
+    $("sh-move").addEventListener("click",function(){
+      reset();
+      hBname.textContent="moved_to : String";
+      setOpacity(hB,1); setOpacity(arrB,1);
+      // old handle greys out (moved-from, invalid)
+      $("handleA").style.opacity = .28;
+      ptrA.textContent="0x7f…a0";
+      state.textContent="owner: moved_to";
+      hint.textContent='Move: the handle was copied (24 bytes); the heap allocation is untouched. The original name is now invalid.';
+    });
+    $("sh-clone").addEventListener("click",function(){
+      reset();
+      hBname.textContent="copy : String";
+      $("ptrB").textContent="0x9c…14";
+      setOpacity(hB,1); setOpacity(heapB,1);
+      var b=$("arrB"); b.setAttribute("d","M150 217 C 430 217, 430 120, 502 120"); setOpacity(b,1);
+      state.textContent="owners: name + copy";
+      hint.textContent='Clone: a second heap allocation was made and the bytes copied. Two independent strings, both valid.';
+    });
+    $("sh-reset").addEventListener("click",reset);
+  })();
+
+
+  /* ============================================================
+     2 · LAYOUT — alignment, padding, repr(Rust) vs repr(C)
+  ============================================================ */
+  (function(){
+    var TYPES = {
+      "u8":{size:1,align:1,color:"#5BC8D6"},
+      "u16":{size:2,align:2,color:"#F0A53C"},
+      "u32":{size:4,align:4,color:"#86C98A"},
+      "u64":{size:8,align:8,color:"#c79bff"}
+    };
+    // declared order
+    var fields = [
+      {name:"a", ty:"u8"},
+      {name:"b", ty:"u64"},
+      {name:"c", ty:"u16"},
+      {name:"d", ty:"u8"}
+    ];
+    var mode = "rust"; // or "c"
+
+    function layout(order){
+      // returns {cells:[{kind,field,color}], size, padding}
+      var cells=[], offset=0, maxAlign=1, padding=0;
+      order.forEach(function(f){
+        var t=TYPES[f.ty]; maxAlign=Math.max(maxAlign,t.align);
+        var pad=(t.align - (offset % t.align)) % t.align;
+        for(var i=0;i<pad;i++){cells.push({kind:"pad"}); padding++;}
+        offset+=pad;
+        for(var j=0;j<t.size;j++){cells.push({kind:"data",field:f.name,color:t.color,first:j===0,ty:f.ty});}
+        offset+=t.size;
+      });
+      var tail=(maxAlign-(offset%maxAlign))%maxAlign;
+      for(var k=0;k<tail;k++){cells.push({kind:"pad"}); padding++;}
+      offset+=tail;
+      return {cells:cells, size:offset, padding:padding, maxAlign:maxAlign};
+    }
+
+    function orderFor(){
+      if(mode==="c") return fields.slice();
+      // repr(Rust): sort by align desc, stable
+      return fields.map(function(f,i){return {f:f,i:i};})
+        .sort(function(a,b){ return TYPES[b.f.ty].align - TYPES[a.f.ty].align || a.i - b.i; })
+        .map(function(o){return o.f;});
+    }
+
+    function renderFieldList(){
+      var host=$("field-list"); host.innerHTML="";
+      fields.forEach(function(f,idx){
+        var t=TYPES[f.ty];
+        var row=document.createElement("div"); row.className="fieldrow";
+        row.innerHTML =
+          '<span class="swatch" style="background:'+t.color+'"></span>'+
+          '<span class="fname">'+f.name+': '+f.ty+'</span>'+
+          '<span class="fmeta">size '+t.size+' · align '+t.align+'</span>'+
+          '<span class="ord"></span>';
+        var ord=row.querySelector(".ord");
+        var up=document.createElement("button"); up.className="ordbtn"; up.textContent="↑"; up.setAttribute("aria-label","move "+f.name+" up");
+        var dn=document.createElement("button"); dn.className="ordbtn"; dn.textContent="↓"; dn.setAttribute("aria-label","move "+f.name+" down");
+        up.disabled = idx===0; dn.disabled = idx===fields.length-1;
+        up.onclick=function(){ var t2=fields[idx-1]; fields[idx-1]=fields[idx]; fields[idx]=t2; render(); };
+        dn.onclick=function(){ var t2=fields[idx+1]; fields[idx+1]=fields[idx]; fields[idx]=t2; render(); };
+        ord.appendChild(up); ord.appendChild(dn);
+        host.appendChild(row);
+      });
+    }
+
+    function render(){
+      renderFieldList();
+      var order=orderFor();
+      var L=layout(order);
+      var bf=$("bytefield"); bf.innerHTML="";
+      L.cells.forEach(function(c,i){
+        var d=document.createElement("div");
+        d.className="byte"+(c.kind==="pad"?" pad":"");
+        if(c.kind==="data"){ d.style.background=c.color; d.textContent = c.first? c.field : ""; }
+        else { d.textContent="·"; d.title="padding"; }
+        bf.appendChild(d);
+      });
+      var minSize = layout(fields.map(function(f,i){return {f:f,i:i};})
+          .sort(function(a,b){return TYPES[b.f.ty].align-TYPES[a.f.ty].align||a.i-b.i;})
+          .map(function(o){return o.f;})).size;
+      var out=$("sizeout");
+      out.innerHTML = 'size = <b>'+L.size+'</b> bytes &nbsp; · &nbsp; padding = <span class="waste">'+L.padding+'</span> wasted bytes';
+
+      var hint=$("layout-hint");
+      if(mode==="rust"){
+        hint.textContent = "repr(Rust): the compiler ignores the declared order and packs optimally, "+L.maxAlign+"-byte aligned. Reordering the fields leaves the size at "+L.size+" bytes.";
+      } else {
+        hint.textContent = (L.size>minSize)
+          ? "#[repr(C)]: fields stay in declared order. This arrangement wastes "+L.padding+" bytes ("+L.size+" total). Largest alignment first is tightest, at "+minSize+" bytes."
+          : "#[repr(C)]: fields stay in declared order. This is the tightest packing, "+L.size+" bytes — the same as the automatic layout.";
+      }
+    }
+
+    $("rep-rust").addEventListener("click",function(){
+      mode="rust"; $("rep-rust").classList.add("active"); $("rep-rust").setAttribute("aria-selected","true");
+      $("rep-c").classList.remove("active"); $("rep-c").setAttribute("aria-selected","false"); render();
+    });
+    $("rep-c").addEventListener("click",function(){
+      mode="c"; $("rep-c").classList.add("active"); $("rep-c").setAttribute("aria-selected","true");
+      $("rep-rust").classList.remove("active"); $("rep-rust").setAttribute("aria-selected","false"); render();
+    });
+    render();
+  })();
+
+
+  /* ============================================================
+     3 · SYSCALL — animated boundary crossing + step mode
+  ============================================================ */
+  (function(){
+    var packet=$("packet"), mode=$("sc-mode"), gate=$("gate"), boundary=$("boundary"), log=$("sc-log");
+    var lns = log.querySelectorAll(".ln");
+    var stepIdx=-1, busy=false;
+
+    function clearLog(){ lns.forEach(function(l){l.classList.remove("on");}); }
+    function lightStep(i){ clearLog(); for(var k=0;k<=i;k++){ if(lns[k]) lns[k].classList.add("on"); } }
+    function moveTo(cx,cy,dur,cb){
+      var startX = parseFloat(packet.querySelector("circle").getAttribute("cx"));
+      var startY = parseFloat(packet.querySelector("circle").getAttribute("cy"));
+      if(reduce){ place(cx,cy); if(cb) cb(); return; }
+      var t0=null;
+      function frame(t){
+        if(!t0) t0=t; var p=Math.min(1,(t-t0)/dur);
+        var e = p<.5? 2*p*p : -1+(4-2*p)*p;
+        place(startX+(cx-startX)*e, startY+(cy-startY)*e);
+        if(p<1) requestAnimationFrame(frame); else if(cb) cb();
+      }
+      requestAnimationFrame(frame);
+    }
+    function place(cx,cy){
+      packet.querySelector("circle").setAttribute("cx",cx);
+      packet.querySelector("circle").setAttribute("cy",cy);
+      packet.querySelector("text").setAttribute("x",cx);
+      packet.querySelector("text").setAttribute("y",cy+4);
+    }
+    function flashGate(){
+      if(reduce) return;
+      gate.style.transition="none"; gate.setAttribute("fill","#E5654B");
+      setTimeout(function(){ gate.style.transition=".5s"; gate.setAttribute("fill","#1a0f0c"); },120);
+    }
+    function reset(){
+      busy=false; stepIdx=-1; clearLog(); setOpacity(packet,0); place(115,85);
+      mode.textContent="mode: USER"; mode.style.color="";
+    }
+    function full(){
+      if(busy) return; busy=true; reset(); setOpacity(packet,1);
+      lightStep(0);
+      moveTo(115,142,650,function(){           // down to gate
+        lightStep(1); flashGate(); mode.textContent="mode: KERNEL ⚠"; boundary.setAttribute("stroke-width","4");
+        moveTo(440,200,500,function(){          // into kernel
+          lightStep(2);
+          moveTo(765,233,650,function(){        // to device
+            setTimeout(function(){
+              lightStep(3); mode.textContent="mode: USER"; boundary.setAttribute("stroke-width","2.5");
+              moveTo(115,85,800,function(){ busy=false; }); // return home
+            },350);
+          });
+        });
+      });
+    }
+    var stepPositions=[[115,85],[440,142],[440,200],[115,85]];
+    function step(){
+      if(busy) return;
+      stepIdx++;
+      if(stepIdx>3){ reset(); return; }
+      setOpacity(packet,1); lightStep(stepIdx);
+      var p=stepPositions[stepIdx]; place(p[0],p[1]);
+      if(stepIdx===1){ flashGate(); mode.textContent="mode: KERNEL ⚠"; }
+      if(stepIdx===2){ mode.textContent="mode: KERNEL ⚠"; }
+      if(stepIdx===3){ mode.textContent="mode: USER"; }
+      $("sc-step").textContent = stepIdx>=3 ? "Reset ↻" : "Step through ▸";
+    }
+    $("sc-go").addEventListener("click",full);
+    $("sc-step").addEventListener("click",step);
+    $("sc-reset2").addEventListener("click",function(){ reset(); $("sc-step").textContent="Step through ▸"; });
+    reset();
+  })();
+
+
+  /* ============================================================
+     4 · BUFFERING — syscall counter, unbuffered vs buffered
+  ============================================================ */
+  (function(){
+    var msg="Hello, world!";
+    var uG=$("bf-u-chars"), bG=$("bf-b-chars"), uC=$("bf-u-count"), bC=$("bf-b-count"), hint=$("bf-hint");
+    var running=false;
+
+    function mkChar(group,ch,x,y,color){
+      var t=document.createElementNS("http://www.w3.org/2000/svg","text");
+      t.setAttribute("x",x); t.setAttribute("y",y); t.setAttribute("font-size","13");
+      t.setAttribute("fill",color); t.setAttribute("text-anchor","middle");
+      t.setAttribute("font-family","JetBrains Mono, monospace"); t.textContent=ch;
+      group.appendChild(t); return t;
+    }
+    function reset(){
+      running=false; uG.innerHTML=""; bG.innerHTML=""; uC.textContent="0"; bC.textContent="0";
+      hint.textContent='The same 13 characters reach the device either way. Unbuffered makes 13 system calls; buffered makes 1.';
+    }
+    function run(){
+      if(running) return; running=true; reset(); running=true;
+      var i=0, delay=reduce?0:120;
+      var startX=30, step=Math.min(26,(330)/msg.length);
+      // unbuffered: each char drops across the line, counter ++
+      function nextU(){
+        if(i>=msg.length){ startBuffered(); return; }
+        var x=startX+i*step;
+        var t=mkChar(uG,msg[i],x,30,"#86C98A");
+        if(reduce){ t.setAttribute("y",92); t.setAttribute("fill","#E5654B"); }
+        else { setTimeout(function(){ t.setAttribute("y",92); t.setAttribute("fill","#E5654B"); },delay/2); }
+        uC.textContent = (i+1);
+        i++;
+        setTimeout(nextU, delay);
+      }
+      function startBuffered(){
+        var j=0;
+        function nextB(){
+          if(j>=msg.length){
+            // one flush
+            setTimeout(function(){
+              var flushed=bG.querySelectorAll("text");
+              flushed.forEach(function(t){ t.setAttribute("y",92); t.setAttribute("fill","#E5654B"); });
+              bC.textContent="1";
+              running=false;
+              hint.textContent=msg.length+' system calls versus 1. The buffer replaced '+msg.length+' crossings with a single flush.';
+            }, reduce?0:260);
+            return;
+          }
+          var x=128+ (j% 11)*11;
+          mkChar(bG,msg[j], x, 45, "#5BC8D6"); // sits in the bucket
+          j++;
+          setTimeout(nextB, delay/1.4);
+        }
+        nextB();
+      }
+      nextU();
+    }
+    $("bf-go").addEventListener("click",run);
+    $("bf-reset").addEventListener("click",reset);
+    reset();
+  })();
+
+
+  /* ============================================================
+     5 · PROCESS — fork / exec / file IPC / wait+zombie
+  ============================================================ */
+  (function(){
+    var stage=$("pr-stage"), hint=$("pr-hint");
+    var child=$("pr-child"), forkArrow=$("pr-fork-arrow"),
+        childName=$("pr-child-name"), childSub=$("pr-child-sub"), childBox=$("pr-child-box"),
+        file=$("pr-file"), write=$("pr-write"), writeL=$("pr-write-l"),
+        read=$("pr-read"), readL=$("pr-read-l"), out=$("pr-out"), draw=$("pr-draw");
+    var seq=[], running=false;
+
+    function reset(){
+      running=false;
+      [child,forkArrow,file,write,writeL,read,readL,out,draw].forEach(function(e){setOpacity(e,0);});
+      childName.textContent="Rust (clone)"; childSub.textContent="forked copy";
+      childBox.setAttribute("stroke","#E5654B");
+      stage.textContent="ready";
+      hint.textContent="fork clones the process · exec swaps the child's program for Python · the file carries the data between them · wait reaps the child.";
+    }
+    function go(){
+      if(running) return; running=true; reset(); running=true;
+      var d = reduce?0:850;
+      var t=0;
+      function at(ms,fn){ seq.push(setTimeout(fn,ms)); }
+      at(t+=0,    function(){ stage.textContent="fork()"; setOpacity(forkArrow,1); setOpacity(child,1);
+                              hint.textContent="fork() — the OS clones the parent. Two near-identical processes now exist, same code and memory."; });
+      at(t+=d,    function(){ stage.textContent="exec()"; childName.textContent="Python"; childSub.textContent="exec'd — new program"; childBox.setAttribute("stroke","#F0A53C");
+                              hint.textContent="exec() — the child replaces its own program image with Python. Same process, new program."; });
+      at(t+=d,    function(){ stage.textContent="write"; setOpacity(file,1); setOpacity(write,1); setOpacity(writeL,1);
+                              hint.textContent="The parent writes log_summary.txt."; });
+      at(t+=d,    function(){ stage.textContent="read"; setOpacity(read,1); setOpacity(readL,1);
+                              hint.textContent="The Python child reads the same file. The file is the channel between the two processes."; });
+      at(t+=d,    function(){ stage.textContent="output"; setOpacity(out,1); setOpacity(draw,1);
+                              hint.textContent="Python reads the data and renders the chart."; });
+      at(t+=d,    function(){ stage.textContent="wait()"; childBox.setAttribute("stroke","#5A6E72"); childName.setAttribute("fill","#5A6E72"); setOpacity(forkArrow,.25);
+                              hint.textContent="wait() — the parent reaps the finished child. Skip this and the child lingers as a zombie, holding a PID until reaped."; running=false; });
+    }
+    $("pr-go").addEventListener("click",go);
+    $("pr-reset").addEventListener("click",function(){ seq.forEach(clearTimeout); seq=[]; childName.setAttribute("fill","#E5654B"); reset(); });
+    reset();
+  })();
+
+
+  /* ============================================================
+     6 · SELF — &self / &mut self / self
+  ============================================================ */
+  (function(){
+    var mode="ref";
+    var inside=$("self-inside"), link=$("self-link"), linkL=$("self-link-l"),
+        box=$("self-box"), tag=$("self-tag"), temp=$("self-temp"),
+        insideL=$("self-inside-l"), insideTemp=$("self-inside-temp"),
+        state=$("self-state"), hint=$("self-hint"), structG=$("self-struct");
+
+    function setMode(m){
+      mode=m;
+      $("rc-ref").classList.toggle("active",m==="ref");
+      $("rc-mut").classList.toggle("active",m==="mut");
+      $("rc-own").classList.toggle("active",m==="own");
+      linkL.textContent = m==="ref" ? "&self" : m==="mut" ? "&mut self" : "self";
+      reset();
+    }
+    function reset(){
+      setOpacity(inside,0); setOpacity(link,0); setOpacity(linkL,0);
+      structG.style.opacity=1; box.setAttribute("stroke","#5BC8D6");
+      temp.textContent="temperature: 0.7"; tag.textContent="owned here";
+      insideTemp.textContent="temperature: 0.7";
+      state.textContent="caller still owns: yes";
+      hint.textContent = mode==="ref" ? "&self borrows the struct to read. The caller keeps it, unchanged."
+        : mode==="mut" ? "&mut self borrows the struct so the method can change a field. The caller still keeps it."
+        : "self moves the struct into the method, which consumes it. The caller's variable is invalid afterward.";
+    }
+    function call(){
+      setOpacity(link,1); setOpacity(linkL,1); setOpacity(inside,1);
+      if(mode==="ref"){
+        insideL.textContent="&self — read only"; insideTemp.textContent="reads 0.7";
+        state.textContent="caller still owns: yes";
+        hint.textContent="The method borrowed the struct immutably, read the field, and returned. agent is unchanged and still usable.";
+      } else if(mode==="mut"){
+        insideL.textContent="&mut self — can edit"; insideTemp.textContent="sets 0.9";
+        temp.textContent="temperature: 0.9";
+        state.textContent="caller still owns: yes (now changed)";
+        hint.textContent="The method borrowed the struct mutably and set temperature to 0.9. The change is visible on the caller's struct, which it still owns.";
+      } else {
+        // consume
+        insideL.textContent="self — moved in"; insideTemp.textContent="temperature: 0.7";
+        structG.style.opacity=.22; tag.textContent="moved — invalid"; box.setAttribute("stroke","#5A6E72");
+        state.textContent="caller still owns: NO";
+        hint.textContent="The struct moved into the method and was dropped at the end. The caller's agent is now invalid; using it won't compile.";
+      }
+    }
+    $("rc-ref").addEventListener("click",function(){setMode("ref");});
+    $("rc-mut").addEventListener("click",function(){setMode("mut");});
+    $("rc-own").addEventListener("click",function(){setMode("own");});
+    $("rc-call").addEventListener("click",call);
+    $("rc-reset").addEventListener("click",reset);
+    setMode("ref");
+  })();
+
+})();
+</script>
+</body>
+</html>
