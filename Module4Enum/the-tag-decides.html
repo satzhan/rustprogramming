@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>the tag decides</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Spectral:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ground:#15141c; --surface:#1d1b27; --surface-2:#252231;
+    --line:rgba(236,233,242,.10); --line-strong:rgba(236,233,242,.20);
+    --ink:#ece9f2; --muted:#9b96ab; --faint:#6e6980;
+
+    --v-empty:#8a90b8; --v-flag:#34d3c0; --v-count:#a78bfa;
+    --v-point:#f5b945; --v-span:#fb7faa; --v-color:#7bd88f;
+
+    --signal:#fff3cf;            /* reserved: the live tag / the firing path */
+    --ok:#7bd88f; --err:#fb7faa;
+
+    --mono:'JetBrains Mono',ui-monospace,monospace;
+    --disp:'Space Grotesk',system-ui,sans-serif;
+    --serif:'Spectral',Georgia,serif;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:
+      radial-gradient(1200px 600px at 50% -10%, #1c1a26 0%, var(--ground) 55%) fixed;
+    color:var(--ink); font-family:var(--serif); font-size:18px; line-height:1.62;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:940px; margin:0 auto; padding:64px 24px 120px}
+  ::selection{background:rgba(255,243,207,.25)}
+
+  /* ---- type ---- */
+  h1{font-family:var(--disp); font-weight:700; font-size:clamp(34px,6vw,58px);
+     letter-spacing:-.02em; line-height:1.02; margin:0 0 14px}
+  .sub{font-family:var(--serif); font-style:italic; color:var(--muted);
+       font-size:clamp(18px,2.4vw,22px); max-width:60ch; margin:0 0 8px}
+  h2{font-family:var(--disp); font-weight:600; font-size:clamp(22px,3vw,28px);
+     letter-spacing:-.01em; margin:0 0 4px}
+  .kicker{font-family:var(--mono); font-size:12.5px; letter-spacing:.22em;
+          text-transform:uppercase; color:var(--faint); margin:0 0 18px}
+  p{margin:0 0 16px; max-width:68ch}
+  .lead{font-size:20px}
+  strong{color:var(--ink); font-weight:600}
+  em{color:#d9d4e6}
+  code{font-family:var(--mono); font-size:.86em; background:rgba(236,233,242,.07);
+       padding:.08em .36em; border-radius:5px}
+  a{color:var(--v-flag); text-decoration:none; border-bottom:1px solid rgba(52,211,192,.35)}
+
+  /* ---- structure ---- */
+  section{margin:54px 0 0; padding:30px 30px 34px; background:var(--surface);
+    border:1px solid var(--line); border-radius:18px; position:relative; overflow:hidden}
+  section::before{content:attr(data-n); position:absolute; top:18px; right:24px;
+    font-family:var(--mono); font-size:13px; color:var(--faint); letter-spacing:.1em}
+  .intro{background:none; border:none; padding:0; margin-top:30px}
+  hr{border:none; border-top:1px solid var(--line); margin:46px 0}
+
+  /* ---- shared widget bits ---- */
+  .panel{background:var(--surface-2); border:1px solid var(--line);
+    border-radius:14px; padding:20px; margin:18px 0}
+  .row{display:flex; flex-wrap:wrap; gap:10px; align-items:center}
+  .controls{display:flex; flex-wrap:wrap; gap:10px; margin:4px 0 0}
+  .caption{font-size:15.5px; color:var(--muted); margin:14px 0 0; max-width:70ch}
+
+  button{font-family:var(--disp); font-weight:500; font-size:15px; color:var(--ink);
+    background:var(--surface-2); border:1px solid var(--line-strong);
+    border-radius:10px; padding:9px 15px; cursor:pointer; transition:.16s ease}
+  button:hover{border-color:var(--muted); transform:translateY(-1px)}
+  button:active{transform:translateY(0)}
+  button.primary{background:rgba(255,243,207,.10); border-color:rgba(255,243,207,.4)}
+
+  /* variant chips */
+  .chip{font-family:var(--mono); font-weight:500; font-size:14px; padding:8px 13px;
+    border-radius:9px; cursor:pointer; border:1px solid var(--line-strong);
+    background:var(--surface); color:var(--muted); transition:.18s ease;
+    display:inline-flex; align-items:center; gap:8px}
+  .chip .dot{width:9px; height:9px; border-radius:50%; background:currentColor; opacity:.5}
+  .chip[data-on="1"]{color:var(--hue,#fff); border-color:var(--hue,#fff);
+    background:color-mix(in srgb, var(--hue) 14%, var(--surface));
+    box-shadow:0 0 0 1px var(--hue), 0 0 22px -6px var(--hue)}
+  .chip[data-on="1"] .dot{opacity:1; box-shadow:0 0 10px var(--hue)}
+
+  .mono{font-family:var(--mono)}
+  .num{font-family:var(--mono); font-variant-numeric:tabular-nums}
+
+  /* code block */
+  pre{font-family:var(--mono); font-size:14px; line-height:1.7; background:#16151e;
+    border:1px solid var(--line); border-radius:12px; padding:16px 18px; margin:16px 0;
+    overflow-x:auto; color:#c9c4d8}
+  .kw{color:#c792ea} .ty{color:#82aaff} .st{color:#c3e88d} .fn{color:#82aaff}
+  .cm{color:var(--faint); font-style:italic}
+  .vEmpty{color:var(--v-empty)} .vFlag{color:var(--v-flag)} .vCount{color:var(--v-count)}
+  .vPoint{color:var(--v-point)} .vSpan{color:var(--v-span)} .vColor{color:var(--v-color)}
+  .hl{background:rgba(255,243,207,.12); border-radius:4px; padding:0 3px}
+  .dim{opacity:.34}
+
+  /* readouts */
+  .read{font-family:var(--mono); font-size:15px; background:#16151e;
+    border:1px solid var(--line); border-radius:10px; padding:12px 15px; color:var(--ink)}
+  .read .lbl{color:var(--faint)}
+  .pill{font-family:var(--mono); font-size:12px; padding:3px 9px; border-radius:999px;
+    border:1px solid var(--line-strong); color:var(--muted)}
+
+  /* epistemic callouts (always text-labelled so colour is never the only cue) */
+  .note{border-left:3px solid var(--c); background:color-mix(in srgb,var(--c) 7%, transparent);
+    border-radius:0 10px 10px 0; padding:13px 16px 13px 17px; margin:16px 0; font-size:15.5px}
+  .note .tag{font-family:var(--mono); font-size:11px; letter-spacing:.14em;
+    text-transform:uppercase; color:var(--c); display:block; margin-bottom:5px; font-weight:700}
+  .note.verified{--c:var(--v-flag)} .note.judgment{--c:var(--v-point)} .note.simplified{--c:var(--v-span)}
+
+  /* memory ruler */
+  .ruler{display:flex; gap:3px; flex-wrap:wrap; margin:6px 0 2px}
+  .byte{width:30px; height:30px; border-radius:5px; background:#16151e;
+    border:1px solid var(--line); transition:.22s ease; position:relative}
+  .byte.used{background:color-mix(in srgb,var(--hue) 60%, #16151e); border-color:var(--hue)}
+  .byte.dead{background:repeating-linear-gradient(45deg,#1a1922,#1a1922 4px,#16151e 4px,#16151e 8px)}
+  .byte.tag{background:color-mix(in srgb,var(--signal) 55%, #16151e); border-color:var(--signal)}
+  .byte.pad{background:#19181f; border-style:dashed; border-color:var(--line)}
+
+  /* match arms */
+  .arm{font-family:var(--mono); font-size:14px; padding:10px 14px; border-radius:9px;
+    border:1px solid var(--line); margin:7px 0; background:#16151e; transition:.2s ease;
+    display:flex; align-items:center; gap:12px}
+  .arm.fired{border-color:var(--signal); background:color-mix(in srgb,var(--signal) 9%, #16151e);
+    box-shadow:0 0 26px -10px var(--signal)}
+  .arm .wire{width:8px; height:8px; border-radius:50%; background:var(--line-strong); flex:none}
+  .arm.fired .wire{background:var(--signal); box-shadow:0 0 10px var(--signal)}
+  .banner{font-family:var(--mono); font-size:13.5px; border-radius:10px; padding:13px 15px;
+    margin:14px 0 0; white-space:pre-wrap; line-height:1.55}
+  .banner.bad{background:rgba(251,127,170,.10); border:1px solid rgba(251,127,170,.45); color:#ffc2d4}
+  .banner.good{background:rgba(123,216,143,.09); border:1px solid rgba(123,216,143,.4); color:#bdeecb}
+
+  /* size bars */
+  .bars{display:grid; grid-template-columns:auto 1fr; gap:12px 16px; align-items:center; margin:6px 0}
+  .barlab{font-family:var(--mono); font-size:14px; color:var(--muted); text-align:right; white-space:nowrap}
+  .bartrack{height:30px; border-radius:7px; background:#16151e; border:1px solid var(--line);
+    position:relative; overflow:hidden}
+  .barfill{height:100%; border-radius:6px; transition:width .5s cubic-bezier(.2,.7,.2,1);
+    display:flex; align-items:center; padding-left:10px; font-family:var(--mono);
+    font-size:13px; color:#16151e; font-weight:700}
+
+  .field{display:inline-flex; align-items:center; gap:6px; font-family:var(--mono); font-size:14px}
+  .field input[type=number]{width:62px; font-family:var(--mono); font-size:14px; background:#16151e;
+    color:var(--ink); border:1px solid var(--line-strong); border-radius:7px; padding:6px 8px}
+  .toggle{display:inline-flex; align-items:center; gap:9px; cursor:pointer; user-select:none;
+    font-size:15px; color:var(--muted)}
+  .switch{width:42px; height:24px; border-radius:999px; background:#2a2734; border:1px solid var(--line-strong);
+    position:relative; transition:.2s}
+  .switch::after{content:""; position:absolute; width:18px; height:18px; border-radius:50%;
+    background:var(--muted); top:2px; left:2px; transition:.2s}
+  .toggle[data-on="1"] .switch{background:color-mix(in srgb,var(--signal) 30%, #2a2734); border-color:var(--signal)}
+  .toggle[data-on="1"] .switch::after{left:21px; background:var(--signal)}
+
+  .slot{display:flex; gap:8px; align-items:stretch; flex-wrap:wrap; margin:8px 0}
+  .cellbox{border:1.5px solid var(--hue); border-radius:11px; padding:12px 16px; min-width:74px;
+    background:color-mix(in srgb,var(--hue) 11%, var(--surface)); transition:.22s ease}
+  .cellbox .fname{font-family:var(--mono); font-size:11.5px; color:var(--muted); letter-spacing:.04em}
+  .cellbox .fval{font-family:var(--mono); font-size:18px; color:var(--ink); margin-top:2px}
+  .tagbox{border:1.5px solid var(--signal); background:color-mix(in srgb,var(--signal) 14%, var(--surface));
+    border-radius:11px; padding:12px 16px; display:flex; flex-direction:column; justify-content:center}
+  .tagbox .fname{color:var(--signal)}
+
+  .foot{margin-top:60px; padding-top:24px; border-top:1px solid var(--line);
+    font-size:14.5px; color:var(--faint)}
+  .legend{display:flex; flex-wrap:wrap; gap:14px; margin:18px 0 0; font-family:var(--mono); font-size:13px; color:var(--muted)}
+  .legend span{display:inline-flex; align-items:center; gap:7px}
+  .legend i{width:11px; height:11px; border-radius:3px; display:inline-block}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="intro">
+    <h1>the tag decides</h1>
+    <p class="sub">An enum is one value wearing one of several shapes. A hidden tag records which shape is in the slot right now. Everything else &mdash; how it&rsquo;s matched, what it costs in memory, the two types that hold the whole language together &mdash; falls out of that one fact.</p>
+  </header>
+
+  <p class="lead" style="margin-top:34px">Pick any value in a program and it usually has one fixed layout: an <code>i32</code> is always four bytes of integer. An enum loosens that. The value is allowed to be one of a few named alternatives, and it carries a small marker &mdash; the <strong>tag</strong>, or <em>discriminant</em> &mdash; saying which alternative is live. Read the tag and you know what&rsquo;s in the slot. Six things follow. Each one below is a control you can turn, not a picture.</p>
+
+  <div class="legend" id="legend"></div>
+
+  <!-- ======================= 1 ======================= -->
+  <section data-n="01">
+    <p class="kicker">one value &middot; several shapes</p>
+    <h2>The shape&ndash;shifter</h2>
+    <p>Here is one enum with five alternatives. Some carry nothing, some carry one piece of data, some carry several named pieces. Choose which alternative the value <em>is</em>. Only one can be live at a time &mdash; that is the whole point of the word <em>or</em>.</p>
+
+    <div class="panel">
+      <div class="row" id="w1chips"></div>
+      <div class="slot" id="w1slot" style="margin-top:18px"></div>
+      <div class="read" id="w1let" style="margin-top:14px"></div>
+      <p class="caption">The alternative you picked <em>is</em> the tag. The bright box is the tag; the coloured boxes are whatever that alternative carries. Switch alternatives and the carried shape changes underneath the same variable.</p>
+    </div>
+
+    <pre id="w1decl"></pre>
+  </section>
+
+  <!-- ======================= 2 ======================= -->
+  <section data-n="02">
+    <p class="kicker">the slot fits the largest tenant</p>
+    <h2>The hidden tag, and the biggest tenant</h2>
+    <p>The value has to fit in memory whatever shape it takes. So the compiler reserves a slot big enough for the <strong>largest</strong> alternative, plus room to record which alternative is in it. Change the live alternative below. The lit bytes &mdash; the part actually in use &mdash; shrink and grow. The slot does not.</p>
+
+    <div class="panel">
+      <div class="row" id="w2chips"></div>
+      <div style="margin:18px 0 6px"><span class="pill" id="w2activelab"></span></div>
+      <div class="ruler" id="w2ruler"></div>
+      <div class="row" style="justify-content:space-between; margin-top:14px">
+        <div class="read"><span class="lbl">in use now:</span> <span class="num" id="w2used"></span> bytes</div>
+        <div class="read"><span class="lbl">size_of::&lt;Cell&gt;() =</span> <span class="num" style="color:var(--signal)">24</span> bytes &mdash; fixed</div>
+      </div>
+      <p class="caption">Rent a slot big enough for the largest possible occupant and it fits no matter who moves in. <code>Flag(true)</code> uses one byte and leaves the rest reserved; <code>Span</code> fills the payload. The size never moves, because the variable has to be able to become any alternative later.</p>
+    </div>
+
+    <div class="note verified"><span class="tag">compiled &middot; x86-64 &middot; rustc 1.75</span>
+      <code>std::mem::size_of::&lt;Cell&gt;()</code> returns <strong>24</strong>: a 16-byte payload sized to the largest alternative (<code>Span</code> = two <code>i64</code>) plus an 8-byte region carrying the one-byte tag and its alignment padding.</div>
+
+    <div class="note simplified"><span class="tag">simplified</span>
+      Default <code>repr(Rust)</code> does not promise <em>where</em> the tag sits or that the layout matches the boxes above &mdash; only that the slot can hold any alternative and record which one. Exact offsets are the compiler&rsquo;s to choose and can differ by version and platform. Run <code>size_of</code> for the true number on a given machine.</div>
+  </section>
+
+  <!-- ======================= 3 ======================= -->
+  <section data-n="03">
+    <p class="kicker">match reads the tag</p>
+    <h2>The switchboard</h2>
+    <p>To use the value you have to ask which alternative it is. <code>match</code> does that: it reads the tag and routes down exactly one arm. Pick the live alternative and watch the matching arm fire. Then add an alternative to the enum &mdash; the compiler refuses to build until the <code>match</code> handles it too. You cannot forget a case, because forgetting is a compile error.</p>
+
+    <div class="panel">
+      <div class="row" style="gap:18px; margin-bottom:6px">
+        <span class="mono" style="color:var(--muted); font-size:13px">live value routes to &rarr;</span>
+        <div class="row" id="w3chips"></div>
+      </div>
+      <div id="w3arms" style="margin-top:6px"></div>
+      <div class="controls" style="margin-top:16px">
+        <button id="w3addvar">+ add alternative <span class="vColor">Color(u8,u8,u8)</span></button>
+        <button id="w3addarm" disabled>+ add its match arm</button>
+        <button id="w3wild" disabled>use <span class="mono">_</span> catch&ndash;all instead</button>
+      </div>
+      <div id="w3banner"></div>
+    </div>
+
+    <div class="note verified"><span class="tag">compiled &middot; rustc 1.75</span>
+      Leaving an alternative unhandled is the real error <code>E0004</code>: <span class="mono" style="color:#ffc2d4">non-exhaustive patterns: `Cell::Color(_)` not covered</span>. A single <code>_</code> arm satisfies it by absorbing every remaining alternative &mdash; convenient, but it also silences the compiler the next time you add one.</div>
+  </section>
+
+  <!-- ======================= 4 ======================= -->
+  <section data-n="04">
+    <p class="kicker">the two that run the language</p>
+    <h2>Absence and failure are just enums</h2>
+    <p>The same construct, twice, holds up most of Rust. A value that might be missing, and a result that might have failed, are not special syntax &mdash; they are this exact thing: a tag, and a payload behind it.</p>
+
+    <pre>
+<span class="kw">enum</span> <span class="ty">Option</span>&lt;T&gt; { <span class="vEmpty">None</span>,        <span class="vFlag">Some</span>(T) }   <span class="cm">// maybe a value</span>
+<span class="kw">enum</span> <span class="ty">Result</span>&lt;T,E&gt; { <span class="vFlag">Ok</span>(T),  <span class="vSpan">Err</span>(E) }   <span class="cm">// worked, or didn't</span></pre>
+
+    <p>A lookup that may find nothing returns <code>Option</code>. Flip the input below between a value that exists and one that doesn&rsquo;t, then try to pull the value out with <code>.unwrap()</code> &mdash; a method on the enum that returns the payload when the tag is <code>Some</code>, and stops the program cold when it is <code>None</code>.</p>
+
+    <div class="panel">
+      <div class="row" style="gap:18px">
+        <div class="toggle" id="w4toggle" data-on="1" role="button" tabindex="0">
+          <div class="switch"></div><span id="w4togglabel"></span>
+        </div>
+      </div>
+      <div class="read" id="w4ret" style="margin-top:16px"></div>
+      <div class="controls" style="margin-top:14px">
+        <button class="primary" id="w4unwrap">call <span class="mono">.unwrap()</span></button>
+        <button id="w4reset">reset</button>
+      </div>
+      <div id="w4out"></div>
+      <p class="caption">To reach the payload you must first confront the tag. That is the trade: the compiler hands you a value only after you have said what to do when there isn&rsquo;t one. The <code>.unwrap()</code> scattered through quick examples is this method &mdash; it skips the confrontation and accepts a crash if the tag isn&rsquo;t the happy one.</p>
+    </div>
+
+    <div class="note verified"><span class="tag">compiled &middot; rustc 1.75</span>
+      Unwrapping the empty case panics with the exact message <span class="mono" style="color:#ffc2d4">called `Option::unwrap()` on a `None` value</span>. <code>Option</code> is the honest replacement for a null pointer; <code>Result</code> is the honest replacement for a returned error code &mdash; both make &ldquo;it might not be there&rdquo; a shape you are forced to open.</div>
+  </section>
+
+  <!-- ======================= 5 ======================= -->
+  <section data-n="05">
+    <p class="kicker">when the tag costs nothing</p>
+    <h2>The tag can hide</h2>
+    <p>A tag usually needs its own bytes &mdash; that is why <code>Option&lt;i32&gt;</code> is wider than a bare <code>i32</code>. But if the wrapped type already has a value it can <em>never</em> hold &mdash; a reference can never be null, a <code>NonZeroU32</code> can never be zero &mdash; the compiler stores <code>None</code> as that forbidden pattern and spends no extra space at all. That spare pattern is called a <strong>niche</strong>. Switch the inner type and compare.</p>
+
+    <div class="panel">
+      <div class="row" id="w5chips" style="margin-bottom:8px"></div>
+      <div class="bars" id="w5bars" style="margin-top:14px"></div>
+      <div class="read" id="w5verdict" style="margin-top:16px"></div>
+      <p class="caption">Same wrapper, opposite outcome. When the inner type spends every bit pattern on real values (<code>i32</code>), the tag needs its own room. When it leaves one pattern forbidden, <code>None</code> moves in rent-free and <code>Option&lt;T&gt;</code> is exactly the size of <code>T</code>.</p>
+    </div>
+
+    <div class="note verified"><span class="tag">measured &middot; x86-64 &middot; rustc 1.75</span>
+      Every number above came from <code>size_of</code>: <code>Option&lt;i32&gt;</code> is 8 vs 4, but <code>Option&lt;&amp;i32&gt;</code>, <code>Option&lt;NonZeroU32&gt;</code>, <code>Option&lt;Box&lt;i32&gt;&gt;</code>, <code>Option&lt;String&gt;</code>, <code>Option&lt;bool&gt;</code> and <code>Option&lt;char&gt;</code> are each the same size as the type inside. This is the same niche trick the layout in panel 2 hinted at &mdash; the tag finding somewhere to live for free.</div>
+  </section>
+
+  <!-- ======================= 6 ======================= -->
+  <section data-n="06">
+    <p class="kicker">where it breaks</p>
+    <h2>The shadow</h2>
+    <p>Pattern matching binds names to the pieces it pulls out of a value. That is its strength, and the place a real bug hides. Below, a payment routine adds inserted money to a balance. Its <code>PaymentPending</code> arm pulls a field called <code>amount</code> out of the value &mdash; and that name lands on top of the function&rsquo;s own parameter, also called <code>amount</code>. From that line on, <code>amount</code> means the field, not the money just inserted. Insert two coins and watch.</p>
+
+    <div class="panel">
+      <pre id="w6code"></pre>
+      <div class="row" style="gap:18px; align-items:center; margin-top:4px">
+        <div class="toggle" id="w6fix" data-on="0" role="button" tabindex="0">
+          <div class="switch"></div><span>rename the bound field &rarr; <span class="mono">added</span></span>
+        </div>
+      </div>
+      <div class="controls" style="margin-top:16px">
+        <button id="w6i75">insert <span class="mono">$0.75</span></button>
+        <button id="w6i50">insert <span class="mono">$0.50</span></button>
+        <button id="w6reset">reset</button>
+      </div>
+      <div class="read" id="w6log" style="margin-top:16px; min-height:84px"></div>
+      <p class="caption">With the shadow in place the second coin is ignored and the stored field is added instead &mdash; the balance is wrong and the printed line is wrong, yet nothing fails to compile. Rename one of the two <code>amount</code>s and the same routine reads correctly. The mechanism is sound; the collision of names is the trap.</p>
+    </div>
+
+    <div class="note verified"><span class="tag">observed &middot; rustc 1.75</span>
+      This reproduces a bug that compiles without a warning: insert <code>0.75</code> then <code>0.50</code> and the second print reads <code>$0.75</code>, with the balance landing at <code>1.50</code> instead of <code>1.25</code>. The fix is a rename &mdash; nothing about the enum or the <code>match</code> was wrong.</div>
+
+    <div class="note judgment"><span class="tag">judgment</span>
+      Treat a shared name between a pattern binding and an enclosing variable as a smell, not a convenience. The compiler permits it, so the cost of a wrong guess here is silent &mdash; which is exactly the kind of failure worth meeting on purpose once.</div>
+  </section>
+
+  <footer class="foot">
+    <p style="max-width:72ch">One construct &mdash; a tag and a payload &mdash; runs from a five-line enum to the way the language handles absence and failure. The byte layouts here are drawn to show the principle; real offsets, tag positions, and the exact size of any type are chosen by the compiler and vary by version and target. <code>std::mem::size_of</code> and a debugger give the true figures on any given machine. Sizes and messages on this page were taken from rustc 1.75 on x86-64.</p>
+  </footer>
+</div>
+
+<script>
+"use strict";
+const $=(s,r=document)=>r.querySelector(s);
+const el=(t,c,h)=>{const e=document.createElement(t); if(c)e.className=c; if(h!=null)e.innerHTML=h; return e;};
+
+/* one enum, used across panels 1-3 */
+const VARIANTS=[
+  {name:"Empty", hue:"--v-empty", cls:"vEmpty", payload:[],                       bytes:0},
+  {name:"Flag",  hue:"--v-flag",  cls:"vFlag",  payload:[{n:"0",t:"bool"}],       bytes:1},
+  {name:"Count", hue:"--v-count", cls:"vCount", payload:[{n:"0",t:"u32"}],        bytes:4},
+  {name:"Point", hue:"--v-point", cls:"vPoint", payload:[{n:"x",t:"i32"},{n:"y",t:"i32"}], bytes:8},
+  {name:"Span",  hue:"--v-span",  cls:"vSpan",  payload:[{n:"lo",t:"i64"},{n:"hi",t:"i64"}], bytes:16},
+];
+const cv=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+/* legend */
+(function(){
+  const L=$("#legend");
+  VARIANTS.forEach(v=>{
+    const s=el("span","",`<i style="background:${cv(v.hue)}"></i>${v.name}`); L.appendChild(s);
+  });
+  L.appendChild(el("span","",`<i style="background:${cv('--signal')}"></i>the live tag`));
+})();
+
+/* ---------- 1: shape-shifter ---------- */
+(function(){
+  const state={v:3, vals:{Flag:true, Count:7, Point:{x:3,y:-2}, Span:{lo:0,hi:64}}};
+  const chips=$("#w1chips"), slot=$("#w1slot"), letline=$("#w1let"), decl=$("#w1decl");
+
+  VARIANTS.forEach((v,i)=>{
+    const c=el("div","chip",`<span class="dot"></span>${v.name}`);
+    c.style.setProperty("--hue",cv(v.hue));
+    c.onclick=()=>{state.v=i; render();};
+    chips.appendChild(c);
+  });
+
+  function fieldBox(v,f){
+    const hue=cv(v.hue);
+    if(v.name==="Flag"){
+      const b=el("div","cellbox"); b.style.setProperty("--hue",hue);
+      b.innerHTML=`<div class="fname">${f.n}: ${f.t}</div><div class="fval">${state.vals.Flag}</div>`;
+      b.style.cursor="pointer"; b.title="toggle";
+      b.onclick=()=>{state.vals.Flag=!state.vals.Flag; render();};
+      return b;
+    }
+    if(v.name==="Count"){
+      const b=el("div","cellbox"); b.style.setProperty("--hue",hue);
+      b.innerHTML=`<div class="fname">${f.n}: ${f.t}</div>
+        <div class="field" style="margin-top:2px"><input type="number" value="${state.vals.Count}" min="0"></div>`;
+      b.querySelector("input").oninput=e=>{state.vals.Count=Math.max(0,+e.target.value||0); letline.innerHTML=letHTML();};
+      return b;
+    }
+    // Point / Span numeric named fields
+    const key=v.name, b=el("div","cellbox"); b.style.setProperty("--hue",hue);
+    b.innerHTML=`<div class="fname">${f.n}: ${f.t}</div>
+      <div class="field" style="margin-top:2px"><input type="number" value="${state.vals[key][f.n]}"></div>`;
+    b.querySelector("input").oninput=e=>{state.vals[key][f.n]=+e.target.value||0; letline.innerHTML=letHTML();};
+    return b;
+  }
+
+  function valueStr(v){
+    if(v.name==="Empty") return "";
+    if(v.name==="Flag")  return `(${state.vals.Flag})`;
+    if(v.name==="Count") return `(${state.vals.Count})`;
+    if(v.name==="Point") return ` { x: ${state.vals.Point.x}, y: ${state.vals.Point.y} }`;
+    if(v.name==="Span")  return ` { lo: ${state.vals.Span.lo}, hi: ${state.vals.Span.hi} }`;
+  }
+  const letHTML=()=>{const v=VARIANTS[state.v];
+    return `<span class="lbl">let cell =</span> Cell::<span class="${v.cls}">${v.name}</span>${valueStr(v)};`;};
+
+  function render(){
+    [...chips.children].forEach((c,i)=>c.dataset.on=(i===state.v)?"1":"0");
+    const v=VARIANTS[state.v];
+    slot.innerHTML="";
+    const tag=el("div","tagbox"); tag.innerHTML=`<div class="fname">tag</div><div class="fval" style="color:${cv(v.hue)}">${v.name}</div>`;
+    slot.appendChild(tag);
+    if(v.payload.length===0){
+      const e=el("div","cellbox"); e.style.setProperty("--hue",cv(v.hue));
+      e.style.opacity=".55"; e.innerHTML=`<div class="fname">payload</div><div class="fval" style="font-size:14px">none</div>`;
+      slot.appendChild(e);
+    } else v.payload.forEach(f=>slot.appendChild(fieldBox(v,f)));
+    letline.innerHTML=letHTML();
+    decl.innerHTML=declHTML();
+  }
+  function declHTML(){
+    const rows=VARIANTS.map((v,i)=>{
+      const sig = v.name==="Empty" ? "" :
+        v.name==="Flag"? "(bool)" : v.name==="Count"? "(u32)" :
+        v.name==="Point"? " { x: i32, y: i32 }" : " { lo: i64, hi: i64 }";
+      const line=`    <span class="${v.cls}">${v.name}</span>${sig},`;
+      return i===state.v ? `<span class="hl">${line}</span>` : line;
+    }).join("\n");
+    return `<span class="kw">enum</span> <span class="ty">Cell</span> {\n${rows}\n}`;
+  }
+  render();
+})();
+
+/* ---------- 2: memory slot ---------- */
+(function(){
+  const chips=$("#w2chips"), ruler=$("#w2ruler"), used=$("#w2used"), lab=$("#w2activelab");
+  let active=4; // Span, the largest, to start
+  const TOTAL=24, PAYLOAD=16;
+
+  VARIANTS.forEach((v,i)=>{
+    const c=el("div","chip",`<span class="dot"></span>${v.name}`);
+    c.style.setProperty("--hue",cv(v.hue));
+    c.onclick=()=>{active=i; render();};
+    chips.appendChild(c);
+  });
+
+  function render(){
+    [...chips.children].forEach((c,i)=>c.dataset.on=(i===active)?"1":"0");
+    const v=VARIANTS[active], hue=cv(v.hue);
+    ruler.innerHTML="";
+    for(let b=0;b<TOTAL;b++){
+      const cell=el("div","byte");
+      if(b<PAYLOAD){
+        if(b<v.bytes){cell.classList.add("used"); cell.style.setProperty("--hue",hue);}
+        else cell.classList.add("dead");
+      } else if(b===PAYLOAD){ cell.classList.add("tag"); cell.title="tag (discriminant)"; }
+      else { cell.classList.add("pad"); cell.title="alignment padding"; }
+      ruler.appendChild(cell);
+    }
+    used.textContent=v.bytes;
+    lab.innerHTML=`live: <span style="color:${hue}">Cell::${v.name}</span> &nbsp;&middot;&nbsp; payload region sized to <span style="color:${cv('--v-span')}">Span</span> (16) &nbsp;&middot;&nbsp; <span style="color:${cv('--signal')}">tag</span> + padding (8)`;
+  }
+  render();
+})();
+
+/* ---------- 3: switchboard ---------- */
+(function(){
+  const base=[
+    {name:"Empty",cls:"vEmpty",arm:'Cell::Empty => "empty",'},
+    {name:"Flag", cls:"vFlag", arm:'Cell::Flag(b) => "flag",'},
+    {name:"Count",cls:"vCount",arm:'Cell::Count(n) => "count",'},
+    {name:"Point",cls:"vPoint",arm:'Cell::Point { .. } => "point",'},
+    {name:"Span", cls:"vSpan", arm:'Cell::Span { .. } => "span",'},
+  ];
+  const color={name:"Color",cls:"vColor",arm:'Cell::Color(r,g,b) => "color",'};
+  let st={colorVar:false, colorArm:false, wild:false, live:0};
+
+  const chips=$("#w3chips"), arms=$("#w3arms"), banner=$("#w3banner");
+  const bAdd=$("#w3addvar"), bArm=$("#w3addarm"), bWild=$("#w3wild");
+
+  function variants(){ return st.colorVar ? base.concat(color) : base.slice(); }
+  function compiles(){ return !st.colorVar || st.colorArm || st.wild; }
+
+  function buildChips(){
+    chips.innerHTML="";
+    variants().forEach((v,i)=>{
+      const c=el("div","chip",`<span class="dot"></span>${v.name}`);
+      c.style.setProperty("--hue",cv("--v-"+v.name.toLowerCase()));
+      c.onclick=()=>{st.live=i; render();};
+      chips.appendChild(c);
+    });
+  }
+
+  function render(){
+    buildChips();
+    [...chips.children].forEach((c,i)=>c.dataset.on=(i===st.live)?"1":"0");
+    const vs=variants(), ok=compiles();
+    arms.innerHTML="";
+    base.forEach((v,i)=>{
+      const a=el("div","arm",`<span class="wire"></span><span class="${v.cls}">${v.name}</span> <span style="color:var(--faint)">&rArr;</span> &hellip;`);
+      if(ok && vs[st.live] && vs[st.live].name===v.name) a.classList.add("fired");
+      arms.appendChild(a);
+    });
+    if(st.colorVar && st.colorArm && !st.wild){
+      const a=el("div","arm",`<span class="wire"></span><span class="vColor">Color</span> <span style="color:var(--faint)">&rArr;</span> &hellip;`);
+      if(ok && vs[st.live] && vs[st.live].name==="Color") a.classList.add("fired");
+      arms.appendChild(a);
+    }
+    if(st.wild){
+      const a=el("div","arm",`<span class="wire"></span><span class="mono">_</span> <span style="color:var(--faint)">&rArr;</span> <span style="color:var(--muted)">everything else</span>`);
+      if(ok && vs[st.live] && (vs[st.live].name==="Color")) a.classList.add("fired");
+      arms.appendChild(a);
+    }
+
+    if(ok){
+      banner.innerHTML=`<div class="banner good">compiles &mdash; every alternative is handled, the tag routes to one arm.</div>`;
+    }else{
+      banner.innerHTML=`<div class="banner bad">error[E0004]: non-exhaustive patterns: \`Cell::Color(_)\` not covered\n  --&gt; the match must handle every alternative the enum can be.</div>`;
+    }
+    bAdd.textContent="";
+    bAdd.innerHTML = st.colorVar ? '&minus; remove alternative <span class="vColor">Color</span>' : '+ add alternative <span class="vColor">Color(u8,u8,u8)</span>';
+    bArm.disabled=!st.colorVar || st.wild;
+    bArm.innerHTML = st.colorArm ? '&minus; remove its match arm' : '+ add its match arm';
+    bWild.disabled=!st.colorVar || st.colorArm;
+    bWild.innerHTML = st.wild ? 'remove the <span class="mono">_</span> catch&ndash;all' : 'use <span class="mono">_</span> catch&ndash;all instead';
+  }
+
+  bAdd.onclick=()=>{st.colorVar=!st.colorVar; if(!st.colorVar){st.colorArm=false;st.wild=false; if(st.live>=base.length)st.live=0;} render();};
+  bArm.onclick=()=>{st.colorArm=!st.colorArm; render();};
+  bWild.onclick=()=>{st.wild=!st.wild; render();};
+  render();
+})();
+
+/* ---------- 4: Option / unwrap ---------- */
+(function(){
+  let found=true, done=false;
+  const tog=$("#w4toggle"), lab=$("#w4togglabel"), ret=$("#w4ret"), out=$("#w4out");
+  function render(){
+    tog.dataset.on=found?"1":"0";
+    lab.textContent = found ? 'lookup finds a value' : 'lookup finds nothing';
+    ret.innerHTML = found
+      ? `<span class="lbl">returns</span> <span class="vFlag">Some</span>(42)`
+      : `<span class="lbl">returns</span> <span class="vEmpty">None</span>`;
+    if(!done) out.innerHTML="";
+  }
+  tog.onclick=()=>{found=!found; done=false; render();};
+  tog.onkeydown=e=>{if(e.key===" "||e.key==="Enter"){e.preventDefault();tog.onclick();}};
+  $("#w4unwrap").onclick=()=>{
+    done=true;
+    out.innerHTML = found
+      ? `<div class="banner good">.unwrap() &rArr; 42 &nbsp; <span style="color:var(--faint)">the payload, handed over</span></div>`
+      : `<div class="banner bad">thread 'main' panicked at src/main.rs:
+called \`Option::unwrap()\` on a \`None\` value</div>`;
+  };
+  $("#w4reset").onclick=()=>{done=false; out.innerHTML="";};
+  render();
+})();
+
+/* ---------- 5: niche ---------- */
+(function(){
+  const ITEMS=[
+    {inner:"i32",         bare:4,  opt:8,  niche:false, why:"every bit pattern of an i32 is a real number, so None needs its own bytes."},
+    {inner:"bool",        bare:1,  opt:1,  niche:true,  why:"a bool only uses 0 and 1; one of the other 254 byte values stands in for None."},
+    {inner:"char",        bare:4,  opt:4,  niche:true,  why:"char skips a huge range of invalid scalar values; None borrows one of them."},
+    {inner:"&i32",        bare:8,  opt:8,  niche:true,  why:"a reference is never null, so the all-zero pattern is free to mean None."},
+    {inner:"Box<i32>",    bare:8,  opt:8,  niche:true,  why:"Box owns a non-null pointer; the null pattern represents None for free."},
+    {inner:"NonZeroU32",  bare:4,  opt:4,  niche:true,  why:"NonZeroU32 can never be 0, so 0 is the spare pattern that means None."},
+    {inner:"String",      bare:24, opt:24, niche:true,  why:"a String holds a non-null pointer; None hides in the pattern it can never take."},
+  ];
+  let idx=0;
+  const chips=$("#w5chips"), bars=$("#w5bars"), verdict=$("#w5verdict");
+  const MAXW=24;
+  const esc=s=>s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  ITEMS.forEach((it,i)=>{
+    const c=el("div","chip",esc(it.inner));
+    c.style.setProperty("--hue",cv(it.niche?"--v-flag":"--v-span"));
+    c.onclick=()=>{idx=i; render();};
+    chips.appendChild(c);
+  });
+  function bar(label,bytes,hueVar){
+    const pct=Math.max(8,(bytes/MAXW)*100);
+    return `<div class="barlab">${label}</div>
+      <div class="bartrack"><div class="barfill" style="width:${pct}%; background:${cv(hueVar)}">${bytes} B</div></div>`;
+  }
+  function render(){
+    [...chips.children].forEach((c,i)=>c.dataset.on=(i===idx)?"1":"0");
+    const it=ITEMS[idx];
+    bars.innerHTML = bar(esc(it.inner), it.bare, "--muted")
+                   + bar(`Option&lt;${esc(it.inner)}&gt;`, it.opt, it.niche?"--v-flag":"--v-span");
+    verdict.innerHTML = it.niche
+      ? `<span style="color:var(--v-flag)">free.</span> ${it.why} <strong>Option is the same size as the value inside.</strong>`
+      : `<span style="color:var(--v-span)">tag stored separately.</span> ${it.why} <strong>Option is wider by the size of the tag.</strong>`;
+  }
+  render();
+})();
+
+/* ---------- 6: shadow bug ---------- */
+(function(){
+  let fixed=false, balance=0, pending=0, started=false, log=[];
+  const code=$("#w6code"), logbox=$("#w6log"), fix=$("#w6fix");
+
+  function codeHTML(){
+    const buggy=`        VendingMachineState::PaymentPending { item, <span class="hl vSpan">amount</span> } =&gt; {
+            self.balance += <span class="hl vSpan">amount</span>;   <span class="cm">// the bound field, not the coin</span>`;
+    const good =`        VendingMachineState::PaymentPending { item, <span class="hl vFlag">added</span> } =&gt; {
+            self.balance += amount;  <span class="cm">// the parameter: the coin just inserted</span>`;
+    return `<span class="kw">fn</span> <span class="fn">insert_money</span>(&amp;<span class="kw">mut</span> self, <span class="hl">amount</span>: f64) {
+    <span class="kw">match</span> &amp;self.state {
+        <span class="cm">// ... first coin goes through ItemSelected, using the parameter ...</span>
+${fixed?good:buggy}
+            <span class="cm">// ...</span>
+        }
+    }
+}`;
+  }
+
+  function fmt(n){return "$"+n.toFixed(2);}
+  function render(){
+    code.innerHTML=codeHTML();
+    fix.dataset.on=fixed?"1":"0";
+    logbox.innerHTML = log.length
+      ? log.map(l=>`<div>${l}</div>`).join("")
+      : `<span style="color:var(--faint)">insert two coins to run the routine.</span>`;
+  }
+  function insert(coin){
+    if(!started){ // first coin: ItemSelected arm, parameter used correctly either way
+      balance+=coin; pending=balance; started=true;
+      log.push(`Money inserted: <span class="mono">${fmt(coin)}</span> &nbsp; balance <span class="mono">${fmt(balance)}</span>`);
+    } else {       // second+: PaymentPending arm
+      if(fixed){ balance+=coin;
+        log.push(`Additional money inserted: <span class="mono" style="color:var(--v-flag)">${fmt(coin)}</span> &nbsp; balance <span class="mono">${fmt(balance)}</span>`);
+      } else { balance+=pending; // shadow: adds the bound field (== current balance)
+        log.push(`Additional money inserted: <span class="mono" style="color:var(--v-span)">${fmt(pending)}</span> &nbsp; balance <span class="mono" style="color:var(--v-span)">${fmt(balance)}</span> <span style="color:var(--faint)">&larr; coin was ${fmt(coin)}</span>`);
+      }
+      pending=balance;
+    }
+    render();
+  }
+  $("#w6i75").onclick=()=>insert(0.75);
+  $("#w6i50").onclick=()=>insert(0.50);
+  $("#w6reset").onclick=()=>{balance=0;pending=0;started=false;log=[];render();};
+  fix.onclick=()=>{fixed=!fixed; balance=0;pending=0;started=false;log=[]; render();};
+  fix.onkeydown=e=>{if(e.key===" "||e.key==="Enter"){e.preventDefault();fix.onclick();}};
+  render();
+})();
+</script>
+</body>
+</html>
