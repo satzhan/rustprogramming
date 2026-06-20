@@ -4,6 +4,8 @@ Enums and pattern matching, and the file and process operations built on top of 
 
 **Interactive demo:** [the-tag-decides.html](https://satzhan.github.io/rustprogramming/Module4Enum/the-tag-decides.html) (requires GitHub Pages enabled; otherwise open it rendered via [htmlpreview](https://htmlpreview.github.io/?https://github.com/satzhan/rustprogramming/blob/main/Module4Enum/the-tag-decides.html), which needs no repo settings)
 
+Presentation Guide:: [presentation-checklist.html](https://satzhan.github.io/rustprogramming/Module4Enum/presentation-checklist.html) 
+
 ## Files
 
 | File | Topic |
