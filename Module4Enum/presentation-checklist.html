@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Presentation Checklist</title>
+<style>
+  :root{
+    --paper:#F0F1ED;
+    --paper-2:#E8EAE4;
+    --paper-3:#E2E4DD;
+    --ink:#18202B;
+    --ink-soft:#4B5664;
+    --ink-faint:#8A93A0;
+    --line:#CBD0C8;
+    --line-soft:#DBDED7;
+    --oxide:#BF480F;
+    --oxide-deep:#8F3408;
+    --grid: rgba(24,32,43,0.035);
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", "Segoe UI Mono", Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; }
+
+  body{
+    background:
+      linear-gradient(var(--grid) 1px, transparent 1px) 0 0 / 26px 26px,
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px) 0 0 / 26px 26px,
+      var(--paper);
+    color:var(--ink);
+    font-family:var(--sans);
+    line-height:1.45;
+    -webkit-font-smoothing:antialiased;
+    padding:32px 20px 48px;
+  }
+
+  .sheet{ max-width:1080px; margin:0 auto; }
+
+  /* ---------- header ---------- */
+  .masthead{
+    border:1.5px solid var(--ink);
+    background:var(--paper);
+    padding:24px 26px 22px;
+  }
+  .eyebrow{
+    font-family:var(--mono);
+    font-size:11.5px;
+    letter-spacing:0.2em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+    margin:0 0 12px;
+  }
+  h1{
+    font-weight:800;
+    font-size:clamp(26px, 4.4vw, 40px);
+    line-height:1.05;
+    letter-spacing:-0.015em;
+    margin:0 0 12px;
+  }
+  .frame{
+    font-size:14.5px;
+    color:var(--ink-soft);
+    max-width:74ch;
+    margin:0;
+  }
+  .frame b{ color:var(--ink); font-weight:600; }
+
+  /* ---------- block scaffolding ---------- */
+  .block{ border:1.5px solid var(--ink); border-top:none; }
+
+  .band{
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:0.18em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+    padding:13px 20px 11px;
+    background:var(--paper);
+  }
+  .band.floor{ color:var(--oxide); }
+  .band.optional{
+    color:var(--ink-soft);
+    background:var(--paper-3);
+    border-top:1.5px solid var(--ink);
+  }
+  .band.optional b{ color:var(--ink); font-weight:700; }
+
+  /* ---------- rubric grid ---------- */
+  .rgrid{ background:var(--paper); }
+  .optional-zone .rgrid{ background:var(--paper-2); }
+
+  .rhead, .rrow{
+    display:grid;
+    grid-template-columns:1.55fr 2fr 2fr 2fr;
+  }
+  .rhead{
+    border-top:1px solid var(--line);
+    border-bottom:1px solid var(--line);
+  }
+  .rhead .hc{
+    font-family:var(--mono);
+    font-size:10px;
+    letter-spacing:0.13em;
+    text-transform:uppercase;
+    color:var(--ink-faint);
+    padding:7px 14px;
+  }
+
+  .rrow{ border-top:1px solid var(--line-soft); }
+  .rrow:first-of-type{ border-top:none; }
+
+  .crit{ padding:12px 14px; }
+  .crit .code{
+    font-family:var(--mono);
+    font-size:10.5px;
+    letter-spacing:0.07em;
+    color:var(--ink-soft);
+    display:flex; align-items:center; gap:7px;
+    margin-bottom:3px;
+  }
+  .crit .mk{
+    width:9px; height:9px; flex:none;
+    border:1.4px solid var(--oxide);
+  }
+  .crit.is-floor .mk{ background:var(--oxide); }
+  .optional-zone .crit .mk{ border-color:var(--ink-faint); }
+  .crit .tag{ color:var(--oxide); font-weight:600; }
+  .crit .bonus{ color:var(--ink-faint); font-weight:600; }
+  .crit .name{ font-weight:700; font-size:14px; }
+
+  .lvl{
+    padding:12px 14px;
+    font-size:13.2px;
+    color:var(--ink);
+    border-left:1px solid var(--line-soft);
+  }
+  .lvl.aim{
+    border-left:1.5px solid var(--oxide);
+    background:rgba(191,72,15,0.045);
+  }
+  .lvl .n{ display:none; }
+
+  /* floor divider */
+  .floorline{
+    border-top:2.5px solid var(--ink);
+    padding:5px 14px;
+    font-family:var(--mono);
+    font-size:10px;
+    letter-spacing:0.2em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+    background:var(--paper);
+  }
+
+  /* ---------- quote ---------- */
+  .quote{
+    border:1.5px solid var(--ink);
+    border-top:none;
+    background:var(--paper-3);
+    padding:22px 26px 20px;
+    position:relative;
+  }
+  .quote blockquote{
+    margin:0;
+    font-size:clamp(18px, 2.6vw, 23px);
+    font-weight:600;
+    font-style:italic;
+    letter-spacing:-0.01em;
+    line-height:1.25;
+    color:var(--ink);
+    border-left:3px solid var(--oxide);
+    padding-left:16px;
+  }
+  .quote .cite{
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:0.08em;
+    color:var(--ink-soft);
+    margin:12px 0 0 19px;
+  }
+  .quote .bridge{
+    font-size:13.5px;
+    color:var(--ink-soft);
+    margin:14px 0 0 19px;
+    max-width:64ch;
+  }
+
+  /* ---------- responsive ---------- */
+  @media (max-width:820px){
+    .rhead{ display:none; }
+    .rrow{ display:block; border-top:1px solid var(--line); }
+    .crit{ padding:12px 16px 8px; }
+    .lvl{
+      border-left:none;
+      border-top:1px solid var(--line-soft);
+      padding:9px 16px 9px 44px;
+      position:relative;
+    }
+    .lvl.aim{ border-left:none; box-shadow:inset 3px 0 0 var(--oxide); }
+    .lvl .n{
+      display:flex; align-items:center; justify-content:center;
+      position:absolute; left:16px; top:9px;
+      width:18px; height:18px;
+      font-family:var(--mono); font-size:10px; font-weight:600;
+      color:var(--ink-faint); border:1px solid var(--line);
+    }
+    .lvl.aim .n{ color:var(--oxide); border-color:var(--oxide); }
+  }
+
+  /* ---------- print ---------- */
+  @media print{
+    body{ background:var(--paper); padding:0; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    .sheet{ max-width:none; }
+    .masthead{ padding:16px 18px; }
+    .crit, .lvl{ padding-top:8px; padding-bottom:8px; }
+  }
+
+  @media (prefers-reduced-motion: no-preference){
+    .masthead,.block,.quote{ animation:rise .45s ease both; }
+    .block{ animation-delay:.05s; }
+    .quote{ animation-delay:.1s; }
+    @keyframes rise{ from{ opacity:0; transform:translateY(6px); } to{ opacity:1; transform:none; } }
+  }
+</style>
+</head>
+<body>
+<main class="sheet">
+
+  <header class="masthead">
+    <p class="eyebrow">LeetCode Hard · 10-minute talk</p>
+    <h1>Presentation checklist</h1>
+    <p class="frame">Each line has three levels — aim as high as you can. <b>C1 and C2 are required.</b> C3–C6 carry the points. F1–F9 are optional.</p>
+  </header>
+
+  <!-- ===== Core block ===== -->
+  <section class="block" aria-label="Criteria">
+    <p class="band floor">Required — clear both</p>
+    <div class="rgrid">
+      <div class="rhead">
+        <span class="hc">Criterion</span>
+        <span class="hc">1</span>
+        <span class="hc">2</span>
+        <span class="hc">3</span>
+      </div>
+
+      <div class="rrow">
+        <div class="crit is-floor">
+          <span class="code"><span class="mk"></span> C1 · <span class="tag">FLOOR</span></span>
+          <span class="name">Owns the problem</span>
+        </div>
+        <div class="lvl l1"><span class="n">1</span>States the problem without notes; traces one example by hand.</div>
+        <div class="lvl l2 aim"><span class="n">2</span>Names the naive approach and where it gets slow or wrong.</div>
+        <div class="lvl l3"><span class="n">3</span>Shows the exact input that breaks the naive approach.</div>
+      </div>
+
+      <div class="rrow">
+        <div class="crit is-floor">
+          <span class="code"><span class="mk"></span> C2 · <span class="tag">FLOOR</span></span>
+          <span class="name">Owns the solution</span>
+        </div>
+        <div class="lvl l1"><span class="n">1</span>Walks the code and says what each part does.</div>
+        <div class="lvl l2 aim"><span class="n">2</span>Points to the one line doing the real work, and why it's needed.</div>
+        <div class="lvl l3"><span class="n">3</span>Explains why the other obvious fixes fail and this one holds.</div>
+      </div>
+
+      <div class="floorline">↑ required · everything below is where points are earned ↓</div>
+
+      <div class="rrow">
+        <div class="crit">
+          <span class="code"><span class="mk"></span> C3</span>
+          <span class="name">This solution vs. the others</span>
+        </div>
+        <div class="lvl l1 aim"><span class="n">1</span>Names how it differs from another solution to the same problem.</div>
+        <div class="lvl l2"><span class="n">2</span>States when each one is the better choice.</div>
+        <div class="lvl l3"><span class="n">3</span>Names what each trades away — time, memory, or simplicity.</div>
+      </div>
+
+      <div class="rrow">
+        <div class="crit">
+          <span class="code"><span class="mk"></span> C4</span>
+          <span class="name">Syntax</span>
+        </div>
+        <div class="lvl l1 aim"><span class="n">1</span>Reads the code aloud without losing the thread.</div>
+        <div class="lvl l2"><span class="n">2</span>Explains a tricky line — a borrow, a type, an iterator.</div>
+        <div class="lvl l3"><span class="n">3</span>Says why the language forces that line, and what breaks without it.</div>
+      </div>
+
+      <div class="rrow">
+        <div class="crit">
+          <span class="code"><span class="mk"></span> C5</span>
+          <span class="name">Visuals</span>
+        </div>
+        <div class="lvl l1 aim"><span class="n">1</span>One slide shows the idea instead of describing it.</div>
+        <div class="lvl l2"><span class="n">2</span>A diagram traces one real input from start to finish.</div>
+        <div class="lvl l3"><span class="n">3</span>The diagram singles out the step that matters most.</div>
+      </div>
+
+      <div class="rrow">
+        <div class="crit">
+          <span class="code"><span class="mk"></span> C6</span>
+          <span class="name">Rehearsed</span>
+        </div>
+        <div class="lvl l1 aim"><span class="n">1</span>Said aloud at least once; timing known.</div>
+        <div class="lvl l2"><span class="n">2</span>First line and last line are fixed.</div>
+        <div class="lvl l3"><span class="n">3</span>A backup is ready if the live demo fails.</div>
+      </div>
+    </div>
+
+    <!-- ===== Optional zone ===== -->
+    <div class="optional-zone">
+      <p class="band optional"><b>Optional · F1–F9</b> &nbsp;— reach for these after the rest holds</p>
+      <div class="rgrid">
+        <div class="rhead">
+          <span class="hc">Criterion</span>
+          <span class="hc">1</span>
+          <span class="hc">2</span>
+          <span class="hc">3</span>
+        </div>
+
+        <div class="rrow">
+          <div class="crit">
+            <span class="code"><span class="mk"></span> F1</span>
+            <span class="name">Structure</span>
+          </div>
+          <div class="lvl l1"><span class="n">1</span>Has a beginning, middle, and end.</div>
+          <div class="lvl l2"><span class="n">2</span>The order is clear; each part says what it covers.</div>
+          <div class="lvl l3"><span class="n">3</span>At any point, where the talk is, is obvious.</div>
+        </div>
+
+        <div class="rrow">
+          <div class="crit">
+            <span class="code"><span class="mk"></span> F2</span>
+            <span class="name">Delivery</span>
+          </div>
+          <div class="lvl l1"><span class="n">1</span>Audible; not read word-for-word off the slide.</div>
+          <div class="lvl l2"><span class="n">2</span>Steady pace; eyes on the room, not only the screen.</div>
+          <div class="lvl l3"><span class="n">3</span>Volume and pace shift to mark what matters.</div>
+        </div>
+
+        <div class="rrow">
+          <div class="crit">
+            <span class="code"><span class="mk"></span> F3</span>
+            <span class="name">Time</span>
+          </div>
+          <div class="lvl l1"><span class="n">1</span>Ends near the limit.</div>
+          <div class="lvl l2"><span class="n">2</span>Lands inside the limit without rushing the end.</div>
+          <div class="lvl l3"><span class="n">3</span>Paced evenly; no part starved to rescue another.</div>
+        </div>
+
+        <div class="rrow">
+          <div class="crit">
+            <span class="code"><span class="mk"></span> F4</span>
+            <span class="name">Questions</span>
+          </div>
+          <div class="lvl l1"><span class="n">1</span>Answers a direct question about the solution.</div>
+          <div class="lvl l2"><span class="n">2</span>Answers a question that wasn't prepared for.</div>
+          <div class="lvl l3"><span class="n">3</span>Admits the limit honestly, and says how to find the answer.</div>
+        </div>
+
+        <div class="rrow">
+          <div class="crit">
+            <span class="code"><span class="mk"></span> F5</span>
+            <span class="name">Takeaway</span>
+          </div>
+          <div class="lvl l1"><span class="n">1</span>Ends with a clear summary line.</div>
+          <div class="lvl l2"><span class="n">2</span>Leaves one specific thing worth remembering.</div>
+          <div class="lvl l3"><span class="n">3</span>That one thing is the point of the talk, not a side note.</div>
+        </div>
+
+        <div class="rrow">
+          <div class="crit">
+            <span class="code"><span class="mk"></span> F6</span>
+            <span class="name">Complexity &amp; trade-offs</span>
+          </div>
+          <div class="lvl l1"><span class="n">1</span>States time and space cost.</div>
+          <div class="lvl l2"><span class="n">2</span>Justifies the cost from the code, not from memory.</div>
+          <div class="lvl l3"><span class="n">3</span>Compares against the naive cost and says what the gap buys.</div>
+        </div>
+
+        <div class="rrow">
+          <div class="crit">
+            <span class="code"><span class="mk"></span> F7</span>
+            <span class="name">Code on screen</span>
+          </div>
+          <div class="lvl l1"><span class="n">1</span>Shows only the key lines, not the whole file.</div>
+          <div class="lvl l2"><span class="n">2</span>The shown lines are readable; the important part stands out.</div>
+          <div class="lvl l3"><span class="n">3</span>The screen points to the line that carries the idea.</div>
+        </div>
+
+        <div class="rrow">
+          <div class="crit">
+            <span class="code"><span class="mk"></span> F8</span>
+            <span class="name">Clarity</span>
+          </div>
+          <div class="lvl l1"><span class="n">1</span>The one or two technical terms are defined.</div>
+          <div class="lvl l2"><span class="n">2</span>Defined in plain words, not more jargon.</div>
+          <div class="lvl l3"><span class="n">3</span>A short example makes the term concrete.</div>
+        </div>
+
+        <div class="rrow">
+          <div class="crit">
+            <span class="code"><span class="mk"></span> F9 · <span class="bonus">BONUS</span></span>
+            <span class="name">The room follows</span>
+          </div>
+          <div class="lvl l1"><span class="n">1</span>Most can restate the rough idea afterward.</div>
+          <div class="lvl l2"><span class="n">2</span>Most can say why the naive approach fails.</div>
+          <div class="lvl l3"><span class="n">3</span>Most could sketch the solution's shape from memory.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="quote" aria-label="Epigraph">
+    <blockquote>A problem well put is half-solved.</blockquote>
+    <p class="cite">John Dewey · Logic: The Theory of Inquiry, 1938</p>
+    <p class="bridge">The talk is the problem to solve. The code is just the input it works on.</p>
+  </section>
+
+</main>
+</body>
+</html>
