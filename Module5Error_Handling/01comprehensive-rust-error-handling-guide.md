@@ -195,3 +195,49 @@ The progression from verbose, explicit error handling to more concise, idiomatic
 
 The choice depends on the specific requirements of your program and the level of control you need over error handling. Remember, good error handling is about finding the right balance between robustness and simplicity. Rust provides the tools, but it's up to you to use them wisely in your specific use case.
 
+
+```rust
+use std::fs::File;
+use std::io::Read;
+
+fn main() {
+    let mut file = match File::open("input.txt") {
+        Ok(f) => f,
+        Err(error) => {
+            println!("Could not open file: {}", error);
+            return;
+        }
+    };
+
+    let mut input = String::new();
+
+    match file.read_to_string(&mut input) {
+        Ok(_) => {}
+        Err(error) => {
+            println!("Could not read file: {}", error);
+            return;
+        }
+    }
+
+    for line in input.lines() {
+        let direction = match line.chars().next() {
+            Some(c) => c,
+            None => {
+                println!("Empty line");
+                return;
+            }
+        };
+
+        let amount = match line[1..].parse::<i32>() {
+            Ok(n) => n,
+            Err(error) => {
+                println!("Could not parse {:?}: {}", line, error);
+                return;
+            }
+        };
+
+        println!("direction = {}, amount = {}", direction, amount);
+    }
+}
+```
+
