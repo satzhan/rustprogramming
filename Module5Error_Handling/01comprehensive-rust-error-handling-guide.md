@@ -242,7 +242,7 @@ fn main() {
 ```
 
 
-```
+```rust
 use std::error::Error;
 use std::fs;
 
