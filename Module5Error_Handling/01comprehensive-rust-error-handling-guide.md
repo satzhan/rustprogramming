@@ -241,3 +241,57 @@ fn main() {
 }
 ```
 
+
+```
+use std::error::Error;
+use std::fs;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Direction {
+    Left,
+    Right,
+}
+
+struct Move {
+    direction: Direction,
+    amount: i32,
+}
+
+
+fn parse(input: &str) -> Result <Vec<Move>, Box<dyn Error>> {
+    let mut moves = Vec::new();
+    for line in input.lines() {
+        if line.is_empty() { continue; }
+        let first = line.chars().next().unwrap();
+        let direction = match first {
+            'R' => Direction::Right,
+            'L' => Direction::Left,
+            other => return Err(format!("Unknown{:?}", other).into()),
+        };
+        let amount: i32 = line[1..].parse()?;
+        moves.push(Move{ direction, amount });
+    }
+    Ok(moves)
+}
+
+fn solve(moves: &[Move]) -> i32 {
+    let mut dial = 50;
+    let mut count = 0;
+    for m in moves {
+        dial = match m.direction{
+            Direction::Right => (dial + m.amount) % 100,
+            Direction::Left  => (dial - m.amount) % 100,
+        };
+        if dial == 0 { count += 1; }
+    }
+    count
+}
+
+fn main() -> Result<(), Box<dyn Error>> {
+    let input = fs::read_to_string("test.txt")?;
+    let moves = parse(&input)?;
+    let count = solve(&moves);
+    println!("Result: {count}");
+    Ok(())
+}
+```
