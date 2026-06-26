@@ -432,3 +432,24 @@ mod tests {
     // }
 }
 ```
+
+
+```
+rustc --test main.rs
+./main  # (or .\main.exe on Windows)
+
+rustc --test src/bin/my_script.rs
+./my_script  # (or .\my_script.exe on Windows)
+```
+
+if you're running cargo init
+```
+cargo test
+
+cargo test --bin my_script
+```
+
+To run a paricular test and ask not to remove println! outputs
+```
+cargo test test4 -- --nocapture
+```
