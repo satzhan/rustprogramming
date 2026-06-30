@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Generics &amp; Traits</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400..700;1,6..72,400..600&family=Libre+Franklin:wght@400;500;600;700&family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#f3f4f1;
+    --card:#fbfbf9;
+    --ink:#1c1f23;
+    --ink-dim:#5b626b;
+    --abstract:#3a4aa0;     /* the generic / abstract side */
+    --abstract-tint:#e7e9f5;
+    --concrete:#1f7a5c;     /* satisfied / compiles / fits */
+    --concrete-tint:#e3f1ea;
+    --stop:#bb4239;         /* blocked / compiler refuses */
+    --stop-tint:#f6e6e3;
+    --line:#dadcd4;
+    --line-soft:#e7e8e2;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--paper);color:var(--ink);
+    font-family:"Libre Franklin",system-ui,sans-serif;
+    font-size:17px;line-height:1.62;-webkit-font-smoothing:antialiased;
+    padding:0 20px 100px;
+  }
+  .wrap{max-width:740px;margin:0 auto}
+
+  /* ---------- header ---------- */
+  header{padding:64px 0 8px;border-bottom:1px solid var(--line)}
+  .kicker{font-family:"IBM Plex Mono",monospace;font-size:.74rem;letter-spacing:.28em;
+          text-transform:uppercase;color:var(--abstract)}
+  h1{font-family:"Newsreader",serif;font-weight:600;font-size:clamp(2.4rem,7vw,3.7rem);
+     line-height:1.02;margin:.18em 0 .25em;letter-spacing:-.01em}
+  h1 .amp{color:var(--abstract);font-style:italic}
+  .thesis{font-family:"Newsreader",serif;font-size:1.22rem;color:var(--ink-dim);
+          max-width:34em;margin:0 0 26px}
+  .thesis code{font-family:"IBM Plex Mono",monospace;font-size:.92em;
+               background:var(--abstract-tint);padding:1px 6px;border-radius:4px;color:var(--abstract)}
+
+  /* ---------- part divider ---------- */
+  .part{margin:54px 0 8px;display:flex;align-items:baseline;gap:14px}
+  .part .pn{font-family:"IBM Plex Mono",monospace;font-size:.78rem;letter-spacing:.24em;
+            text-transform:uppercase;color:var(--abstract)}
+  .part h2{font-family:"Newsreader",serif;font-weight:500;font-size:1.5rem;margin:0}
+  .part .rule{flex:1;height:1px;background:var(--line);align-self:center}
+
+  /* ---------- section ---------- */
+  section.s{padding:34px 0 6px;border-bottom:1px solid var(--line-soft)}
+  .num{font-family:"IBM Plex Mono",monospace;font-size:.8rem;color:var(--ink-dim);
+       border:1px solid var(--line);border-radius:6px;padding:2px 8px;display:inline-block}
+  section.s h3{font-family:"Newsreader",serif;font-weight:600;font-size:1.6rem;
+               margin:.5em 0 .3em;line-height:1.12}
+  .lede{margin:0 0 20px;max-width:44em}
+  .lede strong{font-weight:600}
+  em.term{font-style:normal;font-weight:600;color:var(--abstract)}
+
+  /* ---------- code ---------- */
+  pre{font-family:"IBM Plex Mono",monospace;font-size:.85rem;line-height:1.66;
+      background:var(--card);border:1px solid var(--line);border-left:3px solid var(--abstract);
+      border-radius:8px;padding:15px 17px;overflow-x:auto;margin:18px 0 0}
+  pre .k{color:var(--abstract);font-weight:500}
+  pre .t{color:#0f6b8a}
+  pre .s{color:var(--concrete)}
+  pre .c{color:#9aa0a3;font-style:italic}
+  pre .f{color:#9a4dab}
+  pre .dim{color:#b6bbbe}
+
+  /* ---------- demo surface ---------- */
+  .demo{background:var(--card);border:1px solid var(--line);border-radius:10px;
+        padding:20px 18px;margin-top:4px}
+  .controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px}
+  button{font-family:"Libre Franklin",sans-serif;font-size:.92rem;font-weight:600;color:var(--ink);
+         background:#fff;border:1px solid var(--line);padding:8px 14px;border-radius:8px;
+         cursor:pointer;transition:background .14s,border-color .14s,transform .1s}
+  button:hover{border-color:var(--abstract);background:var(--abstract-tint)}
+  button:active{transform:translateY(1px)}
+  button.on{background:var(--abstract);color:#fff;border-color:var(--abstract)}
+  button:focus-visible{outline:3px solid var(--abstract);outline-offset:2px}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#fff}
+  .seg button{border:none;border-radius:0;border-right:1px solid var(--line)}
+  .seg button:last-child{border-right:none}
+  .seg button.on{background:var(--abstract);color:#fff}
+  .hint{font-size:.86rem;color:var(--ink-dim)}
+
+  /* the SLOT — signature device */
+  .slot{font-family:"IBM Plex Mono",monospace;display:inline-flex;align-items:center;gap:2px;
+        font-size:1.05rem}
+  .slot .br{color:var(--abstract);font-weight:600}
+  .slot .fill{min-width:46px;text-align:center;padding:3px 10px;border-radius:6px;
+              border:1.5px dashed var(--abstract);background:var(--abstract-tint);
+              color:var(--abstract);font-weight:500;transition:all .18s}
+  .slot .fill.set{border-style:solid;background:#fff;color:var(--ink)}
+
+  .readout{font-family:"IBM Plex Mono",monospace;font-size:.9rem;margin-top:6px;min-height:1.3em}
+  .verdict{font-family:"IBM Plex Mono",monospace;font-size:.88rem;margin-top:14px;
+           padding:11px 13px;border-radius:8px;line-height:1.5}
+  .verdict.good{background:var(--concrete-tint);border:1px solid #b8d9cb;color:var(--concrete)}
+  .verdict.bad{background:var(--stop-tint);border:1px solid #e3b8b2;color:var(--stop)}
+
+  .toggle{display:flex;align-items:center;gap:11px;padding:7px 0}
+  .switch{width:44px;height:25px;border-radius:20px;background:#d8dbd5;position:relative;
+          cursor:pointer;border:1px solid var(--line);transition:background .15s;flex:none}
+  .switch::after{content:"";position:absolute;top:1px;left:1px;width:21px;height:21px;border-radius:50%;
+                 background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2);transition:left .15s}
+  .switch.on{background:var(--abstract)}
+  .switch.on::after{left:20px}
+  .switch:focus-visible{outline:3px solid var(--abstract);outline-offset:2px}
+  .tlabel code{font-family:"IBM Plex Mono",monospace;color:var(--abstract);font-size:.9em}
+  .tlabel .sub{color:var(--ink-dim);font-size:.86rem}
+
+  /* fold demo (§1) */
+  .fold{position:relative}
+  .fold .three .fn{border:1px solid var(--line);border-radius:7px;padding:9px 12px;margin-bottom:7px;
+       font-family:"IBM Plex Mono",monospace;font-size:.82rem;background:#fff}
+  .fold .one{border:1.5px solid var(--abstract);border-radius:7px;padding:11px 13px;
+       font-family:"IBM Plex Mono",monospace;font-size:.82rem;background:var(--abstract-tint)}
+  .count{font-size:.85rem;color:var(--ink-dim);margin-top:10px}
+
+  /* stack demo (§5) */
+  .stackbox{display:flex;flex-direction:column-reverse;gap:6px;min-height:160px;
+            justify-content:flex-start;padding:10px;border:1px dashed var(--line);border-radius:8px;
+            background:#fff}
+  .cell{background:var(--abstract-tint);border:1px solid var(--abstract);border-radius:6px;
+        padding:8px 12px;font-family:"IBM Plex Mono",monospace;font-size:.85rem;text-align:center;
+        animation:pop .18s ease}
+  @keyframes pop{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+  /* quiet provenance cue */
+  .note{margin-top:18px;padding-left:13px;border-left:2px solid var(--line);
+        font-size:.85rem;color:var(--ink-dim);max-width:44em}
+  .note .tag{font-family:"IBM Plex Mono",monospace;font-size:.64rem;letter-spacing:.2em;
+             text-transform:uppercase;margin-right:7px;color:var(--abstract)}
+
+  .pending{margin:50px 0 0;padding:22px;border:1px dashed var(--line);border-radius:10px;
+           text-align:center;color:var(--ink-dim);font-family:"Newsreader",serif;font-style:italic}
+
+  footer{margin-top:56px;padding-top:30px;border-top:1px solid var(--line);text-align:center;
+         color:var(--ink-dim);font-size:.92rem}
+  footer .div{font-family:"IBM Plex Mono",monospace;color:var(--abstract);margin-bottom:14px;font-size:1.1rem}
+  footer code{background:var(--abstract-tint);padding:1px 5px;border-radius:4px;color:var(--abstract)}
+  input[type=range]{accent-color:var(--abstract)}
+
+  @media (max-width:560px){
+    body{font-size:16px}
+    .thesis{font-size:1.1rem}
+  }
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="kicker">Rust &middot; a working walkthrough</div>
+    <h1>Generics <span class="amp">&amp;</span> Traits</h1>
+    <p class="thesis">Two ideas, one sentence: write a routine once for many types, and use
+      <code>traits</code> to say what those types must be able to do.</p>
+  </header>
+
+  <!-- ================= PART I ================= -->
+  <div class="part">
+    <span class="pn">Part I</span><h2>Generics &mdash; one routine, many types</h2><span class="rule"></span>
+  </div>
+
+  <!-- §1 -->
+  <section class="s">
+    <span class="num">1</span>
+    <h3>The itch generics scratch</h3>
+    <p class="lede">Here are three functions. Read them closely: they are the <strong>same</strong>
+      function written three times. The body never changes &mdash; only the type in the signature
+      does. Whenever you find yourself copying a routine just to change its type, that is the exact
+      moment a <em class="term">generic</em> replaces all the copies with one.</p>
+
+    <div class="demo fold">
+      <div class="controls">
+        <button id="f1" class="on">Three copies</button>
+        <button id="f2">One generic</button>
+      </div>
+      <div id="foldbody"></div>
+      <div class="count" id="foldcount"></div>
+    </div>
+  </section>
+
+  <!-- §2 -->
+  <section class="s">
+    <span class="num">2</span>
+    <h3>A type that can do nothing</h3>
+    <p class="lede">Write <code>&lt;T&gt;</code> with no conditions and you have promised the compiler
+      nothing about <code>T</code>, so the body may do nothing with it. To compare values you must
+      say the type can be compared; to lift one value out of the list you must say it can be copied.
+      Those promises are <em class="term">trait bounds</em>. Toggle them and watch the compiler
+      decide whether the routine is allowed to exist.</p>
+
+    <div class="demo">
+      <div style="margin-bottom:14px"><span class="slot">
+        <span class="k" style="font-family:'IBM Plex Mono',monospace;color:var(--abstract);font-weight:600">fn largest</span><span class="br">&lt;T:&nbsp;</span><span class="fill set" id="boundslot">&hellip;</span><span class="br">&gt;</span>
+      </span></div>
+      <div class="toggle">
+        <div class="switch on" id="swOrd" tabindex="0" role="switch" aria-checked="true" aria-label="PartialOrd"></div>
+        <div class="tlabel"><code>PartialOrd</code> &mdash; <span class="sub">can be compared with &gt;</span></div>
+      </div>
+      <div class="toggle">
+        <div class="switch on" id="swCopy" tabindex="0" role="switch" aria-checked="true" aria-label="Copy"></div>
+        <div class="tlabel"><code>Copy</code> &mdash; <span class="sub">can be lifted out by value</span></div>
+      </div>
+      <div class="verdict good" id="v2"></div>
+    </div>
+
+    <pre id="code2"></pre>
+
+    <div class="note">
+      <span class="tag">verified</span>Those two errors are the <em>only</em> things standing between
+      you and a working routine. Lifetimes never enter here &mdash; the function returns an owned
+      value, not a borrow, so the question is purely whether <code>T</code> can be compared and
+      copied. Confirmed against the compiler.
+    </div>
+  </section>
+
+  <!-- §3 -->
+  <section class="s">
+    <span class="num">3</span>
+    <h3>Putting a slot in a struct</h3>
+    <p class="lede">The same idea works for data, not just functions. A struct can leave a slot open
+      for a type. One slot, filled the same way for every field; or two slots, filled independently.
+      Choose what goes in each &mdash; the struct's concrete shape is decided the moment you do.</p>
+
+    <div class="demo">
+      <div class="controls"><span class="hint">Point&lt;T&gt; &mdash; both fields share one slot:</span></div>
+      <div class="controls">
+        <div class="seg" id="pointseg" role="group" aria-label="Point type">
+          <button data-ty="i32" class="on">i32</button>
+          <button data-ty="f64">f64</button>
+          <button data-ty="String">String</button>
+        </div>
+      </div>
+      <div class="readout" id="pointout"></div>
+
+      <div class="controls" style="margin-top:18px"><span class="hint">Pair&lt;T, U&gt; &mdash; two slots, chosen independently:</span></div>
+      <div class="controls">
+        <div class="seg" id="pairL" role="group" aria-label="Pair left type">
+          <button data-ty="i32" class="on">i32</button>
+          <button data-ty="bool">bool</button>
+        </div>
+        <span style="color:var(--ink-dim)">,</span>
+        <div class="seg" id="pairR" role="group" aria-label="Pair right type">
+          <button data-ty="String" class="on">String</button>
+          <button data-ty="f64">f64</button>
+        </div>
+      </div>
+      <div class="readout" id="pairout"></div>
+    </div>
+
+    <pre id="code3"></pre>
+  </section>
+
+  <!-- §4 -->
+  <section class="s">
+    <span class="num">4</span>
+    <h3>Methods on a slotted type</h3>
+    <p class="lede">To write methods you announce the slot again on the <code>impl</code> block:
+      <code>impl&lt;T&gt;</code> means "for a <code>Point</code> of any <code>T</code>." A method may
+      also open <strong>its own</strong> new slot, separate from the type's. Here
+      <code>swap_right</code> keeps the left value and accepts a right of some new type
+      <code>V</code> &mdash; so it returns a differently-shaped pair. Pick the replacement and watch
+      the return type follow.</p>
+
+    <div class="demo">
+      <div class="readout" id="swapfrom"></div>
+      <div class="controls" style="margin:10px 0">
+        <span class="hint">.swap_right(</span>
+        <div class="seg" id="swapseg" role="group" aria-label="New right value">
+          <button data-ty="f64" data-val="9.5" class="on">9.5</button>
+          <button data-ty="bool" data-val="true">true</button>
+          <button data-ty="char" data-val="'x'">'x'</button>
+        </div>
+        <span class="hint">)</span>
+      </div>
+      <div class="readout" id="swapto"></div>
+    </div>
+
+    <pre id="code4"></pre>
+  </section>
+
+  <!-- §5 -->
+  <section class="s">
+    <span class="num">5</span>
+    <h3>A container that asks for nothing</h3>
+    <p class="lede">Here is a whole generic type end to end: a stack. Push values on, pop them off.
+      Look at what it does <strong>not</strong> say: there is no <code>T: anything</code> on it. A
+      stack only moves values in and out; it never compares or inspects them, so it needs no
+      promises. The rule from section&nbsp;2 in reverse &mdash; <strong>you require a trait only when
+      the body actually uses it.</strong></p>
+
+    <div class="demo">
+      <div class="controls">
+        <button id="push">push</button>
+        <button id="pop">pop</button>
+        <button id="clear">clear</button>
+        <span class="hint" id="stackmsg">an empty Stack&lt;&amp;str&gt;</span>
+      </div>
+      <div class="stackbox" id="stack" aria-label="stack contents"></div>
+    </div>
+
+    <pre id="code5"></pre>
+  </section>
+
+  <!-- §6 -->
+  <section class="s">
+    <span class="num">6</span>
+    <h3>When inference runs out: turbofish</h3>
+    <p class="lede">Usually Rust works out <code>T</code> from how you use the result. Sometimes it
+      genuinely cannot &mdash; <code>parse</code> can produce many number types, and nothing in the
+      line says which. You name it yourself with the <em class="term">turbofish</em>,
+      <code>::&lt;Type&gt;</code>. Toggle it off to see the real complaint.</p>
+
+    <div class="demo">
+      <div class="controls">
+        <button id="tfon" class="on">turbofish on</button>
+        <button id="tfoff">turbofish off</button>
+      </div>
+      <pre id="tfcode" style="margin-top:0"></pre>
+      <div class="verdict good" id="v6"></div>
+    </div>
+  </section>
+
+  <!-- ================= PART II ================= -->
+  <div class="part">
+    <span class="pn">Part II</span><h2>Traits &mdash; saying what a type can do</h2><span class="rule"></span>
+  </div>
+
+  <!-- §7 -->
+  <section class="s">
+    <span class="num">7</span>
+    <h3>One ability, many shapes</h3>
+    <p class="lede">A generic says "any type." Often you need to say something narrower: "any type
+      that can do <em>this</em>." That ability is a <em class="term">trait</em>. A rectangle and a
+      circle store completely different numbers, yet both can answer one question &mdash; what is your
+      area? Each answers it its own way, under one shared name.</p>
+
+    <div class="demo">
+      <div class="controls">
+        <div class="seg" id="shapeseg" role="group" aria-label="Shape">
+          <button data-sh="Rect" class="on">Rect</button>
+          <button data-sh="Circle">Circle</button>
+        </div>
+        <label class="hint">size <input type="range" id="shapeval" min="1" max="6" value="3" step="1" style="vertical-align:middle"></label>
+      </div>
+      <div class="readout" id="shapeout"></div>
+    </div>
+
+    <pre id="code7"></pre>
+  </section>
+
+  <!-- §8 -->
+  <section class="s">
+    <span class="num">8</span>
+    <h3>Three ways to write the same contract</h3>
+    <p class="lede">Requiring "a type that can do <code>Area</code>" is the same promise you met in
+      section&nbsp;2, now about behavior instead of comparison. Rust gives you three spellings for it.
+      They compile to exactly the same thing; pick whichever reads best. When the list of
+      requirements grows long, the <code>where</code> clause keeps the signature tidy.</p>
+
+    <div class="demo">
+      <div class="controls" id="sigseg" role="group" aria-label="Syntax form">
+        <button data-form="bound" class="on">&lt;T: Area&gt;</button>
+        <button data-form="impl">impl Area</button>
+        <button data-form="where">where</button>
+      </div>
+      <pre id="code8" style="margin-top:0"></pre>
+      <div class="readout" id="sigout"></div>
+    </div>
+  </section>
+
+  <!-- §9 -->
+  <section class="s">
+    <span class="num">9</span>
+    <h3>A trait can bring its own behavior</h3>
+    <p class="lede">A trait is not only a list of required methods. It can also <strong>supply</strong>
+      a method, written in terms of the ones you must provide. You implement the small required part;
+      you get the larger built-on part for free, and you may still override it when one type wants
+      something different.</p>
+
+    <div class="demo">
+      <div class="controls">
+        <button id="defUse" class="on">use the default</button>
+        <button id="defOver">override it</button>
+      </div>
+      <div class="readout" id="defout"></div>
+    </div>
+
+    <pre id="code9"></pre>
+  </section>
+
+  <!-- §10 -->
+  <section class="s">
+    <span class="num">10</span>
+    <h3>Putting a trait on a type you didn't write</h3>
+    <p class="lede">You can implement your own trait for a built-in type, and you can implement a
+      built-in trait for your own type. What you cannot do is implement a <strong>foreign</strong>
+      trait on a <strong>foreign</strong> type &mdash; if both belong to someone else, Rust refuses,
+      so that two crates can never disagree about the same pairing. The way through is a
+      <em class="term">newtype</em>: wrap the foreign type in a one-field struct of your own, and now
+      the type is yours to extend.</p>
+
+    <div class="demo">
+      <div class="controls">
+        <button id="orphBad" class="on">impl Display for Vec&lt;i32&gt;</button>
+        <button id="orphGood">impl Display for Wrapper</button>
+      </div>
+      <pre id="code10" style="margin-top:0"></pre>
+      <div class="verdict bad" id="v10"></div>
+    </div>
+
+    <div class="note">
+      <span class="tag">verified</span>The refusal is rule E0117, not a quirk of how built-in types are
+      built. The newtype wrapper compiles and prints <code>[1, 2, 3]</code>. Both checked against the
+      compiler.
+    </div>
+  </section>
+
+  <!-- §11 -->
+  <section class="s">
+    <span class="num">11</span>
+    <h3>Choosing the type now or later</h3>
+    <p class="lede">There are two ways to use a trait, and the choice is about <em>when</em> the
+      concrete type is settled. With a generic, each call is locked to one type and the compiler
+      writes a direct, specialised copy &mdash; fastest, but every item in the batch must be the same
+      type. With <code>dyn</code>, one collection can hold several different types at once, each
+      decided as the program runs. Match the tool to the situation.</p>
+
+    <div class="demo">
+      <div class="controls">
+        <button id="dispStat" class="on">all the same type</button>
+        <button id="dispDyn">mixed types together</button>
+      </div>
+      <pre id="code11" style="margin-top:0"></pre>
+      <div class="readout" id="dispout"></div>
+    </div>
+  </section>
+
+  <!-- §12 -->
+  <section class="s">
+    <span class="num">12</span>
+    <h3>Both ideas, working together</h3>
+    <p class="lede">Here is where it lands. A cache is generic over a key type <code>K</code> and a
+      value type <code>V</code> &mdash; it works for any pair. But the body looks keys up in a hash
+      map, so it demands the key be hashable and comparable: <code>K: Hash + Eq</code>. The bounds are
+      not decoration; they are the exact abilities the body uses, the rule from section&nbsp;2 once
+      more. Put a few entries in and read them back.</p>
+
+    <div class="demo">
+      <div class="controls">
+        <button data-k="hits" data-v="42">put "hits" =&gt; 42</button>
+        <button data-k="misses" data-v="7">put "misses" =&gt; 7</button>
+        <span class="hint">then look one up:</span>
+        <button data-get="hits">get "hits"</button>
+        <button data-get="misses">get "misses"</button>
+        <button data-get="ratio">get "ratio"</button>
+      </div>
+      <div class="stackbox" id="cachebox" style="min-height:80px;flex-direction:column"></div>
+      <div class="readout" id="cacheout" style="margin-top:10px"></div>
+    </div>
+
+    <pre id="code12"></pre>
+  </section>
+
+  <footer>
+    <div class="div">&mdash;</div>
+    <p style="max-width:42em;margin:0 auto">Write the routine once; let the bounds name what a type
+    must be able to do; reach for <code style="font-family:'IBM Plex Mono',monospace;font-size:.9em">dyn</code>
+    only when one collection must hold many kinds at once. Every snippet and error message on this
+    page was run through the compiler.</p>
+  </footer>
+
+</div>
+
+<script>
+"use strict";
+(function(){
+
+/* ---------------- §1 fold ---------------- */
+var foldThree =
+  '<div class="three">'+
+  '<div class="fn">fn largest_i32(list: &amp;[i32]) -&gt; i32 { /* same body */ }</div>'+
+  '<div class="fn">fn largest_f64(list: &amp;[f64]) -&gt; f64 { /* same body */ }</div>'+
+  '<div class="fn">fn largest_char(list: &amp;[char]) -&gt; char { /* same body */ }</div>'+
+  '</div>';
+var foldOne =
+  '<div class="one">fn largest&lt;T: PartialOrd + Copy&gt;(list: &amp;[T]) -&gt; T { /* one body */ }</div>';
+var fb = document.getElementById("foldbody"), fc = document.getElementById("foldcount");
+function setFold(one){
+  fb.innerHTML = one ? foldOne : foldThree;
+  fc.textContent = one ? "1 function, every type." : "3 functions, 1 per type \u2014 the same body copied.";
+  document.getElementById("f1").classList.toggle("on", !one);
+  document.getElementById("f2").classList.toggle("on", one);
+}
+document.getElementById("f1").addEventListener("click",function(){setFold(false);});
+document.getElementById("f2").addEventListener("click",function(){setFold(true);});
+setFold(false);
+
+/* ---------------- §2 bounds ---------------- */
+var ord=true, copy=true;
+var swOrd=document.getElementById("swOrd"), swCopy=document.getElementById("swCopy");
+var v2=document.getElementById("v2"), slot=document.getElementById("boundslot");
+function render2(){
+  var b=[]; if(ord)b.push("PartialOrd"); if(copy)b.push("Copy");
+  slot.textContent = b.length ? b.join(" + ") : "\u2014";
+  slot.className = "fill" + (b.length ? " set" : "");
+  document.getElementById("code2").innerHTML =
+    '<span class="k">fn</span> <span class="f">largest</span>&lt;<span class="t">T</span>'+
+    (b.length ? ': <span class="t">'+b.join('</span> + <span class="t">')+'</span>' : '')+
+    '&gt;(list: &amp;[<span class="t">T</span>]) -&gt; <span class="t">T</span> {\n'+
+    '    <span class="k">let mut</span> best = list[<span class="s">0</span>];   <span class="c">// needs Copy</span>\n'+
+    '    <span class="k">for</span> &amp;v <span class="k">in</span> list { <span class="k">if</span> v &gt; best { best = v; } }  <span class="c">// needs PartialOrd</span>\n'+
+    '    best\n}';
+  if(!ord){ v2.className="verdict bad"; v2.innerHTML="error[E0369]: binary operation `&gt;` cannot be applied to type `T`"; }
+  else if(!copy){ v2.className="verdict bad"; v2.innerHTML="error[E0508]: cannot move out of type `[T]`, a non-copy slice"; }
+  else { v2.className="verdict good"; v2.innerHTML="compiles \u2014 the routine is allowed to exist."; }
+}
+function tog(sw,set){ var on=sw.classList.toggle("on"); sw.setAttribute("aria-checked",on?"true":"false"); set(on); render2(); }
+swOrd.addEventListener("click",function(){tog(swOrd,function(v){ord=v;});});
+swCopy.addEventListener("click",function(){tog(swCopy,function(v){copy=v;});});
+[swOrd,swCopy].forEach(function(sw){sw.addEventListener("keydown",function(e){if(e.key===" "||e.key==="Enter"){e.preventDefault();sw.click();}});});
+render2();
+
+/* ---------------- §3 structs ---------------- */
+var pty="i32", plt="i32", prt="String";
+function render3(){
+  document.getElementById("pointout").innerHTML =
+    'Point&lt;'+pty+'&gt; &nbsp;\u2192&nbsp; { x: '+pty+', y: '+pty+' }';
+  document.getElementById("pairout").innerHTML =
+    'Pair&lt;'+plt+', '+prt+'&gt; &nbsp;\u2192&nbsp; { left: '+plt+', right: '+prt+' }';
+  document.getElementById("code3").innerHTML =
+    '<span class="k">struct</span> <span class="t">Point</span>&lt;<span class="t">T</span>&gt;    { x: <span class="t">T</span>, y: <span class="t">T</span> }\n'+
+    '<span class="k">struct</span> <span class="t">Pair</span>&lt;<span class="t">T</span>, <span class="t">U</span>&gt; { left: <span class="t">T</span>, right: <span class="t">U</span> }';
+}
+function segPick(id,setter){
+  var seg=document.getElementById(id);
+  seg.addEventListener("click",function(e){
+    var btn=e.target.closest("button"); if(!btn)return;
+    seg.querySelectorAll("button").forEach(function(b){b.classList.remove("on");});
+    btn.classList.add("on"); setter(btn.getAttribute("data-ty")); render3();
+  });
+}
+segPick("pointseg",function(t){pty=t;});
+segPick("pairL",function(t){plt=t;});
+segPick("pairR",function(t){prt=t;});
+render3();
+
+/* ---------------- §4 methods ---------------- */
+var swapTy="f64", swapVal="9.5";
+function render4(){
+  document.getElementById("swapfrom").innerHTML =
+    'start: &nbsp;<b>Pair&lt;&amp;str, i32&gt;</b> &nbsp; { left: "id", right: 1 }';
+  document.getElementById("swapto").innerHTML =
+    'result: &nbsp;<b style="color:var(--abstract)">Pair&lt;&amp;str, '+swapTy+'&gt;</b> &nbsp; { left: "id", right: '+swapVal+' }';
+  document.getElementById("code4").innerHTML =
+    '<span class="k">impl</span>&lt;<span class="t">T</span>, <span class="t">U</span>&gt; <span class="t">Pair</span>&lt;<span class="t">T</span>, <span class="t">U</span>&gt; {\n'+
+    '    <span class="c">// V is the method\'s own slot, new each call</span>\n'+
+    '    <span class="k">fn</span> <span class="f">swap_right</span>&lt;<span class="t">V</span>&gt;(<span class="k">self</span>, new: <span class="t">V</span>) -&gt; <span class="t">Pair</span>&lt;<span class="t">T</span>, <span class="t">V</span>&gt; {\n'+
+    '        <span class="t">Pair</span> { left: <span class="k">self</span>.left, right: new }\n    }\n}';
+}
+(function(){
+  var seg=document.getElementById("swapseg");
+  seg.addEventListener("click",function(e){
+    var btn=e.target.closest("button"); if(!btn)return;
+    seg.querySelectorAll("button").forEach(function(b){b.classList.remove("on");});
+    btn.classList.add("on"); swapTy=btn.getAttribute("data-ty"); swapVal=btn.getAttribute("data-val"); render4();
+  });
+})();
+render4();
+
+/* ---------------- §5 stack ---------------- */
+var bag=["\"a\"","\"b\"","\"c\"","\"d\"","\"e\""], si=0, stack=[];
+var box=document.getElementById("stack"), msg=document.getElementById("stackmsg");
+function drawStack(){
+  box.innerHTML="";
+  stack.forEach(function(v){ var c=document.createElement("div"); c.className="cell"; c.textContent=v; box.appendChild(c); });
+  msg.textContent = stack.length ? ("Stack<&str>, depth "+stack.length) : "an empty Stack<&str>";
+}
+document.getElementById("push").addEventListener("click",function(){ stack.push(bag[si%bag.length]); si++; drawStack(); });
+document.getElementById("pop").addEventListener("click",function(){ stack.pop(); drawStack(); });
+document.getElementById("clear").addEventListener("click",function(){ stack=[]; drawStack(); });
+document.getElementById("code5").innerHTML =
+  '<span class="k">struct</span> <span class="t">Stack</span>&lt;<span class="t">T</span>&gt; { items: <span class="t">Vec</span>&lt;<span class="t">T</span>&gt; }   <span class="c">// no bound on T</span>\n\n'+
+  '<span class="k">impl</span>&lt;<span class="t">T</span>&gt; <span class="t">Stack</span>&lt;<span class="t">T</span>&gt; {\n'+
+  '    <span class="k">fn</span> <span class="f">push</span>(&amp;<span class="k">mut self</span>, v: <span class="t">T</span>) { <span class="k">self</span>.items.<span class="f">push</span>(v); }\n'+
+  '    <span class="k">fn</span> <span class="f">pop</span>(&amp;<span class="k">mut self</span>) -&gt; <span class="t">Option</span>&lt;<span class="t">T</span>&gt; { <span class="k">self</span>.items.<span class="f">pop</span>() }\n}';
+drawStack();
+
+/* ---------------- §6 turbofish ---------------- */
+var v6=document.getElementById("v6"), tfc=document.getElementById("tfcode");
+function render6(on){
+  document.getElementById("tfon").classList.toggle("on",on);
+  document.getElementById("tfoff").classList.toggle("on",!on);
+  if(on){
+    tfc.innerHTML = '<span class="k">let</span> n = <span class="s">"42"</span>.<span class="f">parse</span>::&lt;<span class="t">i32</span>&gt;().<span class="f">unwrap</span>();';
+    v6.className="verdict good"; v6.innerHTML="compiles \u2014 n is an i32.";
+  } else {
+    tfc.innerHTML = '<span class="k">let</span> n = <span class="s">"42"</span>.<span class="f">parse</span>().<span class="f">unwrap</span>();   <span class="c">// parse into... what?</span>';
+    v6.className="verdict bad"; v6.innerHTML="error[E0284]: type annotations needed";
+  }
+}
+document.getElementById("tfon").addEventListener("click",function(){render6(true);});
+document.getElementById("tfoff").addEventListener("click",function(){render6(false);});
+render6(true);
+
+/* ---------------- §7 shapes ---------------- */
+var shape="Rect", sval=3;
+function area(){ return shape==="Rect" ? (sval*sval) : (Math.PI*sval*sval); }
+function render7(){
+  var dims = shape==="Rect" ? ("w: "+sval+", h: "+sval) : ("r: "+sval);
+  document.getElementById("shapeout").innerHTML =
+    shape+" { "+dims+" } &nbsp;.area()&nbsp; \u2192 &nbsp;<b style='color:var(--abstract)'>"+area().toFixed(2)+"</b>";
+  document.getElementById("code7").innerHTML =
+    '<span class="k">trait</span> <span class="t">Area</span> { <span class="k">fn</span> <span class="f">area</span>(&amp;<span class="k">self</span>) -&gt; <span class="t">f64</span>; }\n\n'+
+    '<span class="k">impl</span> <span class="t">Area</span> <span class="k">for</span> <span class="t">Rect</span>   { <span class="k">fn</span> <span class="f">area</span>(&amp;<span class="k">self</span>) -&gt; <span class="t">f64</span> { <span class="k">self</span>.w * <span class="k">self</span>.h } }\n'+
+    '<span class="k">impl</span> <span class="t">Area</span> <span class="k">for</span> <span class="t">Circle</span> { <span class="k">fn</span> <span class="f">area</span>(&amp;<span class="k">self</span>) -&gt; <span class="t">f64</span> { <span class="t">PI</span> * <span class="k">self</span>.r * <span class="k">self</span>.r } }';
+}
+(function(){
+  var seg=document.getElementById("shapeseg");
+  seg.addEventListener("click",function(e){var b=e.target.closest("button");if(!b)return;
+    seg.querySelectorAll("button").forEach(function(x){x.classList.remove("on");});
+    b.classList.add("on"); shape=b.getAttribute("data-sh"); render7();});
+  document.getElementById("shapeval").addEventListener("input",function(e){sval=+e.target.value;render7();});
+})();
+render7();
+
+/* ---------------- §8 syntax forms ---------------- */
+var forms={
+  bound:'<span class="k">fn</span> <span class="f">describe</span>&lt;<span class="t">T</span>: <span class="t">Area</span>&gt;(item: &amp;<span class="t">T</span>) -&gt; <span class="t">f64</span> { item.<span class="f">area</span>() }',
+  impl :'<span class="k">fn</span> <span class="f">describe</span>(item: &amp;<span class="k">impl</span> <span class="t">Area</span>) -&gt; <span class="t">f64</span> { item.<span class="f">area</span>() }',
+  where:'<span class="k">fn</span> <span class="f">describe</span>&lt;<span class="t">T</span>&gt;(item: &amp;<span class="t">T</span>) -&gt; <span class="t">f64</span>\n<span class="k">where</span> <span class="t">T</span>: <span class="t">Area</span> { item.<span class="f">area</span>() }'
+};
+function render8(f){
+  document.getElementById("sigseg").querySelectorAll("button").forEach(function(b){
+    b.classList.toggle("on", b.getAttribute("data-form")===f); });
+  document.getElementById("code8").innerHTML = forms[f];
+  document.getElementById("sigout").innerHTML = "same contract \u2014 a type that can <b>Area</b> \u2014 three spellings.";
+}
+document.getElementById("sigseg").addEventListener("click",function(e){
+  var b=e.target.closest("button"); if(!b)return; render8(b.getAttribute("data-form")); });
+render8("bound");
+
+/* ---------------- §9 default method ---------------- */
+function render9(over){
+  document.getElementById("defUse").classList.toggle("on",!over);
+  document.getElementById("defOver").classList.toggle("on",over);
+  document.getElementById("defout").innerHTML = over
+    ? 'article.summary() \u2192 <b style="color:var(--abstract)">"breaking: \u2026"</b> &nbsp;(its own version)'
+    : 'article.summary() \u2192 <b style="color:var(--abstract)">"(read more at example.com)"</b> &nbsp;(the default)';
+  document.getElementById("code9").innerHTML =
+    '<span class="k">trait</span> <span class="t">Summary</span> {\n'+
+    '    <span class="k">fn</span> <span class="f">source</span>(&amp;<span class="k">self</span>) -&gt; <span class="t">String</span>;                 <span class="c">// you must write this</span>\n'+
+    '    <span class="k">fn</span> <span class="f">summary</span>(&amp;<span class="k">self</span>) -&gt; <span class="t">String</span> {              <span class="c">// supplied for free</span>\n'+
+    '        <span class="f">format!</span>(<span class="s">"(read more at {})"</span>, <span class="k">self</span>.<span class="f">source</span>())\n    }\n}\n\n'+
+    '<span class="k">impl</span> <span class="t">Summary</span> <span class="k">for</span> <span class="t">Article</span> {\n'+
+    '    <span class="k">fn</span> <span class="f">source</span>(&amp;<span class="k">self</span>) -&gt; <span class="t">String</span> { <span class="k">self</span>.site.<span class="f">clone</span>() }'+
+    (over ? '\n    <span class="k">fn</span> <span class="f">summary</span>(&amp;<span class="k">self</span>) -&gt; <span class="t">String</span> { <span class="t">String</span>::from(<span class="s">"breaking: \u2026"</span>) }' : '')+
+    '\n}';
+}
+document.getElementById("defUse").addEventListener("click",function(){render9(false);});
+document.getElementById("defOver").addEventListener("click",function(){render9(true);});
+render9(false);
+
+/* ---------------- §10 orphan rule ---------------- */
+var v10=document.getElementById("v10");
+function render10(good){
+  document.getElementById("orphBad").classList.toggle("on",!good);
+  document.getElementById("orphGood").classList.toggle("on",good);
+  if(good){
+    document.getElementById("code10").innerHTML =
+      '<span class="k">struct</span> <span class="t">Wrapper</span>(<span class="t">Vec</span>&lt;<span class="t">i32</span>&gt;);          <span class="c">// a type of YOUR own</span>\n'+
+      '<span class="k">impl</span> <span class="t">Display</span> <span class="k">for</span> <span class="t">Wrapper</span> { <span class="c">/* \u2026 */</span> }   <span class="c">// now allowed</span>';
+    v10.className="verdict good"; v10.innerHTML="compiles \u2014 prints [1, 2, 3]";
+  } else {
+    document.getElementById("code10").innerHTML =
+      '<span class="c">// Display is foreign. Vec is foreign. Neither is yours:</span>\n'+
+      '<span class="k">impl</span> <span class="t">Display</span> <span class="k">for</span> <span class="t">Vec</span>&lt;<span class="t">i32</span>&gt; { <span class="c">/* \u2026 */</span> }';
+    v10.className="verdict bad"; v10.innerHTML="error[E0117]: only traits defined in the current crate can be implemented for types defined outside of the crate";
+  }
+}
+document.getElementById("orphBad").addEventListener("click",function(){render10(false);});
+document.getElementById("orphGood").addEventListener("click",function(){render10(true);});
+render10(false);
+
+/* ---------------- §11 dispatch ---------------- */
+function render11(dyn){
+  document.getElementById("dispStat").classList.toggle("on",!dyn);
+  document.getElementById("dispDyn").classList.toggle("on",dyn);
+  if(dyn){
+    document.getElementById("code11").innerHTML =
+      '<span class="c">// one Vec, several different types at once</span>\n'+
+      '<span class="k">let</span> shapes: <span class="t">Vec</span>&lt;<span class="t">Box</span>&lt;<span class="k">dyn</span> <span class="t">Area</span>&gt;&gt; = <span class="f">vec!</span>[\n'+
+      '    <span class="t">Box</span>::<span class="f">new</span>(<span class="t">Rect</span> { w: <span class="s">2.0</span>, h: <span class="s">3.0</span> }),\n'+
+      '    <span class="t">Box</span>::<span class="f">new</span>(<span class="t">Circle</span> { r: <span class="s">1.0</span> }),\n];';
+    document.getElementById("dispout").innerHTML = "Use when a collection must hold <b>mixed</b> types. The type is read as the program runs.";
+  } else {
+    document.getElementById("code11").innerHTML =
+      '<span class="c">// every item the same type, locked at compile time</span>\n'+
+      '<span class="k">fn</span> <span class="f">total</span>&lt;<span class="t">T</span>: <span class="t">Area</span>&gt;(items: &amp;[<span class="t">T</span>]) -&gt; <span class="t">f64</span> {\n'+
+      '    items.<span class="f">iter</span>().<span class="f">map</span>(|x| x.<span class="f">area</span>()).<span class="f">sum</span>()\n}';
+    document.getElementById("dispout").innerHTML = "Use when every item is the <b>same</b> type. The compiler writes a direct, specialised copy.";
+  }
+}
+document.getElementById("dispStat").addEventListener("click",function(){render11(false);});
+document.getElementById("dispDyn").addEventListener("click",function(){render11(true);});
+render11(false);
+
+/* ---------------- §12 cache ---------------- */
+var cache={};
+var cbox=document.getElementById("cachebox"), cout=document.getElementById("cacheout");
+function drawCache(){
+  cbox.innerHTML="";
+  var keys=Object.keys(cache);
+  if(!keys.length){ cbox.innerHTML='<span class="hint">empty Cache&lt;String, i32&gt;</span>'; return; }
+  keys.forEach(function(k){
+    var c=document.createElement("div"); c.className="cell";
+    c.innerHTML='"'+k+'" &nbsp;=&gt;&nbsp; '+cache[k]; cbox.appendChild(c);
+  });
+}
+Array.prototype.forEach.call(document.querySelectorAll("[data-k]"),function(btn){
+  btn.addEventListener("click",function(){
+    cache[btn.getAttribute("data-k")]=+btn.getAttribute("data-v"); drawCache();
+    cout.innerHTML='put("'+btn.getAttribute("data-k")+'", '+btn.getAttribute("data-v")+')';
+  });
+});
+Array.prototype.forEach.call(document.querySelectorAll("[data-get]"),function(btn){
+  btn.addEventListener("click",function(){
+    var k=btn.getAttribute("data-get");
+    var hit = Object.prototype.hasOwnProperty.call(cache,k);
+    cout.innerHTML='get("'+k+'") \u2192 '+(hit
+      ? '<b style="color:var(--concrete)">Some('+cache[k]+')</b>'
+      : '<b style="color:var(--ink-dim)">None</b> &nbsp;(never put in)');
+  });
+});
+document.getElementById("code12").innerHTML =
+  '<span class="k">struct</span> <span class="t">Cache</span>&lt;<span class="t">K</span>, <span class="t">V</span>&gt; { store: <span class="t">HashMap</span>&lt;<span class="t">K</span>, <span class="t">V</span>&gt; }\n\n'+
+  '<span class="k">impl</span>&lt;<span class="t">K</span>: <span class="t">Hash</span> + <span class="t">Eq</span>, <span class="t">V</span>: <span class="t">Clone</span>&gt; <span class="t">Cache</span>&lt;<span class="t">K</span>, <span class="t">V</span>&gt; {\n'+
+  '    <span class="k">fn</span> <span class="f">put</span>(&amp;<span class="k">mut self</span>, k: <span class="t">K</span>, v: <span class="t">V</span>) { <span class="k">self</span>.store.<span class="f">insert</span>(k, v); }\n'+
+  '    <span class="k">fn</span> <span class="f">get</span>(&amp;<span class="k">self</span>, k: &amp;<span class="t">K</span>) -&gt; <span class="t">Option</span>&lt;<span class="t">V</span>&gt; { <span class="k">self</span>.store.<span class="f">get</span>(k).<span class="f">cloned</span>() }\n}';
+drawCache();
+
+})();
+</script>
+</body>
+</html>
