@@ -196,3 +196,102 @@ Key observations about generics from these examples:
 
 These examples demonstrate the power and versatility of generics in Rust, showcasing their application in real-world scenarios such as caching systems and potentially in authentication and authorization systems.
 
+
+```rust
+use std::fs;
+use std::str::FromStr;
+use std::fmt::Debug;
+
+// ---------------------------------------------------------
+// 1. THE PROBLEM DOMAIN (Data Structures)
+// ---------------------------------------------------------
+
+#[derive(Debug, PartialEq)]
+pub enum Command {
+    Forward(i32),
+    Down(i32),
+    Up(i32),
+}
+
+// ---------------------------------------------------------
+// 2. THE TRAIT IMPLEMENTATION (Bridging text to data)
+// ---------------------------------------------------------
+
+impl FromStr for Command {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let parts: Vec<&str> = s.split_whitespace().collect();
+        
+        if parts.len() != 2 {
+            return Err(format!("Expected 2 parts, found {}", parts.len()));
+        }
+
+        let direction = parts[0];
+        let amount = parts[1]
+            .parse::<i32>()
+            .map_err(|e| format!("Failed to parse number: {}", e))?;
+
+        match direction {
+            "forward" => Ok(Command::Forward(amount)),
+            "down"    => Ok(Command::Down(amount)),
+            "up"      => Ok(Command::Up(amount)),
+            _         => Err(format!("Unknown direction: {}", direction)),
+        }
+    }
+}
+
+// ---------------------------------------------------------
+// 3. THE GENERIC INFRASTRUCTURE (Reusable Tooling)
+// ---------------------------------------------------------
+
+pub fn parse_lines<T>(input: &str) -> Vec<T>
+where
+    T: FromStr,
+    T::Err: Debug,
+{
+    input
+        .lines()
+        .filter(|line| !line.trim().is_empty()) 
+        .map(|line| {
+            line.trim()
+                .parse::<T>()
+                .expect("Failed to parse a line in the input")
+        })
+        .collect()
+}
+
+// ---------------------------------------------------------
+// 4. MAIN EXECUTION (Putting it together)
+// ---------------------------------------------------------
+
+fn main() {
+    let file_path = "test.txt";
+    let file_content = fs::read_to_string(file_path)
+        .expect(&format!("Should have been able to read the file: {}", file_path));
+
+    let commands: Vec<Command> = parse_lines(&file_content);
+
+    println!("Successfully parsed {} commands.", commands.len());
+    for cmd in &commands {
+        println!("{:?}", cmd);
+    }
+    
+    let answer1 = part1(&commands);
+    println!("Part 1 Answer: {}", answer1);
+
+    let answer2 = part2(&commands);
+    println!("Part 2 Answer: {}", answer2);
+}
+
+fn part1(commands: &[Command]) -> i32 {
+    // Solve Part 1 using the borrowed data
+    0
+}
+
+fn part2(_commands: &[Command]) -> i32 {
+    // Solve Part 2 using the borrowed data
+    0
+}
+```
+
