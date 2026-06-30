@@ -2,9 +2,7 @@
 
 An interactive single-page walkthrough of Rust generics and traits. One self-contained HTML file — no build step, no dependencies beyond two web fonts. It opens in any browser and publishes on GitHub Pages as a static file.
 
-**View:** https://satzhan.github.io/rustprogramming/Module5GenericsTraits/generics-and-traits.html
-
-**Fallback (before Pages is live):** https://htmlpreview.github.io/?https://github.com/satzhan/rustprogramming/blob/main/Module5GenericsTraits/generics-and-traits.html
+**View:** https://satzhan.github.io/rustprogramming/Module6Generics_Trait/generics-and-traits.html
 
 ## What it covers
 
