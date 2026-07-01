@@ -1,0 +1,1036 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Concurrency: Thinking Without a Single Story</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg: #0A0D14;
+  --panel: #121729;
+  --panel-2: #1A2036;
+  --panel-3: #212845;
+  --rule: #2A3252;
+  --text: #E9EDF6;
+  --text-dim: #8D96B3;
+  --text-dimmer: #626B8C;
+  --thread-a: #4FE0C4;
+  --thread-a-dim: #244B45;
+  --thread-b: #F5A64B;
+  --thread-b-dim: #4B3B22;
+  --danger: #F2555F;
+  --danger-dim: #3E1F26;
+  --ok: #6EE7A0;
+  --ok-dim: #1F3A2C;
+  --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+  --sans: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  --max-w: 780px;
+}
+*{box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--sans);
+  line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+::selection{background:var(--thread-a-dim); color:var(--thread-a);}
+
+/* ---------- layout shells ---------- */
+.wrap{max-width:var(--max-w); margin:0 auto; padding:0 24px;}
+section{padding:96px 0;}
+section.tight{padding:64px 0;}
+.eyebrow{
+  font-family:var(--mono);
+  font-size:12px;
+  letter-spacing:0.14em;
+  text-transform:uppercase;
+  color:var(--text-dimmer);
+  margin:0 0 14px 0;
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+.eyebrow::before{
+  content:"";
+  width:18px;
+  height:1px;
+  background:var(--rule);
+  display:inline-block;
+}
+h2{
+  font-family:var(--mono);
+  font-size:clamp(22px, 3.4vw, 30px);
+  font-weight:600;
+  letter-spacing:-0.01em;
+  margin:0 0 20px 0;
+  color:var(--text);
+}
+h3{
+  font-family:var(--mono);
+  font-size:16px;
+  font-weight:600;
+  color:var(--text);
+  margin:32px 0 12px 0;
+}
+p{margin:0 0 16px 0; color:var(--text);}
+p.dim{color:var(--text-dim);}
+strong{color:var(--text); font-weight:600;}
+.lede{font-size:18px; color:var(--text-dim); max-width:60ch;}
+a{color:var(--thread-a);}
+
+/* ---------- top bar ---------- */
+.topbar{
+  position:sticky; top:0; z-index:50;
+  background:rgba(10,13,20,0.85);
+  backdrop-filter:blur(8px);
+  border-bottom:1px solid var(--rule);
+}
+.topbar-inner{
+  max-width:var(--max-w); margin:0 auto; padding:14px 24px;
+  display:flex; align-items:center; justify-content:space-between;
+  font-family:var(--mono); font-size:12px; color:var(--text-dimmer);
+}
+.topbar-dot{width:7px; height:7px; border-radius:50%; background:var(--thread-a); display:inline-block; margin-right:8px; box-shadow:0 0 8px var(--thread-a);}
+
+/* ---------- hero ---------- */
+.hero{padding:88px 0 60px 0;}
+.hero h1{
+  font-family:var(--mono);
+  font-size:clamp(30px, 6vw, 48px);
+  line-height:1.15;
+  letter-spacing:-0.02em;
+  font-weight:700;
+  margin:0 0 22px 0;
+}
+.hero h1 .accent-a{color:var(--thread-a);}
+.hero h1 .accent-b{color:var(--thread-b);}
+.hero .lede{margin-bottom:8px;}
+
+.ambient{
+  margin-top:52px;
+  border:1px solid var(--rule);
+  border-radius:10px;
+  background:var(--panel);
+  padding:22px 24px;
+  overflow:hidden;
+}
+.ambient-row{display:flex; align-items:center; gap:14px; margin:10px 0;}
+.ambient-label{font-family:var(--mono); font-size:11px; color:var(--text-dimmer); width:64px; flex-shrink:0;}
+.ambient-track{position:relative; flex:1; height:2px; background:var(--rule); border-radius:1px; overflow:visible;}
+.ambient-dot{position:absolute; top:50%; width:8px; height:8px; border-radius:50%; transform:translate(-50%,-50%);}
+.ambient-dot.a{background:var(--thread-a); box-shadow:0 0 10px var(--thread-a); animation:driftA 3.6s ease-in-out infinite;}
+.ambient-dot.b{background:var(--thread-b); box-shadow:0 0 10px var(--thread-b); animation:driftB 2.3s ease-in-out infinite;}
+@keyframes driftA{ 0%{left:2%;} 50%{left:97%;} 100%{left:2%;} }
+@keyframes driftB{ 0%{left:97%;} 50%{left:2%;} 100%{left:97%;} }
+@media (prefers-reduced-motion: reduce){
+  .ambient-dot.a, .ambient-dot.b{animation:none; left:40%;}
+  html{scroll-behavior:auto;}
+}
+
+/* ---------- code blocks ---------- */
+.code{
+  background:var(--panel);
+  border:1px solid var(--rule);
+  border-radius:8px;
+  overflow:hidden;
+  margin:20px 0;
+}
+.code-tab{
+  font-family:var(--mono);
+  font-size:11px;
+  color:var(--text-dimmer);
+  padding:9px 16px;
+  border-bottom:1px solid var(--rule);
+  background:var(--panel-2);
+}
+.code pre{
+  margin:0; padding:18px 20px;
+  overflow-x:auto;
+  font-family:var(--mono);
+  font-size:13px;
+  line-height:1.65;
+  color:var(--text);
+}
+.hl-comment{color:var(--text-dimmer); font-style:italic;}
+.hl-string{color:var(--ok);}
+.hl-keyword{color:var(--thread-b);}
+.hl-macro{color:var(--thread-a);}
+.hl-type{color:#B79CF2;}
+.hl-number{color:var(--thread-a);}
+
+.callout{
+  border:1px solid var(--rule);
+  border-left:3px solid var(--thread-a);
+  background:var(--panel);
+  border-radius:0 8px 8px 0;
+  padding:16px 20px;
+  margin:20px 0;
+  font-size:14.5px;
+  color:var(--text-dim);
+}
+.callout strong{color:var(--text);}
+.callout.warn{border-left-color:var(--thread-b);}
+.callout.danger{border-left-color:var(--danger);}
+
+hr.divider{
+  border:none; border-top:1px solid var(--rule);
+  margin:0;
+}
+
+/* ---------- timeline widget ---------- */
+.tl{
+  border:1px solid var(--rule);
+  border-radius:10px;
+  background:var(--panel);
+  margin:24px 0;
+  overflow:hidden;
+}
+.tl-head{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:12px 18px;
+  border-bottom:1px solid var(--rule);
+  background:var(--panel-2);
+}
+.tl-title{font-family:var(--mono); font-size:12px; color:var(--text-dimmer); letter-spacing:0.06em; text-transform:uppercase;}
+.tl-btns{display:flex; gap:8px;}
+.tl-btn{
+  font-family:var(--mono); font-size:11px;
+  background:var(--panel-3); color:var(--text-dim);
+  border:1px solid var(--rule); border-radius:6px;
+  padding:6px 11px; cursor:pointer;
+  transition:border-color 0.15s, color 0.15s;
+}
+.tl-btn:hover{border-color:var(--text-dimmer); color:var(--text);}
+.tl-btn.primary{color:var(--thread-a); border-color:var(--thread-a-dim);}
+.tl-body{padding:20px;}
+
+.tl-lanes{display:flex; flex-direction:column; gap:10px; margin-bottom:16px;}
+.tl-lane{display:flex; align-items:center; gap:12px;}
+.tl-lane-label{
+  font-family:var(--mono); font-size:12px; width:70px; flex-shrink:0;
+}
+.tl-lane[data-lane="A"] .tl-lane-label{color:var(--thread-a);}
+.tl-lane[data-lane="B"] .tl-lane-label{color:var(--thread-b);}
+.tl-tray{display:flex; gap:8px; flex-wrap:wrap; min-height:36px; align-items:center;}
+
+.tl-chip{
+  font-family:var(--mono); font-size:12.5px;
+  border-radius:6px; padding:7px 12px;
+  border:1px solid transparent;
+  cursor:pointer;
+  transition:transform 0.1s, opacity 0.15s;
+}
+.tl-chip-a{background:var(--thread-a-dim); color:var(--thread-a); border-color:var(--thread-a);}
+.tl-chip-b{background:var(--thread-b-dim); color:var(--thread-b); border-color:var(--thread-b);}
+.tl-chip:not(.tl-chip-locked):not(.tl-chip-placed):hover{transform:translateY(-1px);}
+.tl-chip-locked{opacity:0.28; cursor:not-allowed;}
+.tl-chip-placed{cursor:default;}
+
+.tl-track{
+  display:flex; gap:8px; flex-wrap:wrap;
+  min-height:44px;
+  padding:12px;
+  border:1px dashed var(--rule);
+  border-radius:8px;
+  margin-bottom:14px;
+  background:var(--bg);
+}
+.tl-track:empty::before{
+  content:"placed steps will line up here, left to right, in the order you choose them";
+  font-family:var(--sans); font-size:13px; color:var(--text-dimmer); font-style:italic;
+}
+
+.tl-log{
+  font-family:var(--mono); font-size:12.5px; color:var(--text-dim);
+  line-height:1.9;
+  padding:14px 16px;
+  background:var(--bg);
+  border-radius:8px;
+  min-height:20px;
+}
+.tl-log div{border-left:2px solid var(--rule); padding-left:10px; margin-bottom:2px;}
+
+.tl-result{
+  font-family:var(--mono); font-size:13px;
+  margin-top:12px; padding:12px 16px;
+  border-radius:8px;
+  min-height:0;
+}
+.tl-result-ok{background:var(--ok-dim); color:var(--ok);}
+.tl-result-bad{background:var(--danger-dim); color:var(--danger);}
+
+/* ---------- checklist flow (section 8) ---------- */
+.flow{margin:28px 0;}
+.flow-step{
+  display:flex; gap:18px;
+  padding:18px 0;
+  border-top:1px solid var(--rule);
+}
+.flow-step:last-child{border-bottom:1px solid var(--rule);}
+.flow-num{
+  font-family:var(--mono); font-size:12px; color:var(--thread-a);
+  width:26px; flex-shrink:0; padding-top:2px;
+}
+.flow-q{font-family:var(--mono); font-size:14.5px; color:var(--text); margin-bottom:6px;}
+.flow-a{font-size:14px; color:var(--text-dim);}
+.flow-a code{color:var(--thread-a);}
+
+/* ---------- reference cards (section 9) ---------- */
+.cards{display:grid; grid-template-columns:1fr 1fr; gap:14px; margin:24px 0;}
+@media (max-width:620px){.cards{grid-template-columns:1fr;}}
+.card{
+  border:1px solid var(--rule); border-radius:10px;
+  padding:18px 20px; background:var(--panel);
+}
+.card-name{font-family:var(--mono); font-size:14px; font-weight:600; margin-bottom:8px;}
+.card[data-tool="mutex"] .card-name{color:var(--thread-a);}
+.card[data-tool="channel"] .card-name{color:var(--thread-b);}
+.card[data-tool="condvar"] .card-name{color:#B79CF2;}
+.card[data-tool="atomic"] .card-name{color:var(--ok);}
+.card-desc{font-size:13.5px; color:var(--text-dim); margin-bottom:10px;}
+.card-tag{
+  font-family:var(--mono); font-size:11px; color:var(--text-dimmer);
+  border:1px solid var(--rule); border-radius:5px;
+  display:inline-block; padding:3px 8px;
+}
+
+code{
+  font-family:var(--mono); font-size:0.92em;
+  background:var(--panel-2); color:var(--thread-a);
+  padding:1px 6px; border-radius:4px;
+}
+
+footer{
+  padding:64px 0 80px 0;
+  border-top:1px solid var(--rule);
+}
+footer .wrap{text-align:center;}
+footer p{color:var(--text-dimmer); font-family:var(--mono); font-size:12px;}
+
+.tickrule{
+  height:24px;
+  background-image:repeating-linear-gradient(90deg, var(--rule) 0, var(--rule) 1px, transparent 1px, transparent 24px);
+  border-top:1px solid var(--rule);
+  border-bottom:1px solid var(--rule);
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <span><span class="topbar-dot"></span>CONCURRENCY</span>
+    <span id="scroll-progress">00%</span>
+  </div>
+</div>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="eyebrow">before you write another thread</div>
+    <h1>Your code stops being <span class="accent-a">one story</span><br>the moment it has <span class="accent-b">two narrators</span>.</h1>
+    <p class="lede">Sequential code has exactly one order of events: the one written on the page. The moment a second thread shows up, that guarantee is gone — and most of the strange bugs in this space come from forgetting it disappeared.</p>
+
+    <div class="ambient">
+      <div class="ambient-row">
+        <span class="ambient-label">thread a</span>
+        <div class="ambient-track"><div class="ambient-dot a"></div></div>
+      </div>
+      <div class="ambient-row">
+        <span class="ambient-label">thread b</span>
+        <div class="ambient-track"><div class="ambient-dot b"></div></div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="tickrule"></div>
+
+<!-- SECTION 1 -->
+<section id="s1">
+  <div class="wrap">
+    <div class="eyebrow">01 — the shape of the problem</div>
+    <h2>Three people, three banknotes, no rules</h2>
+    <p>Put three $100 bills on a table. Tell three people to each take one. If they talk to each other first — "you take the left one, I'll take the middle" — it works cleanly, every time. If they don't talk, and just move for whichever bill they see, you get one of two outcomes: it happens to work out, or two people grab the same bill at the same instant and you have a torn banknote and an argument.</p>
+    <p>Nothing about the room changed between those two outcomes. Same table, same people, same bills. The only thing that changed was <strong>the order things happened in</strong> — and that order was never written down anywhere. It was decided in the moment, by whoever moved first.</p>
+    <p class="dim">That's the entire shape of concurrent programming. Threads are the people. Shared memory is the table. And the "order things happened in" is something your program's source code does not fully control — the operating system's scheduler has a say too, and it doesn't ask permission.</p>
+    <div class="callout">
+      <strong>Worth sitting with:</strong> a program with a concurrency bug is not broken the way a program with a typo is broken. It can run correctly a thousand times and fail on the thousand-and-first, with nothing in the code having changed between runs. That's a different category of bug, and it needs a different way of thinking about code.
+    </div>
+  </div>
+</section>
+
+<div class="tickrule"></div>
+
+<!-- SECTION 2 -->
+<section id="s2">
+  <div class="wrap">
+    <div class="eyebrow">02 — a different way of reading code</div>
+    <h2>There is no "next line" anymore</h2>
+    <p>When you read normal code, you run a little simulation in your head: this line finishes, then that one starts. It's such a deep habit that it's easy to keep doing it once a second thread enters the picture — and that's exactly where the trouble starts.</p>
+    <p>Once two threads touch the same piece of memory, a single line like <code>counter += 1</code> stops being one event. Underneath, it's three: <strong>load</strong> the current value, <strong>add</strong> one to it, <strong>store</strong> it back. Your other thread can slip in and do its own load, add, or store at any point between yours. The scheduler doesn't know or care that you thought of <code>+= 1</code> as a single step.</p>
+    <p class="dim">Below, two threads each want to add 1 to a shared value that starts at 5. Correct math says the end result should be 7. Build a schedule yourself — click steps in whatever order you like, as long as each thread's own three steps stay in order — and watch what the final number actually turns out to be.</p>
+
+    <div class="tl" id="widget-interleave">
+      <div class="tl-head">
+        <span class="tl-title">shared value starts at 5</span>
+        <div class="tl-btns">
+          <button class="tl-btn" data-action="preset-serial">fully serial</button>
+          <button class="tl-btn" data-action="preset-overlap">fully overlapped</button>
+          <button class="tl-btn primary" data-action="reset">reset</button>
+        </div>
+      </div>
+      <div class="tl-body">
+        <div class="tl-lanes">
+          <div class="tl-lane" data-lane="A">
+            <span class="tl-lane-label">thread a</span>
+            <div class="tl-tray" data-lane="A"></div>
+          </div>
+          <div class="tl-lane" data-lane="B">
+            <span class="tl-lane-label">thread b</span>
+            <div class="tl-tray" data-lane="B"></div>
+          </div>
+        </div>
+        <div class="tl-track"></div>
+        <div class="tl-log"></div>
+        <div class="tl-result"></div>
+      </div>
+    </div>
+
+    <p>Try the two preset buttons first. "Fully serial" runs one thread completely, then the other — and always lands on 7. "Fully overlapped" interleaves their loads before either has stored — and always lands on 6. Same code. Same starting value. Same two threads. The only variable is timing, and timing is not something your source code pins down by itself.</p>
+    <div class="callout">
+      <strong>The general rule hiding in this example:</strong> any operation that reads a value, computes something from it, and writes it back is only safe from this problem if the read-compute-write happens as one uninterruptible unit — or if you've otherwise guaranteed no one else can touch that value in between. Everything from here on is really just different tools for getting that guarantee.
+    </div>
+  </div>
+</section>
+
+<div class="tickrule"></div>
+
+<!-- SECTION 3 -->
+<section id="s3">
+  <div class="wrap">
+    <div class="eyebrow">03 — the basic move</div>
+    <h2>Spawning a thread, and why join isn't optional</h2>
+    <p><code>thread::spawn</code> takes a closure and hands it to the operating system to run independently. Your main thread doesn't wait for it — it just keeps going, immediately, on its own track.</p>
+
+    <div class="code">
+      <div class="code-tab">src/main.rs</div>
+      <pre><code class="rust">use std::thread;
+use std::time::Duration;
+
+fn main() {
+    let handle = thread::spawn(|| {
+        for i in 1..=3 {
+            println!("worker step {i}");
+            thread::sleep(Duration::from_millis(50));
+        }
+    });
+
+    println!("main is already doing its own thing");
+
+    // handle.join() blocks main until the worker closure returns.
+    // Skip this call and main might exit — ending the whole
+    // process — before the worker ever prints anything.
+    handle.join().unwrap();
+    println!("worker is done, main can trust that now");
+}</code></pre>
+    </div>
+
+    <p>The closure passed to <code>spawn</code> owns whatever it captures from the environment — that's what <code>move</code> is for when you see it, and you'll see it constantly, because a spawned thread can outlive the scope it was created in, so it can't safely borrow anything from that scope.</p>
+    <p class="dim"><code>join()</code> is the only thing in this snippet that puts an order back in place: "wait until the worker is finished." Everything else about when the worker's individual print statements happen, relative to main's, is still up for grabs — main and the worker are two separate stories running at once, and <code>join</code> only guarantees where they meet back up, not what happened along the way.</p>
+  </div>
+</section>
+
+<div class="tickrule"></div>
+
+<!-- SECTION 4 -->
+<section id="s4">
+  <div class="wrap">
+    <div class="eyebrow">04 — watching it actually break</div>
+    <h2>Rust won't let you write the naive bug — so here's a version it will</h2>
+    <p>If you tried to have two threads directly share a plain <code>&amp;mut i32</code> and both mutate it, Rust's compiler refuses to build the program at all. That's real, and it's one of the things Rust is genuinely good at: a whole category of this bug is caught before your code ever runs.</p>
+    <p>But the compiler checks <em>ownership</em>, not <em>timing</em>. If you give both threads shared access through something designed for that — like an atomic value — Rust is satisfied, because each individual read and each individual write is memory-safe. What it can't stop is you doing the read and the write as two separate steps, with a gap in between where another thread can sneak in.</p>
+
+    <div class="code">
+      <div class="code-tab">src/main.rs</div>
+      <pre><code class="rust">use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
+use std::thread;
+
+fn main() {
+    let counter = Arc::new(AtomicUsize::new(0));
+    let mut handles = vec![];
+
+    for _ in 0..2 {
+        let counter = Arc::clone(&counter);
+        handles.push(thread::spawn(move || {
+            for _ in 0..100_000 {
+                let current = counter.load(Ordering::Relaxed);
+                counter.store(current + 1, Ordering::Relaxed);
+                // load and store are each safe on their own —
+                // but nothing stops another thread's load from
+                // landing between this load and this store.
+            }
+        }));
+    }
+
+    for h in handles {
+        h.join().unwrap();
+    }
+
+    println!("counter = {}", counter.load(Ordering::Relaxed));
+    // expected 200,000 — almost never what you get
+}</code></pre>
+    </div>
+
+    <p class="dim">Watch a single one of those lost updates happen below, slowed down to two threads doing one increment each instead of a hundred thousand. Same bug, just zoomed in far enough to see.</p>
+
+    <div class="tl" id="widget-race">
+      <div class="tl-head">
+        <span class="tl-title">shared value starts at 0, two threads each add 1</span>
+        <div class="tl-btns">
+          <button class="tl-btn" data-action="step">step</button>
+          <button class="tl-btn primary" data-action="play">play</button>
+          <button class="tl-btn" data-action="reset">reset</button>
+        </div>
+      </div>
+      <div class="tl-body">
+        <div class="tl-lanes">
+          <div class="tl-lane" data-lane="A">
+            <span class="tl-lane-label">thread a</span>
+            <div class="tl-tray" data-lane="A"></div>
+          </div>
+          <div class="tl-lane" data-lane="B">
+            <span class="tl-lane-label">thread b</span>
+            <div class="tl-tray" data-lane="B"></div>
+          </div>
+        </div>
+        <div class="tl-track"></div>
+        <div class="tl-log"></div>
+        <div class="tl-result"></div>
+      </div>
+    </div>
+
+    <div class="callout warn">
+      <strong>The part that should bother you:</strong> this program doesn't always print the wrong number. Run it a few times and you might get 200,000 once, then 187,412, then 200,000 again. A bug that sometimes doesn't happen is worse than one that always does — it passes casual testing and shows up later, somewhere you weren't looking.
+    </div>
+  </div>
+</section>
+
+<div class="tickrule"></div>
+
+<!-- SECTION 5 -->
+<section id="s5">
+  <div class="wrap">
+    <div class="eyebrow">05 — the fix: forced exclusion</div>
+    <h2>Mutex: only one thread holds the key</h2>
+    <p>A <code>Mutex</code> ("mutual exclusion") wraps a value and adds exactly one rule: to touch what's inside, a thread has to call <code>.lock()</code> and get back a guard. While that guard exists, no other thread's <code>.lock()</code> call can succeed — they simply wait. The load, the modification, and the store all happen while holding that one guard, so there's no gap left for another thread to slip into.</p>
+    <p><code>Arc</code> ("atomically reference-counted") is the separate piece that lets multiple threads each own a handle to the same <code>Mutex</code> in the first place. Cloning an <code>Arc</code> doesn't copy the data — it just adds one to a shared counter, and the data itself is freed once that counter hits zero. Think of it as a shared pointer with a built-in headcount, which is exactly what lets several threads legitimately co-own one piece of memory.</p>
+
+    <div class="code">
+      <div class="code-tab">src/main.rs</div>
+      <pre><code class="rust">use std::sync::{Arc, Mutex};
+use std::thread;
+
+fn main() {
+    let counter = Arc::new(Mutex::new(0));
+    let mut handles = vec![];
+
+    for _ in 0..2 {
+        let counter = Arc::clone(&counter);
+        handles.push(thread::spawn(move || {
+            for _ in 0..100_000 {
+                let mut guard = counter.lock().unwrap();
+                *guard += 1;
+            } // guard drops here — the lock releases automatically
+        }));
+    }
+
+    for h in handles {
+        h.join().unwrap();
+    }
+
+    println!("counter = {}", *counter.lock().unwrap());
+    // always 200,000, every single run
+}</code></pre>
+    </div>
+
+    <p>The block between <code>counter.lock().unwrap()</code> and the closing brace is called the <strong>critical section</strong> — the smallest span of code that genuinely needs exclusive access. A good habit is keeping it as short as possible: lock, do the minimum necessary, let the guard drop. A critical section that holds the lock while doing unrelated slow work (a network call, a big computation) doesn't cause wrong answers, but it does mean every other thread waiting on that lock sits idle for no good reason.</p>
+    <div class="callout">
+      <strong>Same bug, opposite fix from section 4:</strong> the atomic version there was racy specifically because load and store were two separate operations on the object. A <code>Mutex</code> fixes this by making the entire read-modify-write sequence into one guarded block, rather than by making any single operation itself indivisible.
+    </div>
+  </div>
+</section>
+
+<div class="tickrule"></div>
+
+<!-- SECTION 6 -->
+<section id="s6">
+  <div class="wrap">
+    <div class="eyebrow">06 — a different paradigm entirely</div>
+    <h2>Channels: stop sharing, start handing off</h2>
+    <p>Everything so far has been about the same problem: several threads touching the same memory, and needing rules for who touches it when. Channels sidestep the problem instead of solving it — only one thread ever owns the data at any given moment. Others don't reach in and grab it; they receive it, one message at a time.</p>
+
+    <div class="code">
+      <div class="code-tab">src/main.rs</div>
+      <pre><code class="rust">use std::sync::mpsc;
+use std::thread;
+
+fn main() {
+    let (tx, rx) = mpsc::channel();
+
+    thread::spawn(move || {
+        for n in 1..=5 {
+            tx.send(n).unwrap(); // ownership of `n` moves into the channel
+        }
+    }); // `tx` is dropped here, once the closure ends
+
+    for received in rx {
+        println!("got {received}");
+    } // the loop ends naturally once every sender has been dropped
+}</code></pre>
+    </div>
+
+    <p><code>mpsc</code> stands for <strong>multiple producer, single consumer</strong> — many threads can hold a clone of <code>tx</code> and send into the same channel, but there's only ever one <code>rx</code> pulling messages out. Each value sent is <em>moved</em>, not shared: once it's sent, the sending thread no longer has it, and the receiving thread is the sole owner from that point on. There's nothing left for two threads to race over, because there's no moment where two threads both have access to the same value.</p>
+    <p class="dim">This is the producer/consumer shape: one or more threads generating work or data, one thread (or a small pool of them) picking it up and processing it in order. It won't save you from every kind of coordination problem — you can still need to know, for instance, that all producers are done before you stop waiting — but it removes the specific "two threads mutate one cell" bug completely, for whatever data flows through it.</p>
+  </div>
+</section>
+
+<div class="tickrule"></div>
+
+<!-- SECTION 7 -->
+<section id="s7">
+  <div class="wrap">
+    <div class="eyebrow">07 — waiting for a reason, not a lock</div>
+    <h2>Condvar: sleep until something is actually true</h2>
+    <p>A <code>Mutex</code> answers "only one at a time." It has nothing to say about <strong>order</strong>. If thread B has to wait until thread A has done something specific first — not just wait for a lock to be free, but wait for a real condition to become true — locking alone doesn't express that. You could make B spin in a loop, repeatedly locking, checking, unlocking, and trying again, but that burns CPU doing nothing thousands of times a second while it waits.</p>
+    <p>A <code>Condvar</code> gives a thread a way to actually go to sleep — not spin — until another thread wakes it up on purpose.</p>
+
+    <div class="code">
+      <div class="code-tab">src/main.rs — the mechanism</div>
+      <pre><code class="rust">use std::sync::{Arc, Mutex, Condvar};
+use std::thread;
+
+fn main() {
+    let pair = Arc::new((Mutex::new(false), Condvar::new()));
+    let pair2 = Arc::clone(&pair);
+
+    thread::spawn(move || {
+        let (lock, cvar) = &*pair2;
+        let mut ready = lock.lock().unwrap();
+        *ready = true;
+        cvar.notify_one(); // wake up one thread that's waiting on this cvar
+    });
+
+    let (lock, cvar) = &*pair;
+    let mut ready = lock.lock().unwrap();
+    while !*ready {
+        // wait() atomically: unlocks the mutex, sleeps, and re-locks
+        // it before returning. The thread holds no lock while asleep.
+        ready = cvar.wait(ready).unwrap();
+    }
+    println!("go!");
+}</code></pre>
+    </div>
+
+    <p>Notice the <code>Condvar</code> is always paired with a <code>Mutex</code> guarding the actual condition (here, the <code>bool</code>). That's not incidental — <code>wait()</code> needs to release the lock while sleeping (otherwise no one else could ever acquire it to make the condition true), and it needs to reacquire the lock before handing control back to you, so you can safely check the condition again without racing anyone.</p>
+
+    <div class="callout warn">
+      <strong>The gotcha that matters most: always <code>while</code>, never <code>if</code>.</strong> It's tempting to write <code>if !*ready { ready = cvar.wait(ready).unwrap(); }</code> — check once, wait once, assume you're done. Two things break that assumption. First, a thread can wake up from <code>wait()</code> with no one having called notify at all — a "spurious wakeup," which the underlying OS is explicitly allowed to do. Second, when you <code>notify_all()</code>, every waiter wakes up and races to reacquire the lock, but only one condition might actually hold — the rest need to go straight back to sleep. A <code>while</code> loop that rechecks the condition after every wake-up handles both cases correctly. An <code>if</code> handles neither.
+    </div>
+
+    <p>Here's that lesson applied to something closer to what you'll actually need: three threads spawned in a random order, but forced to print in a specific order regardless.</p>
+
+    <div class="code">
+      <div class="code-tab">src/main.rs — enforcing a strict order</div>
+      <pre><code class="rust">use std::sync::{Arc, Mutex, Condvar};
+use std::thread;
+
+struct Turn {
+    current: Mutex<u32>,
+    cvar: Condvar,
+}
+
+fn print_in_turn(turn: &Turn, my_turn: u32, label: &str) {
+    let mut current = turn.current.lock().unwrap();
+    while *current != my_turn {
+        current = turn.cvar.wait(current).unwrap();
+    }
+    println!("{label}");
+    *current += 1;
+    turn.cvar.notify_all(); // wake everyone — let each recheck whose turn it is
+}
+
+fn main() {
+    let turn = Arc::new(Turn { current: Mutex::new(0), cvar: Condvar::new() });
+    let mut handles = vec![];
+
+    // spawned in a deliberately scrambled order
+    for (id, label) in [(2, "third"), (0, "first"), (1, "second")] {
+        let turn = Arc::clone(&turn);
+        handles.push(thread::spawn(move || print_in_turn(&turn, id, label)));
+    }
+
+    for h in handles {
+        h.join().unwrap();
+    }
+    // always prints: first, second, third — regardless of spawn order
+    // or which thread the scheduler happens to run first
+}</code></pre>
+    </div>
+
+    <p>Walk through why this works: every thread immediately tries to lock <code>current</code> and check whether it's their turn. Whoever isn't up yet calls <code>wait()</code> and goes to sleep, lock released. When the thread whose turn it <em>is</em> finishes printing, it increments the counter and calls <code>notify_all()</code> — every sleeping thread wakes up, reacquires the lock one at a time, and rechecks its own condition. Exactly one of them finds it's now their turn; the rest see it still isn't and go straight back to sleep. Nobody needed to know in advance which thread that would be — the <code>while</code> loop figures it out.</p>
+    <p class="dim">This pattern — a shared piece of state describing "whose turn," a <code>Condvar</code> for the waking and sleeping, <code>notify_all</code> because you don't know which specific waiter should wake — covers a large share of the ordering puzzles you'll run into. The names of the threads and what they print will change; the shape underneath usually doesn't.</p>
+  </div>
+</section>
+
+<div class="tickrule"></div>
+
+<!-- SECTION 8 -->
+<section id="s8">
+  <div class="wrap">
+    <div class="eyebrow">08 — reading it, and writing it</div>
+    <h2>A method, not a memorized list</h2>
+    <p>The tools above are easy to memorize and easy to reach for at random. What actually transfers to a problem you haven't seen before is a small set of questions you ask <em>before</em> touching a keyboard — whether you're reading someone else's threaded code or writing your own.</p>
+
+    <div class="flow">
+      <div class="flow-step">
+        <div class="flow-num">01</div>
+        <div>
+          <div class="flow-q">What's actually shared?</div>
+          <div class="flow-a">Find the specific variables, fields, or structures more than one thread can touch. Everything else in the code — local variables inside a single thread's closure, data that's moved and never shared again — is not a candidate for any of this and can be set aside.</div>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">02</div>
+        <div>
+          <div class="flow-q">Of that shared state, what's read-only versus mutated?</div>
+          <div class="flow-a">Multiple threads reading the same immutable value at once is completely fine — an <code>Arc&lt;T&gt;</code> around read-only data needs nothing further. The danger is specifically write access, or a read that's used to decide a write.</div>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">03</div>
+        <div>
+          <div class="flow-q">Is the requirement exclusion, or is it ordering?</div>
+          <div class="flow-a">"Only one thread touches this at a time" is exclusion — reach for <code>Mutex</code> (or an atomic, for simple counters and flags). "Thread B can't proceed until thread A has done something specific" is ordering — exclusion alone doesn't express that; you need a <code>Condvar</code>, a channel used as a signal, or both.</div>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">04</div>
+        <div>
+          <div class="flow-q">Could this be a hand-off instead of a share?</div>
+          <div class="flow-a">If the real shape of the problem is "thread A produces something, thread B consumes it," ask whether a channel replaces the shared-state-plus-lock design entirely. It often does, and it's easier to reason about when it does — there's no interleaving to worry about if only one thread ever owns the data.</div>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">05</div>
+        <div>
+          <div class="flow-q">Trace one bad interleaving by hand.</div>
+          <div class="flow-a">Pick a specific, deliberately unfriendly order — two threads' critical sections starting at the same instant, a notify firing before the corresponding wait, a sender finishing before a receiver is even created. Walk the code through that exact order, line by line. If it still ends up correct, that's real evidence, not just a passing test run.</div>
+        </div>
+      </div>
+    </div>
+
+    <p class="dim">None of this replaces understanding the primitives. But most of the difficulty in this space isn't "which function do I call" — it's noticing, up front, which of these five questions the problem in front of you is actually asking.</p>
+  </div>
+</section>
+
+<div class="tickrule"></div>
+
+<!-- SECTION 9 -->
+<section id="s9">
+  <div class="wrap">
+    <div class="eyebrow">09 — quick reference</div>
+    <h2>Four tools, four shapes of problem</h2>
+    <p>Almost every synchronization puzzle you'll meet is one of these shapes, or a combination of two of them.</p>
+
+    <div class="cards">
+      <div class="card" data-tool="mutex">
+        <div class="card-name">Mutex + Arc</div>
+        <div class="card-desc">Several threads need to mutate the same piece of state. Lock, mutate, let the guard drop. Keep the critical section as small as it can be.</div>
+        <span class="card-tag">shape: shared mutable state</span>
+      </div>
+      <div class="card" data-tool="channel">
+        <div class="card-name">Channel (mpsc)</div>
+        <div class="card-desc">One or more threads produce values, one thread consumes them. Ownership transfers with each send — nothing is ever touched by two threads at once.</div>
+        <span class="card-tag">shape: hand-off, produce/consume</span>
+      </div>
+      <div class="card" data-tool="condvar">
+        <div class="card-name">Condvar</div>
+        <div class="card-desc">A thread must wait, without spinning, until a specific condition becomes true — not just until a lock is free. Always recheck the condition in a <code>while</code>, never an <code>if</code>.</div>
+        <span class="card-tag">shape: ordering, signaling</span>
+      </div>
+      <div class="card" data-tool="atomic">
+        <div class="card-name">Atomic types</div>
+        <div class="card-desc">For a single counter or flag, an <code>AtomicUsize</code> or <code>AtomicBool</code> can skip the overhead of a full <code>Mutex</code> — but remember: only <em>individual</em> operations like <code>fetch_add</code> are indivisible. Separate <code>load</code> then <code>store</code> calls are not, as section 4 showed.</div>
+        <span class="card-tag">shape: simple shared counters/flags</span>
+      </div>
+    </div>
+
+    <p class="dim">The shape rarely announces itself in the problem statement. Finding it — is this really exclusion, or is it secretly ordering; is this really shared state, or is it secretly a hand-off — is most of the actual work.</p>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <p>build small, trace by hand, and don't trust a program that only sometimes fails</p>
+  </div>
+</footer>
+
+
+<script>
+// ---------- syntax highlighting (tiny, rust-specific) ----------
+function highlightRust(code) {
+  const escapeHtml = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const pattern = /(\/\/[^\n]*)|("(?:[^"\\]|\\.)*")|(\b(?:fn|let|mut|for|in|while|if|else|match|struct|impl|return|pub|const|loop|move|break|continue|where|type|enum|dyn|use|self|Self|true|false|as|ref)\b)|(\b[A-Za-z_][A-Za-z0-9_]*!)|(\b(?:Arc|Mutex|Condvar|AtomicUsize|AtomicI32|Ordering|Vec|Option|Some|None|Result|Ok|Err|Box|String|JoinHandle|u32|i32|usize)\b)|(\b\d+\b)/g;
+  return escapeHtml(code).replace(pattern, (m, comment, str, kw, macro, type, num) => {
+    if (comment) return `<span class="hl-comment">${comment}</span>`;
+    if (str) return `<span class="hl-string">${str}</span>`;
+    if (kw) return `<span class="hl-keyword">${kw}</span>`;
+    if (macro) return `<span class="hl-macro">${macro}</span>`;
+    if (type) return `<span class="hl-type">${type}</span>`;
+    if (num) return `<span class="hl-number">${num}</span>`;
+    return m;
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('code.rust').forEach(el => {
+    el.innerHTML = highlightRust(el.textContent);
+  });
+
+  // ---------- scroll progress ----------
+  const progressEl = document.getElementById('scroll-progress');
+  if (progressEl) {
+    window.addEventListener('scroll', () => {
+      const h = document.documentElement;
+      const scrolled = h.scrollTop;
+      const max = h.scrollHeight - h.clientHeight;
+      const pct = max > 0 ? Math.min(100, Math.round((scrolled / max) * 100)) : 0;
+      progressEl.textContent = String(pct).padStart(2, '0') + '%';
+    }, { passive: true });
+  }
+
+  // ---------- shared simulation engine ----------
+  const laneLabels = { A: 'Thread A', B: 'Thread B' };
+
+  function makeSteps(initial) {
+    return {
+      A: [
+        { id: 'A-load', lane: 'A', kind: 'load', label: 'load' },
+        { id: 'A-add', lane: 'A', kind: 'add', label: '+1' },
+        { id: 'A-store', lane: 'A', kind: 'store', label: 'store' },
+      ],
+      B: [
+        { id: 'B-load', lane: 'B', kind: 'load', label: 'load' },
+        { id: 'B-add', lane: 'B', kind: 'add', label: '+1' },
+        { id: 'B-store', lane: 'B', kind: 'store', label: 'store' },
+      ],
+    };
+  }
+
+  function createSimState(initial) {
+    return { shared: initial, reg: { A: null, B: null }, log: [] };
+  }
+
+  function applyStep(state, step) {
+    const label = laneLabels[step.lane];
+    if (step.kind === 'load') {
+      state.reg[step.lane] = state.shared;
+      state.log.push(`${label} loads the shared value: ${state.shared}`);
+    } else if (step.kind === 'add') {
+      state.reg[step.lane] = state.reg[step.lane] + 1;
+      state.log.push(`${label} adds 1 in its own private register — now holds ${state.reg[step.lane]}, not saved yet`);
+    } else if (step.kind === 'store') {
+      state.shared = state.reg[step.lane];
+      state.log.push(`${label} writes ${state.reg[step.lane]} back to the shared value`);
+    }
+    return state;
+  }
+
+  function renderChip(text, lane, extraClass) {
+    const chip = document.createElement(extraClass === 'placed' ? 'div' : 'button');
+    chip.className = `tl-chip tl-chip-${lane.toLowerCase()}` + (extraClass ? ` tl-chip-${extraClass}` : '');
+    chip.textContent = text;
+    return chip;
+  }
+
+  // ---------- widget 1: interactive interleaving picker ----------
+  function initInterleaveWidget(rootId) {
+    const root = document.getElementById(rootId);
+    if (!root) return;
+    const initialValue = 5;
+    let steps, placed, simState;
+
+    function nextAvailable(lane) {
+      const done = placed.filter(s => s.lane === lane).length;
+      return steps[lane][done] || null;
+    }
+
+    function place(step) {
+      placed.push(step);
+      applyStep(simState, step);
+      render();
+    }
+
+    function reset() {
+      steps = makeSteps(initialValue);
+      placed = [];
+      simState = createSimState(initialValue);
+      render();
+    }
+
+    function placeSequence(order) {
+      steps = makeSteps(initialValue);
+      placed = [];
+      simState = createSimState(initialValue);
+      order.forEach(lane => {
+        const s = nextAvailable(lane);
+        if (s) {
+          placed.push(s);
+          applyStep(simState, s);
+        }
+      });
+      render();
+    }
+
+    function render() {
+      ['A', 'B'].forEach(lane => {
+        const tray = root.querySelector(`.tl-tray[data-lane="${lane}"]`);
+        tray.innerHTML = '';
+        steps[lane].forEach(s => {
+          if (placed.includes(s)) return;
+          const isNext = nextAvailable(lane) === s;
+          const chip = renderChip(s.label, lane, isNext ? '' : 'locked');
+          chip.disabled = !isNext;
+          if (isNext) chip.onclick = () => place(s);
+          tray.appendChild(chip);
+        });
+      });
+
+      const track = root.querySelector('.tl-track');
+      track.innerHTML = '';
+      placed.forEach(s => {
+        track.appendChild(renderChip(`${laneLabels[s.lane]}: ${s.label}`, s.lane, 'placed'));
+      });
+
+      const log = root.querySelector('.tl-log');
+      log.innerHTML = simState.log.map(l => `<div>${l}</div>`).join('');
+
+      const result = root.querySelector('.tl-result');
+      if (placed.length === 6) {
+        const expected = initialValue + 2;
+        const ok = simState.shared === expected;
+        result.className = 'tl-result ' + (ok ? 'tl-result-ok' : 'tl-result-bad');
+        result.textContent = ok
+          ? `Final value: ${simState.shared}. Both increments landed — correct.`
+          : `Final value: ${simState.shared}, but it should be ${expected}. One increment vanished.`;
+      } else {
+        result.className = 'tl-result';
+        result.textContent = '';
+      }
+    }
+
+    root.querySelector('[data-action="reset"]').onclick = reset;
+    root.querySelector('[data-action="preset-serial"]').onclick = () => placeSequence(['A', 'A', 'A', 'B', 'B', 'B']);
+    root.querySelector('[data-action="preset-overlap"]').onclick = () => placeSequence(['A', 'B', 'A', 'B', 'A', 'B']);
+
+    reset();
+  }
+
+  // ---------- widget 2: scripted playback race condition ----------
+  function initRaceWidget(rootId) {
+    const root = document.getElementById(rootId);
+    if (!root) return;
+    const initialValue = 0;
+    const order = ['A', 'B', 'A', 'B', 'A', 'B'];
+    let steps, placed, simState, idx, timer;
+
+    function updatePlayButton() {
+      const btn = root.querySelector('[data-action="play"]');
+      btn.textContent = timer ? 'pause' : 'play';
+    }
+
+    function render() {
+      const track = root.querySelector('.tl-track');
+      track.innerHTML = '';
+      placed.forEach(s => {
+        track.appendChild(renderChip(`${laneLabels[s.lane]}: ${s.label}`, s.lane, 'placed'));
+      });
+
+      const log = root.querySelector('.tl-log');
+      log.innerHTML = simState.log.map(l => `<div>${l}</div>`).join('');
+
+      const result = root.querySelector('.tl-result');
+      if (placed.length === order.length) {
+        const expected = initialValue + 2;
+        result.className = 'tl-result tl-result-bad';
+        result.textContent = `Final value: ${simState.shared}, expected ${expected}. Lost update.`;
+      } else {
+        result.className = 'tl-result';
+        result.textContent = '';
+      }
+    }
+
+    function reset() {
+      clearInterval(timer);
+      timer = null;
+      steps = makeSteps(initialValue);
+      placed = [];
+      simState = createSimState(initialValue);
+      idx = 0;
+      updatePlayButton();
+      render();
+    }
+
+    function stepForward() {
+      if (idx >= order.length) {
+        clearInterval(timer);
+        timer = null;
+        updatePlayButton();
+        return;
+      }
+      const lane = order[idx];
+      const doneInLane = placed.filter(s => s.lane === lane).length;
+      const s = steps[lane][doneInLane];
+      placed.push(s);
+      applyStep(simState, s);
+      idx++;
+      render();
+      if (idx >= order.length) {
+        clearInterval(timer);
+        timer = null;
+        updatePlayButton();
+      }
+    }
+
+    function play() {
+      if (timer) return;
+      timer = setInterval(stepForward, 900);
+      updatePlayButton();
+    }
+
+    function pause() {
+      clearInterval(timer);
+      timer = null;
+      updatePlayButton();
+    }
+
+    root.querySelector('[data-action="play"]').onclick = () => (timer ? pause() : play());
+    root.querySelector('[data-action="step"]').onclick = () => { pause(); stepForward(); };
+    root.querySelector('[data-action="reset"]').onclick = reset;
+
+    reset();
+  }
+
+  initInterleaveWidget('widget-interleave');
+  initRaceWidget('widget-race');
+});
+</script>
+</body>
+</html>
