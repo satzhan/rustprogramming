@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sharing Across Timelines</title>
+<style>
+  :root {
+    --bg: #0b0e14;
+    --panel: #12161f;
+    --panel2: #171c26;
+    --border: #242c3b;
+    --text: #c9d4e3;
+    --dim: #8593a9;
+    --teal: #2dd4bf;
+    --teal-dim: rgba(45, 212, 191, 0.14);
+    --amber: #f5b942;
+    --amber-dim: rgba(245, 185, 66, 0.14);
+    --red: #ef6b73;
+    --red-dim: rgba(239, 107, 115, 0.12);
+    --green: #4ade80;
+    --green-dim: rgba(74, 222, 128, 0.12);
+    --blue: #6ea8fe;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+    --sans: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background:
+      radial-gradient(ellipse 900px 500px at 20% -5%, rgba(45,212,191,.07), transparent 60%),
+      radial-gradient(ellipse 900px 500px at 85% 10%, rgba(245,185,66,.06), transparent 60%),
+      radial-gradient(ellipse 700px 600px at 50% 110%, rgba(110,168,254,.05), transparent 65%),
+      var(--bg);
+    background-attachment: fixed;
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.6;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 32px 20px 80px; }
+
+  header { margin-bottom: 48px; }
+  header h1 {
+    font-family: var(--mono);
+    font-size: 26px;
+    letter-spacing: 0.5px;
+    color: #e8eef7;
+    text-shadow: 0 0 24px rgba(110,168,254,.35);
+  }
+  header .sub { color: var(--dim); margin-top: 6px; }
+  .strands { display: block; margin: 0 0 14px; }
+  .strands .base { stroke: #4a5568; stroke-width: 2; fill: none; }
+  .strands .ta { stroke: var(--teal); stroke-width: 2; fill: none; filter: drop-shadow(0 0 5px rgba(45,212,191,.8)); }
+  .strands .tb { stroke: var(--amber); stroke-width: 2; fill: none; filter: drop-shadow(0 0 5px rgba(245,185,66,.8)); }
+  .strands .node { fill: var(--blue); filter: drop-shadow(0 0 5px rgba(110,168,254,.9)); }
+  .universe-tag {
+    font-family: var(--mono); font-size: 11px; color: var(--blue);
+    letter-spacing: 1.5px; display: block; margin-bottom: 8px;
+    text-shadow: 0 0 10px rgba(110,168,254,.5);
+  }
+  .legend { display: flex; gap: 14px; margin-top: 16px; flex-wrap: wrap; }
+  .chip {
+    font-family: var(--mono); font-size: 12px;
+    padding: 3px 10px; border-radius: 20px; border: 1px solid var(--border);
+  }
+  .chip.teal { color: var(--teal); background: var(--teal-dim); border-color: rgba(45,212,191,.35); box-shadow: 0 0 12px rgba(45,212,191,.18); }
+  .chip.amber { color: var(--amber); background: var(--amber-dim); border-color: rgba(245,185,66,.35); box-shadow: 0 0 12px rgba(245,185,66,.18); }
+
+  section { margin-bottom: 64px; }
+  .sec-num {
+    font-family: var(--mono); font-size: 12px; color: var(--blue);
+    letter-spacing: 2px; text-transform: uppercase;
+    text-shadow: 0 0 10px rgba(110,168,254,.45);
+  }
+  .sec-num::before { content: "\2387\00a0\00a0"; }
+  section h2 {
+    font-family: var(--mono); font-size: 21px; color: #e8eef7;
+    margin: 4px 0 16px;
+  }
+  section p { margin-bottom: 12px; max-width: 72ch; }
+  .beat {
+    border-left: 3px solid var(--blue);
+    background: var(--panel);
+    padding: 12px 16px; margin: 18px 0; border-radius: 0 8px 8px 0;
+    max-width: 72ch;
+  }
+  .beat b { color: #e8eef7; }
+
+  .code {
+    font-family: var(--mono); font-size: 13.5px; line-height: 1.55;
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; padding: 14px 18px; margin: 14px 0;
+    overflow-x: auto; white-space: pre;
+  }
+  .code .kw { color: #c792ea; }
+  .code .fn { color: var(--blue); }
+  .code .str { color: var(--green); }
+  .code .cm { color: var(--dim); font-style: italic; }
+  .code .hl-guard { background: var(--teal-dim); display: inline-block; width: 100%; }
+
+  .term {
+    font-family: var(--mono); font-size: 13px; line-height: 1.55;
+    background: #0a0c11; border: 1px solid var(--border);
+    border-radius: 8px; padding: 14px 18px; margin: 14px 0;
+    white-space: pre-wrap;
+  }
+  .term .t-main { color: var(--amber); }
+  .term .t-child { color: var(--teal); }
+  .term .t-err { color: var(--red); }
+  .term .t-note { color: var(--blue); }
+  .term .t-help { color: var(--green); }
+  .term .t-dim { color: var(--dim); font-style: italic; }
+
+  button {
+    font-family: var(--mono); font-size: 13px;
+    background: var(--panel2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 6px;
+    padding: 7px 16px; cursor: pointer;
+  }
+  button:hover { border-color: var(--blue); color: #e8eef7; box-shadow: 0 0 14px rgba(110,168,254,.25); }
+  button.active { border-color: var(--blue); background: rgba(110,168,254,.12); color: #e8eef7; }
+  button:disabled { opacity: .45; cursor: default; }
+  .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 12px 0; }
+
+  .toggle-row { display: flex; align-items: center; gap: 10px; font-family: var(--mono); font-size: 13px; color: var(--dim); }
+  .switch { position: relative; width: 40px; height: 22px; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .slider {
+    position: absolute; inset: 0; background: var(--panel2);
+    border: 1px solid var(--border); border-radius: 22px; cursor: pointer; transition: .2s;
+  }
+  .slider:before {
+    content: ""; position: absolute; height: 14px; width: 14px;
+    left: 3px; top: 3px; background: var(--dim); border-radius: 50%; transition: .2s;
+  }
+  .switch input:checked + .slider { background: rgba(239,107,115,.2); border-color: var(--red); }
+  .switch input:checked + .slider:before { transform: translateX(18px); background: var(--red); }
+
+  .verdict {
+    display: inline-block; font-family: var(--mono); font-size: 12px;
+    letter-spacing: 1.5px; padding: 4px 14px; border-radius: 4px; font-weight: 600;
+  }
+  .verdict.ok { color: var(--green); background: var(--green-dim); border: 1px solid rgba(74,222,128,.4); box-shadow: 0 0 16px rgba(74,222,128,.22); }
+  .verdict.fail { color: var(--red); background: var(--red-dim); border: 1px solid rgba(239,107,115,.4); box-shadow: 0 0 16px rgba(239,107,115,.22); }
+
+  .round { border: 1px solid var(--border); border-radius: 10px; background: var(--panel); padding: 18px 20px; margin: 18px 0; }
+  .round h3 { font-family: var(--mono); font-size: 15px; color: #e8eef7; margin-bottom: 8px; }
+  .round .code { background: var(--panel2); }
+  .predict-note { font-family: var(--mono); font-size: 12px; margin-left: 8px; }
+  .predict-note.right { color: var(--green); }
+  .predict-note.wrong { color: var(--amber); }
+  .hidden { display: none; }
+
+  /* deed and house widget */
+  .house-stage { border: 1px solid var(--border); border-radius: 10px; background: var(--panel); padding: 20px; margin: 16px 0; }
+  .house-row { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
+  .house {
+    width: 120px; height: 96px; border: 2px solid var(--teal); border-radius: 8px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-family: var(--mono); transition: .3s; flex-shrink: 0;
+  }
+  .house .roof { font-size: 26px; }
+  .house .cnt { font-size: 13px; color: var(--dim); margin-top: 4px; }
+  .house .cnt b { color: var(--teal); font-size: 16px; }
+  .house.freed { border-color: var(--border); opacity: .5; border-style: dashed; }
+  .house.leaked { border-color: var(--red); }
+  .holders { display: flex; gap: 10px; flex-wrap: wrap; }
+  .deed {
+    font-family: var(--mono); font-size: 12px; background: var(--panel2);
+    border: 1px solid rgba(45,212,191,.4); border-radius: 6px; padding: 8px 10px;
+    display: flex; flex-direction: column; gap: 6px; align-items: center;
+  }
+  .deed button { padding: 3px 10px; font-size: 11px; }
+
+  .race-trace { margin-top: 10px; }
+  .race-trace .step {
+    font-family: var(--mono); font-size: 13px; padding: 3px 0;
+    opacity: 0; transition: opacity .25s;
+  }
+  .race-trace .step.show { opacity: 1; }
+
+  /* lock lanes widget */
+  .lanes { border: 1px solid var(--border); border-radius: 10px; background: var(--panel); padding: 18px 20px; margin: 16px 0; }
+  .lane { display: flex; align-items: center; gap: 12px; margin: 10px 0; }
+  .lane-label { font-family: var(--mono); font-size: 12px; width: 70px; flex-shrink: 0; }
+  .lane-label.a { color: var(--teal); }
+  .lane-label.b { color: var(--amber); }
+  .lane-track { flex: 1; height: 26px; background: var(--panel2); border-radius: 4px; position: relative; overflow: hidden; }
+  .seg { position: absolute; top: 0; bottom: 0; font-family: var(--mono); font-size: 10.5px; display: flex; align-items: center; justify-content: center; white-space: nowrap; overflow: hidden; transition: all .4s; }
+  .seg.hold-a { background: var(--teal-dim); border: 1px solid rgba(45,212,191,.5); color: var(--teal); }
+  .seg.hold-b { background: var(--amber-dim); border: 1px solid rgba(245,185,66,.5); color: var(--amber); }
+  .seg.wait { background: repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(133,147,169,.15) 4px, rgba(133,147,169,.15) 8px); color: var(--dim); border: 1px dashed var(--border); }
+  .seg.work { background: rgba(110,168,254,.08); color: var(--blue); border: 1px solid rgba(110,168,254,.25); }
+
+  /* storyboard */
+  .story { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin: 16px 0; }
+  .panelcard { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
+  .panelcard .pnum { font-family: var(--mono); font-size: 11px; color: var(--blue); letter-spacing: 1px; }
+  .panelcard h4 { font-family: var(--mono); font-size: 14px; color: #e8eef7; margin: 4px 0 8px; }
+  .panelcard .pic { font-family: var(--mono); font-size: 12px; color: var(--dim); background: var(--panel2); border-radius: 6px; padding: 10px; margin-bottom: 8px; line-height: 1.7; white-space: pre; }
+  .panelcard p { font-size: 13.5px; color: var(--dim); margin: 0; }
+
+  .traps { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin: 16px 0; }
+  .trap { background: var(--panel); border: 1px solid rgba(239,107,115,.3); border-radius: 10px; padding: 14px; }
+  .trap h4 { font-family: var(--mono); font-size: 13px; color: var(--red); margin-bottom: 6px; }
+  .trap p { font-size: 13.5px; color: var(--text); margin: 0; }
+  .trap p code { font-family: var(--mono); font-size: 12.5px; color: var(--amber); }
+
+  details { margin: 14px 0; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); }
+  details summary { font-family: var(--mono); font-size: 13px; color: var(--blue); padding: 10px 16px; cursor: pointer; }
+  details .inner { padding: 0 16px 14px; }
+
+  footer { color: var(--dim); font-family: var(--mono); font-size: 12px; border-top: 1px solid var(--border); padding-top: 16px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <svg class="strands" width="100%" height="64" viewBox="0 0 860 64" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+    <path class="base" d="M 0 32 L 150 32" />
+    <path class="tb" d="M 150 32 C 220 32, 240 14, 310 14 L 560 14 C 630 14, 650 32, 710 32" />
+    <path class="ta" d="M 150 32 C 220 32, 240 50, 310 50 L 560 50 C 630 50, 650 32, 710 32" />
+    <path class="base" d="M 710 32 L 860 32" />
+    <circle class="node" cx="150" cy="32" r="4.5" />
+    <circle class="node" cx="710" cy="32" r="4.5" />
+  </svg>
+  <h1>Sharing Across Timelines</h1>
+  <div class="sub">A thread is a branch in the timeline. Every run of the program samples one universe from the set of possible interleavings. This is the story of who owns what while the branches are apart, told through the two questions Arc and Mutex answer.</div>
+  <div class="legend">
+    <span class="chip teal">child thread</span>
+    <span class="chip amber">main thread</span>
+  </div>
+</header>
+
+<!-- ============ SECTION 1 ============ -->
+<section id="s1">
+  <div class="sec-num">01</div>
+  <h2>Two timelines</h2>
+  <p>A program starts as one timeline. One instruction after another, in the order written. <code style="font-family:var(--mono)">thread::spawn</code> is a branch point: from that line, two timelines run apart, and nobody promises you anything about how their steps interleave. There are twenty distinct ways the six lines below can merge, and each run of the program picks one. You do not get to choose which universe you land in.</p>
+  <p>Below, main spawns one child. Both print three lines. Run it a few times and watch the universe number climb.</p>
+
+<div class="code"><span class="kw">let</span> child = thread::<span class="fn">spawn</span>(|| {
+    <span class="kw">for</span> i <span class="kw">in</span> 1..=3 {
+        <span class="fn">println!</span>(<span class="str">"child says {i}"</span>);
+    }
+});
+
+<span class="kw">for</span> i <span class="kw">in</span> 1..=3 {
+    <span class="fn">println!</span>(<span class="str">"main  says {i}"</span>);
+}
+
+child.<span class="fn">join</span>().<span class="fn">unwrap</span>();</div>
+
+  <div class="controls">
+    <button id="s1-run">run again</button>
+    <div class="toggle-row">
+      <label class="switch"><input type="checkbox" id="s1-nojoin"><span class="slider"></span></label>
+      <span>remove <code>join</code></span>
+    </div>
+  </div>
+  <div class="term" id="s1-out"></div>
+
+  <div class="beat"><b>join is where the branches converge.</b> Main stops at that line and waits for the child timeline to catch up, and past it there is one timeline again. Flip the switch and run a few times: without join, main ends its universe whenever it pleases, and whatever the child had left to say is simply gone from it.</div>
+</section>
+
+<!-- ============ SECTION 2 ============ -->
+<section id="s2">
+  <div class="sec-num">02</div>
+  <h2>The wall</h2>
+  <p>Now try to let threads <em>see your data</em>. Three rounds. In each one, read the code and predict the verdict before revealing it. The error messages below are the compiler's real output, not paraphrase.</p>
+
+  <!-- Round 1 -->
+  <div class="round" id="r1">
+    <h3>Round 1: borrow it</h3>
+<div class="code"><span class="kw">let</span> data = <span class="fn">vec!</span>[10, 20, 30];
+
+<span class="kw">let</span> child = thread::<span class="fn">spawn</span>(|| {
+    <span class="fn">println!</span>(<span class="str">"child sees {:?}"</span>, data);
+});
+
+child.<span class="fn">join</span>().<span class="fn">unwrap</span>();</div>
+    <div class="controls">
+      <span style="font-family:var(--mono);font-size:13px;color:var(--dim)">your call:</span>
+      <button data-round="r1" data-guess="ok">compiles</button>
+      <button data-round="r1" data-guess="fail">rejected</button>
+      <span class="predict-note" id="r1-note"></span>
+    </div>
+    <div class="hidden" id="r1-reveal">
+      <span class="verdict fail">REJECTED</span>
+<div class="term"><span class="t-err">error[E0373]</span>: closure may outlive the current function, but it
+borrows `data`, which is owned by the current function
+
+<span class="t-note">note</span>: function requires argument type to outlive `'static`
+<span class="t-help">help</span>: to force the closure to take ownership of `data` (and any
+other referenced variables), use the `move` keyword</div>
+      <p>Read the word <b>may</b>. The compiler is not claiming your thread will outlive main. It is saying it has no way to rule that out. A spawned thread has no known endpoint, so no borrow can be proven safe. And notice: the compiler itself hands you the next move.</p>
+    </div>
+  </div>
+
+  <!-- Round 2 -->
+  <div class="round" id="r2">
+    <h3>Round 2: obey the hint</h3>
+<div class="code"><span class="kw">let</span> data = <span class="fn">vec!</span>[10, 20, 30];
+
+<span class="kw">let</span> child = thread::<span class="fn">spawn</span>(<span class="kw">move</span> || {
+    <span class="fn">println!</span>(<span class="str">"child sees {:?}"</span>, data);
+});
+
+child.<span class="fn">join</span>().<span class="fn">unwrap</span>();</div>
+    <div class="controls">
+      <span style="font-family:var(--mono);font-size:13px;color:var(--dim)">your call:</span>
+      <button data-round="r2" data-guess="ok">compiles</button>
+      <button data-round="r2" data-guess="fail">rejected</button>
+      <span class="predict-note" id="r2-note"></span>
+    </div>
+    <div class="hidden" id="r2-reveal">
+      <span class="verdict ok">COMPILES</span>
+      <p style="margin-top:10px"><code style="font-family:var(--mono)">move</code> hands the vector to the child. No borrow, no proof needed: the child owns it now. Victory. The cost is that main gave it away, and there is only one to give. Which raises a question. What if you want three children?</p>
+    </div>
+  </div>
+
+  <!-- Round 3 -->
+  <div class="round" id="r3">
+    <h3>Round 3: three children</h3>
+<div class="code"><span class="kw">let</span> data = <span class="fn">vec!</span>[10, 20, 30];
+<span class="kw">let mut</span> handles = <span class="fn">vec!</span>[];
+
+<span class="kw">for</span> i <span class="kw">in</span> 0..3 {
+    handles.<span class="fn">push</span>(thread::<span class="fn">spawn</span>(<span class="kw">move</span> || {
+        <span class="fn">println!</span>(<span class="str">"thread {i} sees {:?}"</span>, data);
+    }));
+}</div>
+    <div class="controls">
+      <span style="font-family:var(--mono);font-size:13px;color:var(--dim)">your call:</span>
+      <button data-round="r3" data-guess="ok">compiles</button>
+      <button data-round="r3" data-guess="fail">rejected</button>
+      <span class="predict-note" id="r3-note"></span>
+    </div>
+    <div class="hidden" id="r3-reveal">
+      <span class="verdict fail">REJECTED</span>
+<div class="term"><span class="t-err">error[E0382]</span>: use of moved value: `data`
+
+move occurs because `data` has type `Vec&lt;i32&gt;`, which does
+not implement the `Copy` trait
+
+value moved into closure here, <span class="t-err">in previous iteration of loop</span></div>
+      <p>This is the wall. One value. Three timelines. Ownership permits exactly one owner, and iteration one took it. The compiler's own advice walked you here, so this is not a trap someone set for you. It is the natural path, and everyone walks it.</p>
+      <p>Notice the philosophy underneath. There is no authority that steps in later to prune the universes where three branches fight over one value. Rust's answer is to refuse to branch them into existence at all.</p>
+      <p>You could <code style="font-family:var(--mono)">clone()</code> the vector per thread. That works, and it copies the whole house three times. The next section is about copying the deed instead.</p>
+    </div>
+  </div>
+
+  <p style="font-family:var(--mono);font-size:12px;color:var(--dim)">Error text captured from rustc 1.75. Wording drifts between compiler versions; the verdicts do not.</p>
+</section>
+<!-- ============ SECTION 3 ============ -->
+<section id="s3">
+  <div class="sec-num">03</div>
+  <h2>One owner vs a headcount</h2>
+  <p>A plain reference <code style="font-family:var(--mono)">&amp;T</code> never owns anything. Somewhere, one true owner exists, and when that owner dies the data dies. So every borrow comes with a proof, checked before the program runs, that the owner outlives it. Visiting a friend's house, after the city has verified your friend will not demolish it while you are inside.</p>
+  <p><code style="font-family:var(--mono)">Rc</code> abolishes the one true owner. Every clone is an equal co-owner, and the data is freed when the last one drops. Which clone drops last can depend on things that only happen at runtime, so the compile-time proof is impossible in principle. The counter is its replacement: a live headcount, standing in for a proof that can no longer be written.</p>
+
+<div class="code"><span class="kw">let</span> a = Rc::<span class="fn">new</span>(<span class="fn">vec!</span>[10, 20, 30]);
+<span class="kw">let</span> b = a.<span class="fn">clone</span>();  <span class="cm">// copies a pointer, bumps a counter. The vector is not copied.</span></div>
+
+  <div class="house-stage">
+    <div class="house-row">
+      <div class="house" id="house">
+        <div class="roof">&#127968;</div>
+        <div class="cnt">count: <b id="house-count">1</b></div>
+      </div>
+      <div style="flex:1">
+        <div class="controls" style="margin-top:0">
+          <button id="deed-clone">clone a deed</button>
+          <button id="deed-reset">reset</button>
+        </div>
+        <div class="holders" id="holders"></div>
+        <div id="house-msg" style="font-family:var(--mono);font-size:13px;color:var(--dim);margin-top:10px"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="beat"><b>Deeds, not houses.</b> Cloning hands out another deed and ticks the counter. Dropping shreds a deed and ticks it down. The last shredded deed demolishes the house. Nobody needed to prove anything in advance; the count decides at runtime.</div>
+
+  <p>Now the letter A. Two threads can shred their deeds <em>at the same instant</em>. The counter itself is shared mutable state, so decrementing it is a read, a subtract, and a write. Watch what happens when two threads do that unprotected, versus with the atomic decrement you already know.</p>
+
+  <div class="house-stage">
+    <div class="controls" style="margin-top:0">
+      <button id="race-rc" class="active">Rc (plain counter)</button>
+      <button id="race-arc">Arc (atomic counter)</button>
+      <button id="race-go">both drop at the same instant</button>
+    </div>
+    <div class="house-row" style="margin-top:12px">
+      <div class="house" id="race-house">
+        <div class="roof">&#127968;</div>
+        <div class="cnt">count: <b id="race-count">2</b></div>
+      </div>
+      <div class="race-trace" id="race-trace" style="flex:1"></div>
+    </div>
+  </div>
+
+  <div class="beat"><b>The A in Arc is the headcount itself.</b> Arc's counter is maintained with the atomic fetch-and-subtract, indivisible in hardware. That one guarantee is what makes handing deeds across threads safe. This is why Rc refuses to cross a thread boundary at all: the compiler will not let a plain counter anywhere near two timelines.</div>
+</section>
+
+<!-- ============ SECTION 4 ============ -->
+<section id="s4">
+  <div class="sec-num">04</div>
+  <h2>The invisible join</h2>
+  <p>Back at the wall, you might object: but I <em>do</em> join every thread at the end. True. And it changes nothing, because the compiler does not read your intentions. It reads signatures. Nothing in <code style="font-family:var(--mono)">spawn</code>'s contract obliges you to join, so your discipline is a promise written in invisible ink.</p>
+  <p>Same code, two APIs. Flip between them.</p>
+
+  <div class="controls">
+    <button id="s4-spawn" class="active">thread::spawn</button>
+    <button id="s4-scope">thread::scope</button>
+  </div>
+
+  <div id="s4-spawn-pane">
+<div class="code"><span class="kw">let</span> data = <span class="fn">vec!</span>[10, 20, 30];
+<span class="kw">let mut</span> handles = <span class="fn">vec!</span>[];
+
+<span class="kw">for</span> i <span class="kw">in</span> 0..3 {
+    handles.<span class="fn">push</span>(thread::<span class="fn">spawn</span>(|| {
+        <span class="fn">println!</span>(<span class="str">"thread {i} sees {:?}"</span>, &amp;data);
+    }));
+}
+
+<span class="kw">for</span> h <span class="kw">in</span> handles { h.<span class="fn">join</span>().<span class="fn">unwrap</span>(); }  <span class="cm">// right there. every one of them.</span></div>
+    <span class="verdict fail">REJECTED</span>
+    <p style="margin-top:10px">The joins are three lines away and the compiler does not care. <code style="font-family:var(--mono)">spawn</code> demands data that lives forever, unconditionally, because you <em>could</em> forget to join, return early, or drop the handle. Since the language cannot prove the merge will happen, it assumes the thread lives forever.</p>
+  </div>
+
+  <div id="s4-scope-pane" class="hidden">
+<div class="code">thread::<span class="fn">scope</span>(|s| {
+    <span class="kw">let</span> data = &amp;data;
+    <span class="kw">for</span> i <span class="kw">in</span> 0..3 {
+        s.<span class="fn">spawn</span>(<span class="kw">move</span> || {
+            <span class="fn">println!</span>(<span class="str">"thread {i} sees {:?}"</span>, data);
+        });
+    }
+});  <span class="cm">// scope does not return until every thread inside has joined</span>
+
+<span class="fn">println!</span>(<span class="str">"main still owns {:?}"</span>, data);  <span class="cm">// and it does. nothing was moved.</span></div>
+    <span class="verdict ok">COMPILES</span>
+    <p style="margin-top:10px"><code style="font-family:var(--mono)">scope</code> is not smarter. It is structured differently: the function itself refuses to return until all its threads have joined. The merge stopped being your habit and became the API's contract. With the endpoint provable again, plain borrows flow into threads, three of them, no Arc in sight.</p>
+  </div>
+
+  <details>
+    <summary>why the line: let data = &amp;data;</summary>
+    <div class="inner">
+      <p>Inside a scope, <code style="font-family:var(--mono)">move</code> still means move. Writing <code style="font-family:var(--mono)">&amp;data</code> inside a move closure does not borrow from outside; the closure captures the vector first, then you reference your own captured copy, and the loop hits the same moved-value wall as Round 3.</p>
+      <p>Shadowing with a reference first means the closure now moves a <em>reference</em>. Moving a reference is a copy, so all three threads get one. The rule underneath: move captures whatever the body names, as that name is currently typed.</p>
+    </div>
+  </details>
+
+  <div class="beat"><b>So which do you reach for?</b> References work with threads whose end is provable. Arc is for threads whose end is not. That sentence is the whole decision.</div>
+</section>
+
+<!-- ============ SECTION 5 ============ -->
+<section id="s5">
+  <div class="sec-num">05</div>
+  <h2>The door, not the guard</h2>
+  <p>Arc answers <em>who owns it</em>. It says nothing about <em>who may touch it right now</em>. That is a different question, so it gets a different tool, nested inside: <code style="font-family:var(--mono)">Arc&lt;Mutex&lt;T&gt;&gt;</code>. Read it inside out: a value, behind a locked door, whose address every branch of the timeline shares.</p>
+  <p>Keep three objects separate. The <b>Mutex</b> is the door, at a fixed address, alive as long as the data. The <b>guard</b> is the experience of currently being inside: born at <code style="font-family:var(--mono)">lock()</code>, alive for a few lines, and its death is what unlocks the door. The <b>Arc</b> is many threads holding the same address. You share the door. Nobody shares a guard. Each thread manufactures its own at the threshold, every time.</p>
+
+<div class="code"><span class="kw">let</span> total = Arc::<span class="fn">new</span>(Mutex::<span class="fn">new</span>(0));
+
+<span class="cm">// inside each thread:</span>
+{
+<span class="hl-guard">    <span class="kw">let mut</span> guard = total.<span class="fn">lock</span>().<span class="fn">unwrap</span>();   <span class="cm">// born: door locks</span></span>
+<span class="hl-guard">    *guard += partial;</span>
+}  <span class="cm">// guard dies here: door unlocks. The brace is the unlock.</span></div>
+
+  <p>The unlock is invisible in the source. No unlock call, just a closing brace. That makes the guard's scope a design decision, and here is what the decision costs. Two threads, one door:</p>
+
+  <div class="lanes">
+    <div class="lane">
+      <div class="lane-label a">thread A</div>
+      <div class="lane-track" id="lane-a"></div>
+    </div>
+    <div class="lane">
+      <div class="lane-label b">thread B</div>
+      <div class="lane-track" id="lane-b"></div>
+    </div>
+    <div class="controls">
+      <div class="toggle-row">
+        <label class="switch"><input type="checkbox" id="s5-sleep"><span class="slider"></span></label>
+        <span>A holds the guard across a sleep</span>
+      </div>
+    </div>
+    <div id="s5-caption" style="font-family:var(--mono);font-size:13px;color:var(--dim)"></div>
+  </div>
+
+  <div class="beat"><b>The critical section is a bathroom key.</b> Take it, do your business, return it. Do not take it to lunch. Everything A does while holding the guard, B spends waiting at the door, so keep the span down to the touch itself.</div>
+</section>
+
+<!-- ============ SECTION 6 ============ -->
+<section id="s6">
+  <div class="sec-num">06</div>
+  <h2>Freeze, then share</h2>
+  <p>One pattern to keep. When many threads need to <em>read</em> the same structure, do not reach for locks. Build it on one timeline, freeze it, hand out deeds, and let every result travel home through the join handle.</p>
+
+  <div class="story">
+    <div class="panelcard">
+      <div class="pnum">PANEL 1</div>
+      <h4>Build</h4>
+      <div class="pic">main:  [table &#9612;&#9612;&#9612;...]
+       one timeline,
+       no threads yet</div>
+      <p>Construct the structure sequentially. No coordination, because there is nobody to coordinate with.</p>
+    </div>
+    <div class="panelcard">
+      <div class="pnum">PANEL 2</div>
+      <h4>Freeze</h4>
+      <div class="pic">Arc::new(table)
+
+  &#128274; nobody writes
+     from here on</div>
+      <p>Wrap it in Arc. From this line forward the structure is read-only by construction, not by promise.</p>
+    </div>
+    <div class="panelcard">
+      <div class="pnum">PANEL 3</div>
+      <h4>Share</h4>
+      <div class="pic">deed &#8594; thread 1
+deed &#8594; thread 2
+deed &#8594; thread 3
+   all read at once</div>
+      <p>Clone a deed per thread. Many readers, zero locks, zero waiting. This is Arc's honest day job.</p>
+    </div>
+    <div class="panelcard">
+      <div class="pnum">PANEL 4</div>
+      <h4>Gather</h4>
+      <div class="pic">h1.join() &#8594; part
+h2.join() &#8594; part
+h3.join() &#8594; part
+   main sums parts</div>
+      <p>Each thread returns its piece through its handle. No shared accumulator needed; the merge point carries the value.</p>
+    </div>
+  </div>
+
+  <h2 style="font-size:17px;margin-top:36px">Traps worth naming</h2>
+  <div class="traps">
+    <div class="trap">
+      <h4>some phases are sequential</h4>
+      <p>Sorting must see the whole list. Chunk <em>after</em> phases like that, never before. Parallelism applies per phase, not to programs wholesale.</p>
+    </div>
+    <div class="trap">
+      <h4>small inputs break chunk math</h4>
+      <p>8 workers, 6 items: worker 7 asks for slice <code>[7..6]</code> and panics at runtime. Compiles clean, detonates on small data. Skip or clamp empty chunks.</p>
+    </div>
+    <div class="trap">
+      <h4>pick your integer width</h4>
+      <p>Sums grow past what any single element suggests. <code>i64</code> is cheap insurance; a silent <code>i32</code> overflow is not.</p>
+    </div>
+    <div class="trap">
+      <h4>measure before believing</h4>
+      <p>Spawning threads costs real time. On small inputs the sequential version often wins. Whether it does here is an empirical question: time both, believe the clock.</p>
+    </div>
+    <div class="trap">
+      <h4>do not parallelize the build</h4>
+      <p>A table built by many writers behind a lock is slower and harder than a table built once and frozen. Build, freeze, share. In that order.</p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  Verdicts and error text verified against rustc 1.75; wording may differ on newer compilers, outcomes do not.
+  Interleavings in section 01 are sampled uniformly for illustration; a real scheduler makes no such promise of fairness.
+</footer>
+
+</div>
+
+<script>
+// ---------- Section 1: interleaving replay ----------
+(function () {
+  const out = document.getElementById('s1-out');
+  const btn = document.getElementById('s1-run');
+  const nojoin = document.getElementById('s1-nojoin');
+  let universe = 0;
+
+  function run() {
+    universe++;
+    const main = [1, 2, 3].map(i => ({ t: 'main', text: 'main  says ' + i }));
+    const child = [1, 2, 3].map(i => ({ t: 'child', text: 'child says ' + i }));
+    const merged = [];
+    while (main.length || child.length) {
+      if (!main.length) { merged.push(child.shift()); continue; }
+      if (!child.length) { merged.push(main.shift()); continue; }
+      merged.push(Math.random() < 0.5 ? main.shift() : child.shift());
+    }
+    let lines = merged;
+    let cut = false;
+    if (nojoin.checked) {
+      let lastMain = -1;
+      merged.forEach((l, idx) => { if (l.t === 'main') lastMain = idx; });
+      cut = merged.slice(lastMain + 1).some(l => l.t === 'child');
+      lines = merged.slice(0, lastMain + 1);
+    }
+    out.innerHTML = '<span class="universe-tag">UNIVERSE #' + universe + '</span>' + lines.map(l =>
+      '<span class="t-' + l.t + '">' + l.text + '</span>'
+    ).join('\n') + (cut ? '\n<span class="t-dim">[process exited: remaining child lines never printed in this universe]</span>' : '');
+  }
+  btn.addEventListener('click', run);
+  nojoin.addEventListener('change', run);
+  run();
+})();
+
+// ---------- Section 2: predict and reveal ----------
+(function () {
+  const answers = { r1: 'fail', r2: 'ok', r3: 'fail' };
+  document.querySelectorAll('button[data-round]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const r = btn.dataset.round;
+      const guess = btn.dataset.guess;
+      document.getElementById(r + '-reveal').classList.remove('hidden');
+      const note = document.getElementById(r + '-note');
+      const right = guess === answers[r];
+      note.textContent = right ? 'you called it' : 'not this time';
+      note.className = 'predict-note ' + (right ? 'right' : 'wrong');
+      document.querySelectorAll('button[data-round="' + r + '"]').forEach(b => b.disabled = true);
+    });
+  });
+})();
+
+// ---------- Section 3a: deed and house ----------
+(function () {
+  const holdersEl = document.getElementById('holders');
+  const countEl = document.getElementById('house-count');
+  const house = document.getElementById('house');
+  const msg = document.getElementById('house-msg');
+  let holders = [];
+  let nextId = 1;
+
+  function render() {
+    countEl.textContent = holders.length;
+    holdersEl.innerHTML = '';
+    holders.forEach(h => {
+      const d = document.createElement('div');
+      d.className = 'deed';
+      d.innerHTML = '<span>&#128220; ' + h + '</span>';
+      const b = document.createElement('button');
+      b.textContent = 'drop';
+      b.addEventListener('click', () => {
+        holders = holders.filter(x => x !== h);
+        render();
+      });
+      d.appendChild(b);
+      holdersEl.appendChild(d);
+    });
+    if (holders.length === 0) {
+      house.classList.add('freed');
+      house.classList.remove('leaked');
+      msg.textContent = 'count hit zero: last deed shredded, house demolished, memory freed.';
+    } else {
+      house.classList.remove('freed', 'leaked');
+      msg.textContent = '';
+    }
+  }
+  document.getElementById('deed-clone').addEventListener('click', () => {
+    if (holders.length === 0) return;
+    holders.push('deed ' + (++nextId));
+    render();
+  });
+  document.getElementById('deed-reset').addEventListener('click', () => {
+    holders = ['deed 1'];
+    nextId = 1;
+    render();
+  });
+  holders = ['deed 1'];
+  render();
+})();
+
+// ---------- Section 3b: the race ----------
+(function () {
+  let mode = 'rc';
+  const rcBtn = document.getElementById('race-rc');
+  const arcBtn = document.getElementById('race-arc');
+  const go = document.getElementById('race-go');
+  const trace = document.getElementById('race-trace');
+  const countEl = document.getElementById('race-count');
+  const house = document.getElementById('race-house');
+
+  function setMode(m) {
+    mode = m;
+    rcBtn.classList.toggle('active', m === 'rc');
+    arcBtn.classList.toggle('active', m === 'arc');
+    reset();
+  }
+  function reset() {
+    trace.innerHTML = '';
+    countEl.textContent = '2';
+    house.classList.remove('freed', 'leaked');
+  }
+  rcBtn.addEventListener('click', () => setMode('rc'));
+  arcBtn.addEventListener('click', () => setMode('arc'));
+
+  const scripts = {
+    rc: [
+      { text: 'thread A reads the count: 2', color: 'var(--teal)' },
+      { text: 'thread B reads the count: 2', color: 'var(--amber)' },
+      { text: 'thread A computes 2 - 1, writes 1', color: 'var(--teal)', count: '1' },
+      { text: 'thread B computes 2 - 1, writes 1', color: 'var(--amber)', count: '1' },
+      { text: 'count says 1. Nobody holds a deed. The house is never freed. It leaks, forever.', color: 'var(--red)', leak: true }
+    ],
+    arc: [
+      { text: 'thread A: fetch_sub, indivisible. Count is now 1.', color: 'var(--teal)', count: '1' },
+      { text: 'thread B: fetch_sub, indivisible. Count is now 0.', color: 'var(--amber)', count: '0' },
+      { text: 'count hit zero exactly once. Thread B, the last to decrement, frees the house.', color: 'var(--green)', freed: true }
+    ]
+  };
+
+  go.addEventListener('click', () => {
+    reset();
+    const steps = scripts[mode];
+    steps.forEach((s, i) => {
+      const div = document.createElement('div');
+      div.className = 'step';
+      div.style.color = s.color;
+      div.textContent = s.text;
+      trace.appendChild(div);
+      setTimeout(() => {
+        div.classList.add('show');
+        if (s.count !== undefined) countEl.textContent = s.count;
+        if (s.leak) house.classList.add('leaked');
+        if (s.freed) house.classList.add('freed');
+      }, 550 * (i + 1));
+    });
+  });
+})();
+
+// ---------- Section 4: spawn vs scope toggle ----------
+(function () {
+  const a = document.getElementById('s4-spawn');
+  const b = document.getElementById('s4-scope');
+  const pa = document.getElementById('s4-spawn-pane');
+  const pb = document.getElementById('s4-scope-pane');
+  a.addEventListener('click', () => {
+    a.classList.add('active'); b.classList.remove('active');
+    pa.classList.remove('hidden'); pb.classList.add('hidden');
+  });
+  b.addEventListener('click', () => {
+    b.classList.add('active'); a.classList.remove('active');
+    pb.classList.remove('hidden'); pa.classList.add('hidden');
+  });
+})();
+
+// ---------- Section 5: lock lanes ----------
+(function () {
+  const laneA = document.getElementById('lane-a');
+  const laneB = document.getElementById('lane-b');
+  const cap = document.getElementById('s5-caption');
+  const toggle = document.getElementById('s5-sleep');
+
+  function seg(cls, left, width, label) {
+    return '<div class="seg ' + cls + '" style="left:' + left + '%;width:' + width + '%">' + label + '</div>';
+  }
+  function render() {
+    if (!toggle.checked) {
+      laneA.innerHTML =
+        seg('work', 0, 10, 'work') +
+        seg('hold-a', 10, 18, 'holding lock') +
+        seg('work', 28, 72, 'work');
+      laneB.innerHTML =
+        seg('work', 0, 10, 'work') +
+        seg('wait', 10, 18, 'waiting') +
+        seg('hold-b', 28, 18, 'holding lock') +
+        seg('work', 46, 54, 'work');
+      cap.textContent = 'A touches the value and lets go. B waits only for the touch.';
+    } else {
+      laneA.innerHTML =
+        seg('work', 0, 10, 'work') +
+        seg('hold-a', 10, 70, 'holding lock... and sleeping with it') +
+        seg('work', 80, 20, 'work');
+      laneB.innerHTML =
+        seg('work', 0, 10, 'work') +
+        seg('wait', 10, 70, 'waiting the entire time') +
+        seg('hold-b', 80, 12, 'lock') +
+        seg('work', 92, 8, '');
+      cap.textContent = 'Same program, one guard held across a sleep. B\u2019s timeline is now mostly a queue.';
+    }
+  }
+  toggle.addEventListener('change', render);
+  render();
+})();
+</script>
+</body>
+</html>
