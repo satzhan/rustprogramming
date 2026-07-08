@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Arc: who turns off the lights</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Chivo+Mono:wght@300;400;500;600&family=Archivo:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0e13; --panel:#10161d; --panel2:#151d26; --line:#223041; --line2:#2c3d52;
+  --ink:#dbe4ec; --mut:#7f90a0; --dim:#5a6a79;
+  --teal:#41d6c3; --amber:#f5a742; --violet:#a78bfa; --green:#67d98b; --red:#ff6d6d;
+  --code:#0d1319; --hdr:#c9d6e2;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto} *{animation:none!important;transition:none!important}}
+body{background:var(--bg);color:var(--ink);font-family:'Archivo',system-ui,sans-serif;font-size:16px;line-height:1.65;
+  background-image:radial-gradient(1200px 600px at 85% -10%, rgba(65,214,195,.05), transparent 60%),
+                   radial-gradient(900px 500px at -10% 30%, rgba(245,167,66,.04), transparent 60%);}
+.wrap{max-width:980px;margin:0 auto;padding:0 24px 120px}
+.mono{font-family:'Chivo Mono',monospace}
+.eyebrow{font-family:'Chivo Mono',monospace;font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--mut)}
+h1{font-family:'Chivo Mono',monospace;font-weight:600;font-size:clamp(28px,5vw,44px);line-height:1.15;letter-spacing:-.01em;color:var(--hdr)}
+h2{font-family:'Chivo Mono',monospace;font-weight:500;font-size:clamp(20px,3vw,26px);color:var(--hdr);margin-bottom:6px}
+h3{font-family:'Chivo Mono',monospace;font-weight:500;font-size:15px;color:var(--hdr)}
+p{max-width:72ch}
+section{margin-top:96px;scroll-margin-top:24px}
+.sechead{display:flex;align-items:baseline;gap:14px;margin-bottom:14px}
+.secnum{font-family:'Chivo Mono',monospace;color:var(--dim);font-size:13px;letter-spacing:.15em}
+.lede{color:var(--mut);margin-bottom:22px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:20px}
+.panel + .panel{margin-top:14px}
+
+/* fact vs judgment: quiet left rules */
+.fact,.judge{border-left:2px solid;padding:10px 16px;margin:18px 0;max-width:76ch}
+.fact{border-color:var(--teal)}
+.judge{border-color:var(--amber)}
+.fact .tag,.judge .tag{font-family:'Chivo Mono',monospace;font-size:10px;letter-spacing:.24em;text-transform:uppercase;display:block;margin-bottom:4px}
+.fact .tag{color:var(--teal)} .judge .tag{color:var(--amber)}
+.fact p,.judge p{color:var(--mut);font-size:14.5px}
+
+/* code */
+pre{background:var(--code);border:1px solid var(--line);border-radius:8px;padding:16px 18px;overflow-x:auto;
+  font-family:'Chivo Mono',monospace;font-size:13px;line-height:1.7;color:#c4d2de}
+pre .k{color:var(--violet)} pre .f{color:var(--teal)} pre .s{color:var(--green)}
+pre .n{color:var(--amber)} pre .c{color:var(--dim);font-style:italic} pre .e{color:var(--red)}
+pre.err{border-color:rgba(255,109,109,.35);color:#e8b6b6}
+pre.err .hl{color:var(--red);font-weight:500}
+.codecap{font-family:'Chivo Mono',monospace;font-size:11px;color:var(--dim);letter-spacing:.12em;text-transform:uppercase;margin:14px 0 6px}
+
+/* controls */
+.btn{font-family:'Chivo Mono',monospace;font-size:13px;background:var(--panel2);color:var(--ink);
+  border:1px solid var(--line2);border-radius:7px;padding:8px 16px;cursor:pointer;transition:border-color .15s,background .15s}
+.btn:hover{border-color:var(--teal)}
+.btn:focus-visible,.tab:focus-visible,input:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+.btn[disabled]{opacity:.35;cursor:default}
+.btn[disabled]:hover{border-color:var(--line2)}
+.btn.primary{border-color:var(--teal);color:var(--teal)}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.tab{font-family:'Chivo Mono',monospace;font-size:12.5px;background:transparent;color:var(--mut);
+  border:1px solid var(--line);border-radius:7px;padding:7px 14px;cursor:pointer}
+.tab.on{color:var(--teal);border-color:var(--teal);background:rgba(65,214,195,.06)}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+input[type=range]{accent-color:var(--teal);width:100%}
+.switch{display:inline-flex;align-items:center;gap:10px;cursor:pointer;font-family:'Chivo Mono',monospace;font-size:13px;color:var(--mut)}
+.switch input{appearance:none;width:38px;height:20px;background:var(--line);border-radius:999px;position:relative;cursor:pointer;transition:background .15s;flex:none}
+.switch input:checked{background:var(--teal)}
+.switch input::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--bg);transition:left .15s}
+.switch input:checked::after{left:20px}
+
+/* nav */
+nav{margin-top:28px;display:flex;gap:6px;flex-wrap:wrap}
+nav a{font-family:'Chivo Mono',monospace;font-size:11.5px;color:var(--mut);text-decoration:none;
+  border:1px solid var(--line);border-radius:6px;padding:5px 10px;letter-spacing:.04em}
+nav a:hover{color:var(--teal);border-color:var(--teal)}
+
+/* header art */
+header{padding-top:64px}
+.hero{display:flex;gap:34px;align-items:center;flex-wrap:wrap;margin-top:26px}
+.hero svg{flex:none}
+.sub{color:var(--mut);max-width:58ch;margin-top:14px}
+.premise{margin-top:22px;border:1px solid var(--line);border-radius:10px;padding:16px 20px;background:var(--panel);max-width:640px}
+.premise .eyebrow{margin-bottom:6px}
+.kbd{font-family:'Chivo Mono',monospace;font-size:.92em;color:var(--teal)}
+.kbd.a{color:var(--amber)} .kbd.r{color:var(--red)}
+
+table{border-collapse:collapse;width:100%}
+footer{margin-top:110px;border-top:1px solid var(--line);padding-top:24px;color:var(--dim);font-size:13.5px;font-family:'Chivo Mono',monospace}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">shared state &middot; ownership across threads</div>
+  <h1>Arc: who turns off<br>the lights?</h1>
+  <div class="hero">
+    <svg width="270" height="150" viewBox="0 0 270 150" aria-hidden="true">
+      <defs>
+        <filter id="glow"><feGaussianBlur stdDeviation="2.4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+      </defs>
+      <!-- three stacks -->
+      <g font-family="Chivo Mono,monospace" font-size="9">
+        <rect x="8" y="14" width="52" height="26" rx="4" fill="none" stroke="#7f90a0" opacity=".7"/>
+        <text x="34" y="30" fill="#7f90a0" text-anchor="middle">main</text>
+        <rect x="8" y="60" width="52" height="26" rx="4" fill="none" stroke="#41d6c3"/>
+        <text x="34" y="76" fill="#41d6c3" text-anchor="middle">thr A</text>
+        <rect x="8" y="106" width="52" height="26" rx="4" fill="none" stroke="#f5a742"/>
+        <text x="34" y="122" fill="#f5a742" text-anchor="middle">thr B</text>
+      </g>
+      <!-- pointer lines -->
+      <g stroke-width="1.4" fill="none" opacity=".85">
+        <path d="M60 27 C 110 27, 130 66, 168 70" stroke="#7f90a0"/>
+        <path d="M60 73 C 100 73, 120 74, 168 76" stroke="#41d6c3"/>
+        <path d="M60 119 C 110 119, 130 88, 168 82" stroke="#f5a742"/>
+      </g>
+      <!-- heap block -->
+      <g filter="url(#glow)">
+        <rect x="170" y="48" width="90" height="56" rx="6" fill="#10161d" stroke="#41d6c3" stroke-width="1.3"/>
+      </g>
+      <g font-family="Chivo Mono,monospace">
+        <rect x="170" y="48" width="90" height="20" rx="6" fill="rgba(65,214,195,.10)"/>
+        <text x="215" y="62" font-size="9.5" fill="#41d6c3" text-anchor="middle">strong: 3</text>
+        <text x="215" y="86" font-size="10" fill="#dbe4ec" text-anchor="middle">the data</text>
+        <text x="215" y="120" font-size="8.5" fill="#5a6a79" text-anchor="middle">freed when strong = 0</text>
+      </g>
+    </svg>
+    <p class="sub">A tour of one type with one job. <span class="kbd">Arc</span> answers a single question: when several threads hold the same data and any of them might finish last, who frees it? Everything else here, cloning, scoping, locking, is either a way to dodge that question or a consequence of answering it.</p>
+  </div>
+  <div class="premise">
+    <span class="eyebrow">the running example</span>
+    <p style="font-size:14.5px;color:var(--mut)">A server left behind <span class="kbd">readings.txt</span>: one latency measurement per line, about a million lines. Somewhere in it is the worst request it ever served. Finding a maximum is trivial. Finding it on all cores at once is where ownership gets interesting.</p>
+  </div>
+  <nav aria-label="sections">
+    <a href="#s1">01 ladder</a><a href="#s2">02 anatomy</a><a href="#s3">03 headcount</a>
+    <a href="#s4">04 the bill</a><a href="#s5">05 writing</a><a href="#s6">06 two lenses</a><a href="#s7">07 deciding</a>
+  </nav>
+</header>
+
+<!-- ============ S1 LADDER ============ -->
+<section id="s1">
+  <div class="sechead"><span class="secnum">01</span><h2>Five ways to hand data to a thread</h2></div>
+  <p class="lede">Each rung compiles or fails for a reason the ledger below can explain. The verdicts and error text are captured from a real compiler run, not paraphrased.</p>
+
+  <div class="panel">
+    <div class="tabs" role="tablist" id="ladderTabs"></div>
+    <div id="ladderBody"></div>
+  </div>
+
+  <div class="panel" style="margin-top:14px">
+    <div class="eyebrow" style="margin-bottom:10px">the ledger &middot; accumulates as rungs are visited</div>
+    <div style="overflow-x:auto">
+    <table id="ledger" class="mono" style="font-size:12.5px;min-width:640px">
+      <thead><tr id="ledgerHead"><th style="text-align:left;color:var(--dim);font-weight:400;padding:6px 10px 8px 0">for 1,000,000 readings, 4 threads</th></tr></thead>
+      <tbody>
+        <tr id="lr0"><td style="color:var(--mut);padding:6px 10px 6px 0">verdict</td></tr>
+        <tr id="lr1"><td style="color:var(--mut);padding:6px 10px 6px 0">bytes moved just to share</td></tr>
+        <tr id="lr2"><td style="color:var(--mut);padding:6px 10px 6px 0">copies of the data alive</td></tr>
+        <tr id="lr3"><td style="color:var(--mut);padding:6px 10px 6px 0">who proves the lifetime</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p style="font-size:13.5px;color:var(--mut);margin-top:12px;max-width:74ch">The last row is the real plot. A surface reading of this ladder says "some versions compile and some do not," and that reading cannot explain why rung four fails when rung three passed: the code barely changed. The ledger can. What changed is where the proof lives. Rung three proves the lifetime at compile time with a closing brace. Rung four has no brace that fences the workers, so no proof can exist in the source. Arc moves the proof into the running program: sixteen bytes of counter that get checked at runtime instead of a fact checked before the program exists.</p>
+  </div>
+</section>
+
+<!-- ============ S2 ANATOMY ============ -->
+<section id="s2">
+  <div class="sechead"><span class="secnum">02</span><h2>What an Arc physically is</h2></div>
+  <p class="lede">Not a wrapper, not magic: a pointer on each stack, and a small ledger stapled to the front of one heap allocation. Toggle the two worlds, then hover or tap the header block.</p>
+
+  <div class="panel">
+    <div class="tabs">
+      <button class="tab" id="wClone" role="tab">clone world &middot; three private copies</button>
+      <button class="tab on" id="wArc" role="tab">arc world &middot; one copy, counted</button>
+    </div>
+    <div id="anatomyStage" style="overflow-x:auto"></div>
+    <div id="anatomyNote" style="font-size:13.5px;color:var(--mut);margin-top:10px;min-height:44px"></div>
+  </div>
+
+  <div class="fact"><span class="tag">verified against the compiler</span>
+    <p><code class="kbd">Arc::clone(&x)</code> copies eight bytes (the pointer) and atomically increments one counter. The data itself is not touched. The programs in section 04 print this bill at runtime; nothing here is asserted from memory.</p>
+  </div>
+  <div class="judge"><span class="tag">implementation detail, not a guarantee</span>
+    <p>In the current standard library the heap block begins with two <span class="kbd">AtomicUsize</span> counters, strong and weak, sixteen bytes on a 64-bit target, followed by your data. The counts are observable through <span class="kbd">Arc::strong_count</span>; the exact layout is the library's business and could change.</p>
+  </div>
+
+  <div class="panel">
+    <h3 style="margin-bottom:8px">The comparison that makes Arc make sense</h3>
+    <p style="font-size:14.5px;color:var(--mut);max-width:76ch">A garbage-collected runtime gives <em>every</em> object this treatment, invisibly and always. References are shared freely, the bookkeeping is hidden, and the moment of freeing is unknowable: it happens when the collector wakes up, on its schedule, not yours. That is a fine trade for many programs. It is a bad trade when you care where data lives and when it dies.</p>
+    <p style="font-size:14.5px;color:var(--mut);max-width:76ch;margin-top:10px">Rust inverts the default. Nothing is counted unless you say so, which is why sharing requires you to <em>type the word</em> <span class="kbd">Arc</span>. The ledger exists only where you asked for it, its cost is visible in the type, and the free is deterministic: the instant the count reaches zero, on that exact line, on whichever thread happened to leave last. The surface story is "Arc lets you share." The machine story is "Arc is sixteen bytes of bookkeeping you opted into, and clone is one atomic increment."</p>
+  </div>
+</section>
+
+<!-- ============ S3 HEADCOUNT ============ -->
+<section id="s3">
+  <div class="sechead"><span class="secnum">03</span><h2>The headcount, live</h2></div>
+  <p class="lede">strong_count is not a metaphor. It is an integer, and it can be watched. Check workers in, join them back out, and see when the data actually dies.</p>
+
+  <div class="panel">
+    <div class="row" style="justify-content:space-between">
+      <div class="row">
+        <button class="btn primary" id="hcIn">check a worker in</button>
+        <button class="btn" id="hcOut" disabled>join a worker</button>
+        <button class="btn" id="hcDropMain" disabled>drop main's Arc</button>
+        <button class="btn" id="hcReset" style="display:none">start over</button>
+      </div>
+      <label class="switch"><input type="checkbox" id="hcTouch" checked>closure body touches the data</label>
+    </div>
+    <div id="hcStage" style="margin-top:18px;overflow-x:auto"></div>
+    <div id="hcLog" class="mono" style="font-size:12.5px;color:var(--mut);margin-top:12px;min-height:60px;white-space:pre-line"></div>
+  </div>
+
+  <div class="fact"><span class="tag">verified against the compiler</span>
+    <p>With the switch on, a real run prints counts 1, 4, 3, 2, 1 as three workers arrive and leave. With it off, the same program prints 1 the whole way down: a <span class="kbd">move</span> closure captures only variables its body uses, so an untouched clone drops on the spot, before the thread even runs. This trap was found by falling into it, not by reading about it.</p>
+  </div>
+
+  <div class="codecap">the line that forces the capture</div>
+<pre><span class="k">let</span> data = Arc::<span class="f">clone</span>(&amp;data);
+handles.<span class="f">push</span>(thread::<span class="f">spawn</span>(<span class="k">move</span> || {
+    thread::<span class="f">sleep</span>(Duration::<span class="f">from_millis</span>(<span class="n">50</span> * (id + <span class="n">1</span>)));
+    data.<span class="f">len</span>() <span class="c">// delete this line and the clone is never captured at all</span>
+}));</pre>
+</section>
+
+<!-- ============ S4 BILL ============ -->
+<section id="s4">
+  <div class="sechead"><span class="secnum">04</span><h2>The bill meter</h2></div>
+  <p class="lede">Sharing by clone and sharing by Arc both compile. Only one of them scales. Drag the sliders; the bars are log scale because the ratio is the point.</p>
+
+  <div class="panel">
+    <div class="row" style="gap:32px;align-items:flex-start">
+      <div style="flex:1;min-width:220px">
+        <div class="eyebrow" style="margin-bottom:6px">readings in the log: <span id="bmN" style="color:var(--ink)">1,000,000</span></div>
+        <input type="range" id="bmNs" min="3" max="8" step="0.05" value="6" aria-label="number of readings, log scale">
+      </div>
+      <div style="flex:1;min-width:220px">
+        <div class="eyebrow" style="margin-bottom:6px">threads: <span id="bmT" style="color:var(--ink)">4</span></div>
+        <input type="range" id="bmTs" min="2" max="16" step="1" value="4" aria-label="thread count">
+      </div>
+    </div>
+    <div id="bmBars" style="margin-top:22px"></div>
+    <div class="mono" id="bmRatio" style="font-size:13px;color:var(--mut);margin-top:8px"></div>
+  </div>
+
+  <div class="judge"><span class="tag">judgment &middot; measure before trusting</span>
+    <p>The copy bill above is arithmetic and exact. What it buys is not: for a pure scan of a contiguous array, memory bandwidth is usually the ceiling, so four threads rarely mean four times faster. The clone version pays twice, once streaming the copies through the bus and again in cache pressure as four private copies compete for the same cache. How much twice costs depends on the machine. The programs behind this page print their own timings when run; the numbers belong to whatever laptop runs them, not to this page.</p>
+  </div>
+</section>
+
+<!-- ============ S5 WRITING ============ -->
+<section id="s5">
+  <div class="sechead"><span class="secnum">05</span><h2>Writing through the shared door</h2></div>
+  <p class="lede">Arc solved exactly one problem: who frees the data. Ask it to solve a different one, who may write and when, and it refuses in plain text.</p>
+
+  <div class="codecap">the wish: every worker pushes its chunk peak into one shared vector</div>
+<pre><span class="k">let</span> peaks = Arc::<span class="f">new</span>(Vec::&lt;<span class="k">u64</span>&gt;::<span class="f">new</span>());
+<span class="c">// ... inside each worker:</span>
+peaks.<span class="f">push</span>(m); <span class="c">// write through an Arc?</span></pre>
+  <div class="codecap">the verdict, verbatim</div>
+<pre class="err"><span class="hl">error[E0596]</span>: cannot borrow data in an `Arc` as mutable
+   = help: trait `DerefMut` is required to modify through a dereference,
+     but it is not implemented for `Arc&lt;Vec&lt;u64&gt;&gt;`</pre>
+  <p style="font-size:14.5px;color:var(--mut);max-width:76ch;margin-top:14px">Several writers pushing into one vector with no rule about turns is a data race, and the type system declines to be a party to it. The rule about turns is a second type with a second job: <span class="kbd">Mutex</span>. Arc shares the door, Mutex is the lock on it, and the guard is a key held briefly and returned automatically. But a lock is not free. It makes threads take turns, and turns are a queue. The timeline below makes the queue visible.</p>
+
+  <div class="panel" style="margin-top:18px">
+    <div class="tabs">
+      <button class="tab" id="tlNone">no lock</button>
+      <button class="tab on" id="tlMutex">arc + mutex</button>
+      <button class="tab" id="tlHandles">return via handles</button>
+    </div>
+    <div class="row" style="margin-bottom:10px">
+      <button class="btn primary" id="tlPlay">run the timeline</button>
+      <span class="mono" id="tlClock" style="font-size:12px;color:var(--dim)"></span>
+    </div>
+    <div id="tlStage" style="overflow-x:auto"></div>
+    <div id="tlNote" style="font-size:13.5px;color:var(--mut);margin-top:12px;min-height:66px"></div>
+  </div>
+</section>
+
+<!-- ============ S6 TWO LENSES ============ -->
+<section id="s6">
+  <div class="sechead"><span class="secnum">06</span><h2>Two lenses, one program</h2></div>
+  <p class="lede">Every operation on this page has a surface story and a machine story. Both are true. Only one of them predicts performance, and only one of them says where and when memory dies. Each row links back to its evidence.</p>
+
+  <div class="panel" style="padding:0;overflow:hidden">
+    <div style="overflow-x:auto">
+    <table style="min-width:720px;font-size:13.8px">
+      <thead>
+        <tr style="border-bottom:1px solid var(--line)">
+          <th style="text-align:left;padding:14px 18px;font-family:'Chivo Mono',monospace;font-weight:500;font-size:12px;color:var(--dim);letter-spacing:.1em">OPERATION</th>
+          <th style="text-align:left;padding:14px 18px;font-family:'Chivo Mono',monospace;font-weight:500;font-size:12px;color:var(--mut);letter-spacing:.1em">WHAT THE INTERFACE SAYS</th>
+          <th style="text-align:left;padding:14px 18px;font-family:'Chivo Mono',monospace;font-weight:500;font-size:12px;color:var(--teal);letter-spacing:.1em">WHAT THE MACHINE DOES</th>
+          <th style="padding:14px 10px"></th>
+        </tr>
+      </thead>
+      <tbody id="lensRows"></tbody>
+    </table>
+    </div>
+  </div>
+  <p style="font-size:13.5px;color:var(--mut);margin-top:14px;max-width:76ch">The left column is where a lot of otherwise good code stops thinking. Nothing in it is wrong. It is just insufficient: it cannot say why the clone version is slower, why the lock serializes, or on which line the vector is freed. The right column can, and it is available for the asking, because every one of these operations is a small, inspectable machine.</p>
+</section>
+
+<!-- ============ S7 DECIDE ============ -->
+<section id="s7">
+  <div class="sechead"><span class="secnum">07</span><h2>Deciding without a flowchart taped to the wall</h2></div>
+  <p class="lede">Three questions, asked in order. The answers were all earned above; the leaves link back to the evidence.</p>
+  <div class="panel">
+    <div id="dtBody"></div>
+  </div>
+</section>
+
+<footer>
+  arc shares the door &middot; mutex is the lock &middot; the guard is the key &middot; last one out turns off the lights
+</footer>
+
+</div>
+<script>
+/* ==================== helpers ==================== */
+const $=s=>document.querySelector(s);
+const el=(t,c,h)=>{const e=document.createElement(t);if(c)e.className=c;if(h!==undefined)e.innerHTML=h;return e};
+const fmt=n=>n.toLocaleString('en-US');
+
+/* ==================== S1 LADDER ==================== */
+const RUNGS=[
+ {id:'borrow',label:'1 &middot; borrow',verdict:'fails',
+  code:`<span class="k">let</span> front = &amp;readings[..mid];
+<span class="k">let</span> back  = &amp;readings[mid..];
+
+<span class="k">let</span> a = thread::<span class="f">spawn</span>(<span class="k">move</span> || front.<span class="f">iter</span>().<span class="f">max</span>().<span class="f">copied</span>());
+<span class="k">let</span> b = thread::<span class="f">spawn</span>(<span class="k">move</span> || back.<span class="f">iter</span>().<span class="f">max</span>().<span class="f">copied</span>());`,
+  err:`<span class="hl">error[E0597]</span>: \`readings\` does not live long enough
+   |  argument requires that \`readings\` is borrowed for \`'static\`
+   |  \`readings\` dropped here while still borrowed`,
+  note:`The <span class="kbd">join</span> calls two lines later look like proof to a human. The compiler does not read intentions, it reads types, and <span class="kbd">spawn</span>'s type says the closure must be able to live forever. A borrow of a local cannot.`,
+  ledger:['<span style="color:var(--red)">E0597</span>','&middot;','&middot;','<span style="color:var(--red)">nobody can</span>']},
+ {id:'clone',label:'2 &middot; clone',verdict:'compiles',
+  code:`<span class="k">for</span> i <span class="k">in</span> <span class="n">0</span>..n_threads {
+    <span class="k">let</span> my_copy = readings.<span class="f">clone</span>(); <span class="c">// a full private copy per thread</span>
+    handles.<span class="f">push</span>(thread::<span class="f">spawn</span>(<span class="k">move</span> || {
+        my_copy[lo..hi].<span class="f">iter</span>().<span class="f">max</span>().<span class="f">copied</span>()
+    }));
+}`,
+  err:null,
+  note:`It compiles, runs, and prints the right answer. Then it prints the bill: every thread copied the entire log in order to read a quarter of it. Four people each photocopying a whole phone book to look up one borough. Cloning is legitimate when data is small; here the meter disagrees.`,
+  ledger:['<span style="color:var(--green)">compiles</span>','<span style="color:var(--amber)">32,000,000</span>','5','unnecessary: everyone owns their own']},
+ {id:'scope',label:'3 &middot; scope',verdict:'compiles',
+  code:`thread::<span class="f">scope</span>(|s| {
+    <span class="k">for</span> slice <span class="k">in</span> readings.<span class="f">chunks</span>(readings.<span class="f">len</span>() / <span class="n">4</span> + <span class="n">1</span>) {
+        handles.<span class="f">push</span>(s.<span class="f">spawn</span>(<span class="k">move</span> || slice.<span class="f">iter</span>().<span class="f">max</span>().<span class="f">copied</span>()));
+    }
+    <span class="c">/* collect answers */</span>
+}); <span class="c">// every worker provably finished here, before readings can drop</span>`,
+  err:null,
+  note:`The closing brace is a wall: no worker exists past it, so the borrows demonstrably end before the vector does. Zero data copied, plain references, clean compile. When thread lifetimes fit inside one visible region of code, this is the right tool and nothing fancier is needed. That sentence matters for the next rung.`,
+  ledger:['<span style="color:var(--green)">compiles</span>','64 <span style="color:var(--dim)">(four slice refs)</span>','1','<span style="color:var(--teal)">the compiler, via the closing brace</span>']},
+ {id:'broken',label:'4 &middot; scope breaks',verdict:'fails',
+  code:`<span class="c">// the scan should not block: start workers, hand back tickets</span>
+<span class="k">fn</span> <span class="f">start_scan</span>(readings: &amp;Vec&lt;<span class="k">u64</span>&gt;) -&gt; Vec&lt;JoinHandle&lt;Option&lt;<span class="k">u64</span>&gt;&gt;&gt; {
+    <span class="c">// ... spawn four workers borrowing slices ...</span>
+    handles
+}`,
+  err:`<span class="hl">error[E0521]</span>: borrowed data escapes outside of function
+   |  \`readings\` is a reference that is only valid in the function body
+   |  \`readings\` escapes the function body here
+   |  argument requires that \`'1\` must outlive \`'static\``,
+  note:`The workers now outlive the function that created them, so no brace anywhere fences them in. Nobody can say, at compile time, who finishes last. The question of who owns the vector when the dust settles has become genuinely unanswerable by reading the source. It can only be answered by counting at runtime.`,
+  ledger:['<span style="color:var(--red)">E0521</span>','&middot;','&middot;','<span style="color:var(--red)">no brace fences the workers</span>']},
+ {id:'arc',label:'5 &middot; arc',verdict:'compiles',
+  code:`<span class="k">fn</span> <span class="f">start_scan</span>(readings: Arc&lt;Vec&lt;<span class="k">u64</span>&gt;&gt;, n: <span class="k">usize</span>) -&gt; Vec&lt;JoinHandle&lt;Option&lt;<span class="k">u64</span>&gt;&gt;&gt; {
+    (<span class="n">0</span>..n).<span class="f">map</span>(|i| {
+        <span class="k">let</span> readings = Arc::<span class="f">clone</span>(&amp;readings); <span class="c">// +1 on the count, zero data copied</span>
+        thread::<span class="f">spawn</span>(<span class="k">move</span> || readings[lo..hi].<span class="f">iter</span>().<span class="f">max</span>().<span class="f">copied</span>())
+    }).<span class="f">collect</span>()                             <span class="c">// each worker's Arc drops later: -1</span>
+}`,
+  err:null,
+  note:`The data now carries its own headcount. Whoever drops the count to zero frees the vector; it no longer matters who that is. Same function signature that just failed, now legal, at the price of sixteen bytes of ledger and one atomic increment per clone.`,
+  ledger:['<span style="color:var(--green)">compiles</span>','32 <span style="color:var(--dim)">(four pointers)</span>','1','<span style="color:var(--amber)">counted at runtime, 16 bytes of header</span>']},
+];
+const lTabs=$('#ladderTabs'),lBody=$('#ladderBody');
+const visited=new Set();
+RUNGS.forEach((r,i)=>{
+  const b=el('button','tab',r.label);b.setAttribute('role','tab');
+  b.onclick=()=>showRung(i);lTabs.appendChild(b);
+});
+function showRung(i){
+  const r=RUNGS[i];visited.add(i);
+  [...lTabs.children].forEach((t,j)=>t.classList.toggle('on',j===i));
+  lBody.innerHTML=`<pre>${r.code}</pre>`+
+    (r.err?`<div class="codecap">the verdict, verbatim</div><pre class="err">${r.err}</pre>`
+          :`<div class="codecap">verdict</div><div class="mono" style="color:var(--green);font-size:13px">compiles and prints the right answer</div>`)+
+    `<p style="font-size:14px;color:var(--mut);margin-top:14px;max-width:74ch">${r.note}</p>`;
+  renderLedger();
+}
+function renderLedger(){
+  const head=$('#ledgerHead');
+  while(head.children.length>1)head.removeChild(head.lastChild);
+  for(let k=0;k<4;k++){const row=$('#lr'+k);while(row.children.length>1)row.removeChild(row.lastChild);}
+  RUNGS.forEach((r,i)=>{
+    const on=visited.has(i);
+    const th=el('th','', on?r.label.replace(' &middot; ','&middot;'):'&middot;&middot;&middot;');
+    th.style.cssText='text-align:left;color:var(--dim);font-weight:400;padding:6px 14px 8px 0;white-space:nowrap';
+    head.appendChild(th);
+    for(let k=0;k<4;k++){
+      const td=el('td','',on?r.ledger[k]:'<span style="color:var(--line2)">&middot;</span>');
+      td.style.cssText='padding:6px 14px 6px 0;white-space:nowrap;color:var(--ink)';
+      $('#lr'+k).appendChild(td);
+    }
+  });
+}
+showRung(0);
+
+/* ==================== S2 ANATOMY ==================== */
+const stage=$('#anatomyStage'),aNote=$('#anatomyNote');
+let world='arc';
+$('#wClone').onclick=()=>{world='clone';setWorld()};
+$('#wArc').onclick=()=>{world='arc';setWorld()};
+function setWorld(){
+  $('#wClone').classList.toggle('on',world==='clone');
+  $('#wArc').classList.toggle('on',world==='arc');
+  drawAnatomy();
+}
+const THREADS=[{n:'main',c:'#7f90a0'},{n:'thread A',c:'#41d6c3'},{n:'thread B',c:'#f5a742'}];
+function drawAnatomy(){
+  const W=760,H=300;
+  let s=`<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="Chivo Mono,monospace" role="img" aria-label="stack and heap diagram">`;
+  s+=`<text x="70" y="24" font-size="11" fill="#5a6a79" letter-spacing="2">STACKS</text>`;
+  s+=`<text x="${world==='arc'?470:420}" y="24" font-size="11" fill="#5a6a79" letter-spacing="2">HEAP</text>`;
+  THREADS.forEach((t,i)=>{
+    const y=56+i*82;
+    s+=`<rect x="40" y="${y}" width="150" height="52" rx="6" fill="none" stroke="${t.c}" stroke-width="1.2"/>`;
+    s+=`<text x="52" y="${y+20}" font-size="11" fill="${t.c}">${t.n}</text>`;
+    s+=`<rect x="52" y="${y+28}" width="126" height="16" rx="3" fill="rgba(255,255,255,.04)" stroke="#2c3d52" stroke-width="1"/>`;
+    s+=`<text x="58" y="${y+40}" font-size="9.5" fill="#8494a3">${world==='arc'?'Arc ptr &middot; 8 bytes':'Vec (ptr,len,cap) &middot; 24 B'}</text>`;
+  });
+  if(world==='arc'){
+    const hx=460,hy=96,hw=230,hh=118;
+    THREADS.forEach((t,i)=>{
+      const y=56+i*82+36;
+      s+=`<path d="M190 ${y} C 320 ${y}, 360 ${hy+26+i*10}, ${hx} ${hy+26+i*10}" stroke="${t.c}" stroke-width="1.4" fill="none" opacity=".8"/>`;
+    });
+    s+=`<g id="heapBlock"><rect x="${hx}" y="${hy}" width="${hw}" height="${hh}" rx="8" fill="#10161d" stroke="#41d6c3" stroke-width="1.4"/>`;
+    s+=`<rect id="hdrHit" x="${hx}" y="${hy}" width="${hw}" height="40" rx="8" fill="rgba(65,214,195,.10)" style="cursor:pointer"/>`;
+    s+=`<text x="${hx+14}" y="${hy+17}" font-size="10" fill="#41d6c3" pointer-events="none">strong: 3   weak: (idle)</text>`;
+    s+=`<text x="${hx+14}" y="${hy+32}" font-size="9" fill="#5a6a79" pointer-events="none">header &middot; 16 bytes &middot; hover me</text>`;
+    s+=`<text x="${hx+14}" y="${hy+66}" font-size="11" fill="#dbe4ec">Vec&lt;u64&gt; &middot; 1,000,000 readings</text>`;
+    s+=`<text x="${hx+14}" y="${hy+84}" font-size="10" fill="#8494a3">8,000,000 bytes &middot; allocated once</text>`;
+    s+=`<text x="${hx+14}" y="${hy+106}" font-size="9.5" fill="#5a6a79">freed exactly when strong = 0</text></g>`;
+  } else {
+    THREADS.forEach((t,i)=>{
+      const y=42+i*88, hx=420;
+      s+=`<path d="M190 ${56+i*82+36} C 300 ${56+i*82+36}, 340 ${y+34}, ${hx} ${y+34}" stroke="${t.c}" stroke-width="1.4" fill="none" opacity=".8"/>`;
+      s+=`<rect x="${hx}" y="${y}" width="290" height="66" rx="8" fill="#10161d" stroke="${t.c}" stroke-width="1.1"/>`;
+      s+=`<text x="${hx+14}" y="${y+24}" font-size="10.5" fill="#dbe4ec">private copy &middot; 8,000,000 bytes</text>`;
+      s+=`<text x="${hx+14}" y="${y+42}" font-size="9.5" fill="#8494a3">allocated, filled byte by byte, freed separately</text>`;
+    });
+  }
+  s+=`</svg>`;
+  stage.innerHTML=s;
+  if(world==='arc'){
+    aNote.innerHTML=`One allocation, three eight-byte pointers aimed at it, and a ledger sitting in front of the data like a receptionist in front of an office: nobody gets the data freed while the sign-in sheet shows names. Total cost of sharing: 24 bytes of pointers and a counter at 3.`;
+    const hit=document.getElementById('hdrHit');
+    const reveal=()=>{aNote.innerHTML=`Header layout, in the current standard library: <span class="kbd">strong: AtomicUsize</span> (8 bytes), then <span class="kbd">weak: AtomicUsize</span> (8 bytes), then your data, all in one block. "Atomic" means the counter itself is updated with indivisible hardware operations, so two threads cloning at the same instant cannot lose an increment. The A in Arc is about the headcount, not the data.`};
+    hit.addEventListener('mouseenter',reveal);hit.addEventListener('click',reveal);
+  } else {
+    aNote.innerHTML=`Three full allocations, roughly 24,000,000 bytes for a 1M-reading log, each filled by streaming every byte through the memory bus, each freed on its own. No coordination needed, and none possible: the copies drift apart the moment anything writes. This is what "just clone it" buys and costs.`;
+  }
+}
+setWorld();
+
+/* ==================== S3 HEADCOUNT ==================== */
+const hcStage=$('#hcStage'),hcLog=$('#hcLog');
+let workers=0,mainAlive=true,freed=false,total=0;
+const hcIn=$('#hcIn'),hcOut=$('#hcOut'),hcDrop=$('#hcDropMain'),hcReset=$('#hcReset'),hcTouch=$('#hcTouch');
+function count(){return (mainAlive?1:0)+workers}
+function hcDraw(pulse){
+  const W=700,H=170,c=count();
+  const cols=['#41d6c3','#f5a742','#a78bfa','#67d98b','#ff6d6d','#7f90a0'];
+  let s=`<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="Chivo Mono,monospace">`;
+  let x=30;
+  if(mainAlive){s+=`<rect x="${x}" y="40" width="86" height="40" rx="6" fill="none" stroke="#7f90a0"/><text x="${x+43}" y="64" font-size="11" fill="#7f90a0" text-anchor="middle">main</text>`;x+=100;}
+  for(let i=0;i<workers;i++){const col=cols[i%cols.length];
+    s+=`<rect x="${x}" y="40" width="86" height="40" rx="6" fill="none" stroke="${col}"/><text x="${x+43}" y="64" font-size="11" fill="${col}" text-anchor="middle">worker ${i+1}</text>`;x+=100;}
+  const hx=W-190;
+  if(!freed){
+    s+=`<g ${pulse?'class="pulse"':''}><rect x="${hx}" y="26" width="160" height="96" rx="8" fill="#10161d" stroke="#41d6c3" stroke-width="1.4"/>`;
+    s+=`<rect x="${hx}" y="26" width="160" height="34" rx="8" fill="rgba(65,214,195,.1)"/>`;
+    s+=`<text x="${hx+80}" y="48" font-size="14" fill="#41d6c3" text-anchor="middle">strong: ${c}</text>`;
+    s+=`<text x="${hx+80}" y="86" font-size="10.5" fill="#dbe4ec" text-anchor="middle">the data</text>`;
+    s+=`<text x="${hx+80}" y="104" font-size="8.5" fill="#5a6a79" text-anchor="middle">alive</text></g>`;
+  } else {
+    s+=`<rect x="${hx}" y="26" width="160" height="96" rx="8" fill="none" stroke="#2c3d52" stroke-dasharray="4 5"/>`;
+    s+=`<text x="${hx+80}" y="70" font-size="11" fill="#5a6a79" text-anchor="middle">freed</text>`;
+    s+=`<text x="${hx+80}" y="88" font-size="8.5" fill="#5a6a79" text-anchor="middle">count reached 0 right here</text>`;
+  }
+  s+=`</svg>`;hcStage.innerHTML=s;
+  hcOut.disabled=workers===0||freed;
+  hcDrop.disabled=!mainAlive||freed;
+  hcIn.disabled=freed||workers>=4;
+  hcReset.style.display=freed?'':'none';
+}
+function log(t){hcLog.textContent=(t+'\n'+hcLog.textContent).split('\n').slice(0,5).join('\n')}
+hcIn.onclick=()=>{
+  if(hcTouch.checked){workers++;total++;log(`worker ${total} checked in           count = ${count()}`);}
+  else{total++;log(`worker ${total} spawned, clone untouched, dropped on the spot   count = ${count()}  (the trap)`);}
+  hcDraw(true);
+};
+hcOut.onclick=()=>{workers--;log(`a worker joined and left      count = ${count()}`);maybeFree();hcDraw(true);};
+hcDrop.onclick=()=>{mainAlive=false;log(`main dropped its Arc          count = ${count()}`);maybeFree();hcDraw(true);};
+function maybeFree(){if(count()===0){freed=true;log(`count hit 0: the Vec is freed, on this line, by whoever left last`);}}
+hcReset.onclick=()=>{workers=0;mainAlive=true;freed=false;total=0;hcLog.textContent='';hcDraw();};
+hcDraw();
+
+/* ==================== S4 BILL METER ==================== */
+const bmNs=$('#bmNs'),bmTs=$('#bmTs');
+function bill(){
+  const N=Math.round(Math.pow(10,parseFloat(bmNs.value)));
+  const T=parseInt(bmTs.value);
+  $('#bmN').textContent=fmt(N);$('#bmT').textContent=T;
+  const cloneB=N*8*T, arcB=8*T;
+  const maxLog=Math.log10(8*Math.pow(10,8)*16);
+  const w=b=>Math.max(2,(Math.log10(Math.max(b,1))/maxLog)*100);
+  $('#bmBars').innerHTML=`
+   <div style="margin-bottom:16px">
+     <div class="eyebrow" style="margin-bottom:5px">clone per thread &middot; <span style="color:var(--amber)">${fmt(cloneB)} bytes copied</span></div>
+     <div style="height:16px;background:var(--panel2);border-radius:5px;overflow:hidden"><div style="height:100%;width:${w(cloneB)}%;background:linear-gradient(90deg,#f5a742,#ff6d6d);border-radius:5px;transition:width .25s"></div></div>
+   </div>
+   <div>
+     <div class="eyebrow" style="margin-bottom:5px">arc &middot; <span style="color:var(--teal)">${fmt(arcB)} bytes copied</span> <span style="color:var(--dim)">(${T} pointers)</span></div>
+     <div style="height:16px;background:var(--panel2);border-radius:5px;overflow:hidden"><div style="height:100%;width:${w(arcB)}%;background:var(--teal);border-radius:5px;transition:width .25s"></div></div>
+   </div>`;
+  $('#bmRatio').innerHTML=`ratio: clone moves <span style="color:var(--amber)">${fmt(Math.round(cloneB/arcB))}&times;</span> more bytes just to grant read access &middot; bars are log scale`;
+}
+bmNs.oninput=bill;bmTs.oninput=bill;bill();
+
+/* ==================== S5 TIMELINE ==================== */
+const tlStage=$('#tlStage'),tlNote=$('#tlNote'),tlClock=$('#tlClock');
+let tlMode='mutex',tlAnim=null;
+const WCOL=['#41d6c3','#f5a742','#a78bfa','#67d98b'];
+/* segments: per worker, list of {t0,t1,kind} kind: scan|wait|hold ; times in ms of model */
+function buildSegs(mode){
+  const scan=[46,60,38,54]; // per-worker scan cost, staggered finishes
+  if(mode==='handles'){
+    return scan.map((d,i)=>[{t0:0,t1:d,kind:'scan'}]);
+  }
+  if(mode==='mutex'){
+    const HOLD=14;
+    const arrivals=scan.map((d,i)=>({i,at:d})).sort((a,b)=>a.at-b.at);
+    let free=0;const out=scan.map(()=>[]);
+    arrivals.forEach(a=>{
+      out[a.i].push({t0:0,t1:a.at,kind:'scan'});
+      const start=Math.max(a.at,free);
+      if(start>a.at)out[a.i].push({t0:a.at,t1:start,kind:'wait'});
+      out[a.i].push({t0:start,t1:start+HOLD,kind:'hold'});
+      free=start+HOLD;
+    });
+    return out;
+  }
+  /* none: same as mutex but holds overlap freely = torn */
+  return scan.map((d,i)=>[{t0:0,t1:d,kind:'scan'},{t0:d,t1:d+14,kind:'torn'}]);
+}
+function tlDraw(prog){ /* prog = sweep position in model ms, or null */
+  const segs=buildSegs(tlMode);
+  const T=Math.max(...segs.map(w=>w[w.length-1].t1))+6;
+  const W=720,H=44*segs.length+46,L=86,R=20,SW=W-L-R;
+  const x=t=>L+t/T*SW;
+  let s=`<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="Chivo Mono,monospace">`;
+  segs.forEach((w,i)=>{
+    const y=14+i*44;
+    s+=`<text x="${L-10}" y="${y+17}" font-size="10.5" fill="${WCOL[i]}" text-anchor="end">worker ${i+1}</text>`;
+    s+=`<line x1="${L}" y1="${y+24}" x2="${W-R}" y2="${y+24}" stroke="#1a2530"/>`;
+    w.forEach(g=>{
+      const gw=Math.max(1,x(Math.min(g.t1,prog??1e9))-x(g.t0));
+      if(prog!==null&&g.t0>prog)return;
+      if(g.kind==='scan')s+=`<rect x="${x(g.t0)}" y="${y+6}" width="${gw}" height="14" rx="3" fill="${WCOL[i]}" opacity=".8"/>`;
+      if(g.kind==='wait')s+=`<rect x="${x(g.t0)}" y="${y+6}" width="${gw}" height="14" rx="3" fill="none" stroke="#ff6d6d" stroke-dasharray="3 3"/>`;
+      if(g.kind==='hold')s+=`<rect x="${x(g.t0)}" y="${y+6}" width="${gw}" height="14" rx="3" fill="#dbe4ec" opacity=".9"/>`;
+      if(g.kind==='torn')s+=`<rect x="${x(g.t0)}" y="${y+6}" width="${gw}" height="14" rx="3" fill="#ff6d6d" opacity=".55"/>`;
+    });
+  });
+  const ly=H-16;
+  s+=`<g font-size="9.5" fill="#8494a3">
+      <rect x="${L}" y="${ly-9}" width="12" height="9" rx="2" fill="#41d6c3" opacity=".8"/><text x="${L+18}" y="${ly}">scanning (parallel)</text>
+      ${tlMode==='mutex'?`<rect x="${L+160}" y="${ly-9}" width="12" height="9" rx="2" fill="none" stroke="#ff6d6d" stroke-dasharray="3 3"/><text x="${L+178}" y="${ly}">waiting for the lock</text>
+      <rect x="${L+340}" y="${ly-9}" width="12" height="9" rx="2" fill="#dbe4ec"/><text x="${L+358}" y="${ly}">holding the key</text>`:''}
+      ${tlMode==='none'?`<rect x="${L+160}" y="${ly-9}" width="12" height="9" rx="2" fill="#ff6d6d" opacity=".55"/><text x="${L+178}" y="${ly}">unsynchronized writes, overlapping</text>`:''}
+      ${tlMode==='handles'?`<text x="${L+160}" y="${ly}">results return through join handles &middot; merge happens after, in main</text>`:''}
+      </g>`;
+  if(prog!==null)s+=`<line x1="${x(prog)}" y1="6" x2="${x(prog)}" y2="${H-28}" stroke="#dbe4ec" opacity=".5"/>`;
+  s+=`</svg>`;tlStage.innerHTML=s;
+}
+const TLNOTES={
+ none:`<span class="mono" style="font-size:10.5px;letter-spacing:.18em;color:var(--red)">ILLUSTRATIVE</span> &middot; shown so the shape of the disaster is visible: two writers in the same bytes at once, final state garbled. Real Rust never gets here; the E0596 above is the compiler refusing to produce this program. Languages that do compile it produce a data race, which is undefined behavior, not a wrong answer you can reason about.`,
+ mutex:`Correct, and honest about its price. Scans run in parallel (colored), then the lock serializes the writes: solid light segments never overlap, and the dashed red is time spent standing in line. With four short writes the queue is cheap. Put the lock <em>inside</em> the scan loop instead and the queue becomes the program.`,
+ handles:`No shared bucket, no lock, no red anywhere. Each worker keeps a private partial answer and returns it through its own join handle; main merges after the fact. The fastest lock is the one the design deleted. This is the same code shape as the ladder's final rung, which is why it was worth noticing there.`
+};
+function setTl(m){tlMode=m;
+ ['None','Mutex','Handles'].forEach(k=>$('#tl'+k).classList.toggle('on',k.toLowerCase()===m));
+ tlNote.innerHTML=TLNOTES[m];cancelAnimationFrame(tlAnim);tlClock.textContent='';tlDraw(null);}
+$('#tlNone').onclick=()=>setTl('none');
+$('#tlMutex').onclick=()=>setTl('mutex');
+$('#tlHandles').onclick=()=>setTl('handles');
+$('#tlPlay').onclick=()=>{
+  cancelAnimationFrame(tlAnim);
+  const segs=buildSegs(tlMode);const T=Math.max(...segs.map(w=>w[w.length-1].t1))+6;
+  const t0=performance.now(),DUR=2600;
+  const step=now=>{const p=Math.min(1,(now-t0)/DUR);tlDraw(p*T);
+    tlClock.textContent='t = '+Math.round(p*T)+' (model time)';
+    if(p<1)tlAnim=requestAnimationFrame(step);};
+  tlAnim=requestAnimationFrame(step);
+};
+setTl('mutex');
+
+/* ==================== S6 TWO LENSES ==================== */
+const LENS=[
+ ['<span class="kbd">.clone()</span> on the Vec','makes a copy','allocates a second block, then streams every byte of the data through the memory bus; the copies drift apart the moment anything writes','#s4'],
+ ['<span class="kbd">Arc::clone</span>','shares ownership','one atomic add on a counter, eight new bytes on one stack; the data is never touched','#s2'],
+ ['<span class="kbd">.lock()</span>','protects the data','an atomic compare-and-swap; if the lock is taken, the thread escalates to waiting, and waiting threads form a visible queue','#s5'],
+ ['count drops to zero','memory is cleaned up','the free happens here, on this exact line, on whichever thread lost the race to leave; nothing is deferred to a collector','#s3'],
+];
+const lensRows=$('#lensRows');
+LENS.forEach(r=>{
+  const tr=el('tr');tr.style.cssText='border-bottom:1px solid var(--line);cursor:pointer';
+  tr.innerHTML=`<td style="padding:13px 18px;white-space:nowrap;font-family:'Chivo Mono',monospace;font-size:12.5px">${r[0]}</td>
+    <td style="padding:13px 18px;color:var(--mut)">${r[1]}</td>
+    <td style="padding:13px 18px;color:var(--ink)">${r[2]}</td>
+    <td style="padding:13px 10px;font-family:'Chivo Mono',monospace;font-size:11px;color:var(--teal);white-space:nowrap">seen in ${r[3].replace('#s','0')} &rarr;</td>`;
+  tr.onclick=()=>document.querySelector(r[3]).scrollIntoView({behavior:'smooth'});
+  tr.onmouseenter=()=>tr.style.background='rgba(65,214,195,.03)';
+  tr.onmouseleave=()=>tr.style.background='';
+  lensRows.appendChild(tr);
+});
+
+/* ==================== S7 DECISION ==================== */
+const DT={
+ q1:{q:'Is the data cheap to copy?',hint:'a few integers, a small struct, a short string: cheap. a million readings: not.',
+     yes:{leaf:'clone it',c:'var(--green)',t:'Give every thread its own copy and stop thinking about sharing entirely. The ladder\u2019s second rung is only a mistake when the meter says so.',link:'#s1'},
+     no:'q2'},
+ q2:{q:'Do the workers live inside one visible scope?',hint:'can a single closing brace fence in every thread before the data drops?',
+     yes:{leaf:'thread::scope',c:'var(--teal)',t:'Borrow plainly and let the brace be the proof. Zero bytes moved, zero runtime bookkeeping. Reaching for Arc here is paying rent on a ledger nobody reads.',link:'#s1'},
+     no:'q3'},
+ q3:{q:'Does anyone need to write to the shared data?',hint:'reading in parallel is free; writing is where turns begin.',
+     no:{leaf:'Arc',c:'var(--teal)',t:'The who-frees-this question is genuinely unanswerable at compile time, so let the data carry its headcount. Sixteen bytes of ledger, one atomic bump per clone, deterministic free.',link:'#s2'},
+     yes:{leaf:'Arc + Mutex, after one more question',c:'var(--amber)',t:'First ask: can each worker keep a private partial and merge at join, like the handles timeline? If yes, delete the lock; the fastest lock is the one the design removed. If results must be visible mid-flight, or the structure forbids merging, then Arc + Mutex is exactly right, and the queue it creates is a cost you now know how to see.',link:'#s5'}},
+};
+const dtBody=$('#dtBody');
+function dtRender(node,trail){
+  trail=trail||[];
+  if(typeof node==='object'&&node.leaf){
+    dtBody.innerHTML=`<div class="eyebrow" style="margin-bottom:10px">${trail.join(' &nbsp;&rarr;&nbsp; ')}</div>
+      <div style="border-left:2px solid ${node.c};padding:14px 18px">
+        <div class="mono" style="font-size:17px;color:${node.c};margin-bottom:6px">${node.leaf}</div>
+        <p style="font-size:14.5px;color:var(--mut);max-width:70ch">${node.t}</p>
+        <a href="${node.link}" class="mono" style="font-size:12px;color:${node.c};text-decoration:none">evidence &rarr;</a>
+      </div>
+      <button class="btn" style="margin-top:16px" onclick="dtStart()">ask again</button>`;
+    return;
+  }
+  const n=DT[node];
+  dtBody.innerHTML=`<div class="eyebrow" style="margin-bottom:10px">${trail.length?trail.join(' &nbsp;&rarr;&nbsp; '):'question one'}</div>
+    <h3 style="margin-bottom:4px">${n.q}</h3>
+    <p style="font-size:13px;color:var(--dim);margin-bottom:14px">${n.hint}</p>
+    <div class="row">
+      <button class="btn" id="dtY">yes</button>
+      <button class="btn" id="dtN">no</button>
+    </div>`;
+  $('#dtY').onclick=()=>dtRender(n.yes,[...trail,n.q+' <span style="color:var(--teal)">yes</span>']);
+  $('#dtN').onclick=()=>dtRender(n.no,[...trail,n.q+' <span style="color:var(--amber)">no</span>']);
+}
+window.dtStart=()=>dtRender('q1');
+dtStart();
+</script>
+</body>
+</html>
