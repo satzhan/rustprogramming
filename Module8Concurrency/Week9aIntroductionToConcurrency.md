@@ -133,3 +133,125 @@ Sometimes, synchronization requires more than just locking data; it requires orc
 * **Race Condition:** A flaw where the timing or order of thread scheduling changes the program's correctness.
 * **Deterministic vs. Nondeterministic:** Predictable output versus output that changes based on uncontrollable system scheduling.
 * **Mutex (Mutual Exclusion):** A primitive lock used to prevent simultaneous access to a shared resource.
+
+
+
+AOC 2024 Day 1
+```rust
+use std::fs;
+use std::thread;
+
+fn main() {
+    let (l, r) = parse("test.txt"); // remember to create the file
+    let ans = solve_part1(l, r);
+    println!("{}", ans);
+}
+
+fn parse(path: &str) -> (Vec<u32>, Vec<u32>) {
+    let input = fs::read_to_string(path).unwrap();
+    let mut l = Vec::new();
+    let mut r = Vec::new();
+    
+    for line in input.lines() {
+        let mut parts = line.split_whitespace();
+        
+        if let (Some(l_str), Some(r_str)) = (parts.next(), parts.next()) {
+            l.push(l_str.parse().unwrap());
+            r.push(r_str.parse().unwrap());
+        }
+    }
+
+    (l, r)
+}
+
+fn solve_part1(mut l: Vec<u32>, mut r: Vec<u32>) -> u32 {
+    l.sort_unstable();
+    r.sort_unstable();
+    let n = l.len();
+    let sz = n.div_ceil(4);
+
+    thread::scope(|s| {
+        let mut threads = Vec::new();
+        for i in 0..4 {
+            let start = i * sz;
+            let end = std::cmp::min(start + sz, n);
+
+            let left = &l[start..end];
+            let right = &r[start..end];
+
+            let t = s.spawn(move || {
+                // TODO build a function that works with 2 parts left and right
+                // and return result for this chunk view
+            });
+            threads.push(t);
+        }
+        // TODO get result from all 4 threads.
+
+    })
+}
+```
+
+SOLUTION PART 1
+```rust
+use std::fs;
+use std::thread;
+
+fn main() {
+    let (l, r) = parse("input.txt");
+    let ans = solve_part1(l, r);
+    println!("{}", ans);
+}
+
+fn parse(path: &str) -> (Vec<u32>, Vec<u32>) {
+    let input = fs::read_to_string(path).unwrap();
+    let mut l = Vec::new();
+    let mut r = Vec::new();
+
+    for line in input.lines() {
+        let mut parts = line.split_whitespace();
+        
+        if let (Some(l_str), Some(r_str)) = (parts.next(), parts.next()) {
+            l.push(l_str.parse().unwrap());
+            r.push(r_str.parse().unwrap());
+        }
+    }
+
+    (l, r)
+}
+
+fn solve_part1(mut l: Vec<u32>, mut r: Vec<u32>) -> u32 {
+    l.sort_unstable();
+    r.sort_unstable();
+
+    let n = l.len();
+
+    let sz = n.div_ceil(4);
+
+    thread::scope(|s| {
+        let mut threads = Vec::new();
+
+        for i in 0..4 {
+            let start = i * sz;
+            let end = std::cmp::min(start + sz, n);
+
+            let l_chk = &l[start..end];
+            let r_chk = &r[start..end];
+
+            let t = s.spawn(move || {
+                let mut sum = 0;
+                for j in 0..l_chk.len() {
+                    sum += l_chk[j].abs_diff(r_chk[j]);
+                }
+                sum
+            });
+            threads.push(t);
+        }
+
+        let mut total = 0;
+        for t in threads {
+            total += t.join().unwrap();
+        }
+        total
+    })
+}
+```
