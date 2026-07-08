@@ -342,124 +342,61 @@ fn main() {
 }
 ```
 
-AOC 2024 Day 1
-```rust
+
+AOC 2022 day 1
+```
 use std::fs;
+use std::sync::Arc;
 use std::thread;
 
-fn main() {
-    let (l, r) = parse("test.txt"); // remember to create the file
-    let ans = solve_part1(l, r);
-    println!("{}", ans);
-}
+fn parse(filename: &str) -> Vec<Vec<i32>> {
+    let input = fs::read_to_string(filename).unwrap();
+    let mut elves = Vec::new();
 
-fn parse(path: &str) -> (Vec<u32>, Vec<u32>) {
-    let input = fs::read_to_string(path).unwrap();
-    let mut l = Vec::new();
-    let mut r = Vec::new();
-    
-    for line in input.lines() {
-        let mut parts = line.split_whitespace();
-        
-        if let (Some(l_str), Some(r_str)) = (parts.next(), parts.next()) {
-            l.push(l_str.parse().unwrap());
-            r.push(r_str.parse().unwrap());
+    for group in input.split("\n\n") {
+        let mut elf = Vec::new();
+
+        for line in group.lines() {
+            elf.push(line.parse().unwrap());
         }
+
+        elves.push(elf);
     }
 
-    (l, r)
+    elves
 }
 
-fn solve_part1(mut l: Vec<u32>, mut r: Vec<u32>) -> u32 {
-    l.sort_unstable();
-    r.sort_unstable();
-    let n = l.len();
-    let sz = n.div_ceil(4);
+fn solve_part1(elves: Arc<Vec<Vec<i32>>>) -> i32 {
+    let mut handles = Vec::new();
+    let num_threads = 4;
 
-    thread::scope(|s| {
-        let mut threads = Vec::new();
-        for i in 0..4 {
-            let start = i * sz;
-            let end = std::cmp::min(start + sz, n);
+    for id in 0..num_threads {
+        let elves = Arc::clone(&elves);
 
-            let left = &l[start..end];
-            let right = &r[start..end];
+        let handle = thread::spawn(move || {
+            let mut best = 0;
+            let mut i = id; // starting elf id
+            
+            // TODO create a function that will loop over 
+            // every other 4 elves
+            // so each thread starts at it's own elf and jump over
+            // e.g. 0, 4, 8, 12, ... <---- thread0
+            //      1, 5, 9, 13, ... <---- thread1
+            // and accumulates result (best variable)
 
-            let t = s.spawn(move || {
-                // TODO build a function that works with 2 parts left and right
-                // and return result for this chunk view
-            });
-            threads.push(t);
-        }
-        // TODO get result from all 4 threads.
+            best
+        });
 
-    })
+        handles.push(handle);
+    }
+    // TODO join the threads and collect total result
+
 }
-```
-
-SOLUTION PART 1
-```rust
-use std::fs;
-use std::thread;
 
 fn main() {
-    let (l, r) = parse("input.txt");
-    let ans = solve_part1(l, r);
-    println!("{}", ans);
-}
+    let elves = Arc::new(parse("input.txt"));
+    let answer = solve_part1(Arc::clone(&elves));
 
-fn parse(path: &str) -> (Vec<u32>, Vec<u32>) {
-    let input = fs::read_to_string(path).unwrap();
-    let mut l = Vec::new();
-    let mut r = Vec::new();
-
-    for line in input.lines() {
-        let mut parts = line.split_whitespace();
-        
-        if let (Some(l_str), Some(r_str)) = (parts.next(), parts.next()) {
-            l.push(l_str.parse().unwrap());
-            r.push(r_str.parse().unwrap());
-        }
-    }
-
-    (l, r)
-}
-
-fn solve_part1(mut l: Vec<u32>, mut r: Vec<u32>) -> u32 {
-    l.sort_unstable();
-    r.sort_unstable();
-
-    let n = l.len();
-
-    let sz = n.div_ceil(4);
-
-    thread::scope(|s| {
-        let mut threads = Vec::new();
-
-        for i in 0..4 {
-            let start = i * sz;
-            let end = std::cmp::min(start + sz, n);
-
-            let l_chk = &l[start..end];
-            let r_chk = &r[start..end];
-
-            let t = s.spawn(move || {
-                let mut sum = 0;
-                for j in 0..l_chk.len() {
-                    sum += l_chk[j].abs_diff(r_chk[j]);
-                }
-                sum
-            });
-            threads.push(t);
-        }
-
-        let mut total = 0;
-        for t in threads {
-            total += t.join().unwrap();
-        }
-        total
-    })
+    println!("Part 1: {}", answer);
 }
 ```
-
-
