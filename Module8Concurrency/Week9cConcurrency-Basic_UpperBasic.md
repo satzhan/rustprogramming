@@ -379,7 +379,7 @@ fn solve_part1(elves: Arc<Vec<Vec<i32>>>) -> i32 {
             
             // TODO create a function that will loop over 
             // every other 4 elves
-            // so each thread starts at it's own elf and jump over
+            // so each thread starts at it's own elf and jumps over
             // e.g. 0, 4, 8, 12, ... <---- thread0
             //      1, 5, 9, 13, ... <---- thread1
             // and accumulates result (best variable)
