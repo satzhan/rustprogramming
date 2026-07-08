@@ -344,7 +344,7 @@ fn main() {
 
 
 AOC 2022 day 1
-```
+```rust
 use std::fs;
 use std::sync::Arc;
 use std::thread;
