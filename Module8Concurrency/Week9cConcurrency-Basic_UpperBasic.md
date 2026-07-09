@@ -346,8 +346,7 @@ fn main() {
 AOC 2022 day 1
 ```rust
 use std::fs;
-use std::sync::Arc;
-use std::thread;
+use std::{sync::{Arc, Mutex}, thread};
 
 fn parse(filename: &str) -> Vec<Vec<i32>> {
     let input = fs::read_to_string(filename).unwrap();
@@ -369,34 +368,61 @@ fn parse(filename: &str) -> Vec<Vec<i32>> {
 fn solve_part1(elves: Arc<Vec<Vec<i32>>>) -> i32 {
     let mut handles = Vec::new();
     let num_threads = 4;
-
     for id in 0..num_threads {
         let elves = Arc::clone(&elves);
-
         let handle = thread::spawn(move || {
             let mut best = 0;
             let mut i = id; // starting elf id
-            
-            // TODO create a function that will loop over 
-            // every other 4 elves
-            // so each thread starts at it's own elf and jumps over
-            // e.g. 0, 4, 8, 12, ... <---- thread0
-            //      1, 5, 9, 13, ... <---- thread1
-            // and accumulates result (best variable)
-
+            while i < elves.len() {
+                let mut sum = 0;
+                for x in &elves[i] {
+                    sum += x;
+                }
+                if best < sum {
+                    best = sum;
+                }
+                i += 4;
+            }
             best
         });
-
         handles.push(handle);
     }
-    // TODO join the threads and collect total result
-
+    let mut bestbest = 0;
+    for handle in handles {
+        let x = handle.join().unwrap();
+        if bestbest < x {
+            bestbest = x;
+        }
+    }
+    return bestbest;
 }
 
 fn main() {
     let elves = Arc::new(parse("input.txt"));
-    let answer = solve_part1(Arc::clone(&elves));
+    let answer1 = solve_part1(Arc::clone(&elves));
+    let answer2 = solve_part2(Arc::clone(&elves));
 
-    println!("Part 1: {}", answer);
+    println!("Part 1: {}", answer1);
+    println!("Part 2: {}", answer2);
+}
+
+fn solve_part2(elves: Arc<Vec<Vec<i32>>>) -> i32 {
+    let top = Arc::new(Mutex::new([0; 3]));
+    let mut threads = Vec::new();
+    for id in 0..4 {
+        let elves = Arc::clone(&elves);
+        let top = Arc::clone(&top);
+        threads.push(thread::spawn(move || {
+            let mut i = id;
+            // TODO::complete thread function
+            // that iterates over elves and computes their calories
+            // and updates "global" top array.
+            // top should sustain best 3 variables it has seen.
+        }));
+    }
+    for thread in threads {
+        thread.join().unwrap();
+    }
+    // TODO:: don't forger to return result.
 }
 ```
