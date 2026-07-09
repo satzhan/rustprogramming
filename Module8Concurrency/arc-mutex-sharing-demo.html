@@ -1,0 +1,1035 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sharing to Write: Arc, Mutex, and the Cost of a Door</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0b0e14;
+  --panel:#121824;
+  --panel2:#0e131d;
+  --line:#1f2836;
+  --ink:#dbe3ee;
+  --muted:#8a96a8;
+  --t0:#45d0c2;
+  --t1:#f0b34e;
+  --t2:#b48ef2;
+  --t3:#ef7a93;
+  --lock:#ff5d5d;
+  --ok:#6fd08c;
+  --mono:'JetBrains Mono',ui-monospace,'Cascadia Code',Menlo,Consolas,monospace;
+  --disp:'Chakra Petch',var(--mono);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  background:var(--bg);
+  color:var(--ink);
+  font-family:var(--mono);
+  font-size:15px;
+  line-height:1.65;
+}
+.wrap{max-width:880px;margin:0 auto;padding:0 22px 120px}
+
+/* header */
+header{padding:64px 0 30px;border-bottom:1px solid var(--line)}
+.kicker{font-family:var(--disp);font-size:12px;letter-spacing:.28em;text-transform:uppercase;color:var(--muted)}
+h1{
+  font-family:var(--disp);font-weight:700;
+  font-size:clamp(30px,5vw,46px);line-height:1.12;
+  margin:14px 0 16px;letter-spacing:.01em;
+}
+h1 .dim{color:var(--muted)}
+.lede{color:var(--muted);max-width:620px}
+.lede b{color:var(--ink);font-weight:600}
+
+/* toc */
+nav.toc{display:flex;flex-wrap:wrap;gap:8px;margin:22px 0 0}
+nav.toc a{
+  color:var(--muted);text-decoration:none;font-size:12.5px;
+  border:1px solid var(--line);border-radius:999px;padding:4px 12px;
+  transition:color .15s,border-color .15s;
+}
+nav.toc a:hover,nav.toc a:focus-visible{color:var(--ink);border-color:var(--muted)}
+
+/* sections */
+section{margin-top:74px}
+.secnum{
+  font-family:var(--disp);font-size:12px;letter-spacing:.26em;
+  color:var(--muted);text-transform:uppercase;
+}
+h2{
+  font-family:var(--disp);font-weight:600;font-size:26px;
+  margin:6px 0 18px;letter-spacing:.015em;
+}
+h3{font-family:var(--disp);font-weight:600;font-size:16.5px;margin:26px 0 10px;letter-spacing:.03em}
+p{margin:0 0 14px;max-width:72ch}
+p code,li code{
+  background:var(--panel);border:1px solid var(--line);
+  border-radius:4px;padding:1px 6px;font-size:13.5px;
+}
+ul{margin:0 0 14px 20px}
+li{margin-bottom:6px;max-width:70ch}
+
+/* fact vs judgment cues */
+.note{
+  border-left:2px solid var(--muted);
+  padding:8px 0 8px 16px;margin:18px 0;color:var(--muted);
+  font-size:13.5px;max-width:70ch;
+}
+.note .tag{
+  display:block;font-variant:small-caps;letter-spacing:.14em;
+  font-size:12px;margin-bottom:3px;
+}
+.note.verified{border-left-color:var(--t0)}
+.note.verified .tag{color:var(--t0)}
+.note.judgment{border-left-color:var(--t1)}
+.note.judgment .tag{color:var(--t1)}
+.note.model{border-left-color:var(--t2)}
+.note.model .tag{color:var(--t2)}
+
+/* code blocks */
+pre{
+  background:var(--panel2);border:1px solid var(--line);border-radius:8px;
+  padding:16px 18px;overflow-x:auto;margin:16px 0;
+  font-size:13px;line-height:1.6;
+}
+pre .cm{color:#5c6b80}
+pre .kw{color:var(--t2)}
+pre .fn{color:var(--t0)}
+pre .st{color:var(--t1)}
+pre .hl{background:rgba(255,93,93,.13);display:inline-block;width:100%}
+
+/* widgets */
+.widget{
+  background:var(--panel);border:1px solid var(--line);border-radius:10px;
+  padding:20px;margin:20px 0;
+}
+.widget .wtitle{
+  font-family:var(--disp);font-size:12px;letter-spacing:.22em;
+  text-transform:uppercase;color:var(--muted);margin-bottom:14px;
+}
+.widget .hint{font-size:12.5px;color:var(--muted);margin-top:12px}
+.controls{display:flex;flex-wrap:wrap;gap:18px;align-items:center;margin:10px 0 16px}
+.ctrl{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--muted)}
+.ctrl output{color:var(--ink);font-weight:600}
+input[type=range]{width:170px;accent-color:var(--t0)}
+button.act{
+  font-family:var(--mono);font-size:13px;color:var(--ink);
+  background:var(--panel2);border:1px solid var(--line);border-radius:6px;
+  padding:7px 16px;cursor:pointer;transition:border-color .15s;
+}
+button.act:hover,button.act:focus-visible{border-color:var(--muted)}
+button.act.on{border-color:var(--t0);color:var(--t0)}
+.readout{
+  font-size:13px;background:var(--panel2);border:1px solid var(--line);
+  border-radius:6px;padding:10px 14px;margin-top:14px;color:var(--muted);
+}
+.readout b{color:var(--ink)}
+.readout.bad{border-color:rgba(255,93,93,.5)}
+.readout.good{border-color:rgba(111,208,140,.5)}
+
+/* S1 svg diagram */
+.diagram{width:100%;height:auto;display:block;margin:6px 0}
+.svglabel{font-family:var(--mono);font-size:11px;fill:var(--muted)}
+.svglabel.big{font-size:12px;fill:var(--ink)}
+
+/* S2 rw grid */
+.rwgrid{display:grid;grid-template-columns:110px 1fr;gap:10px;align-items:center}
+.rwname{font-size:13px;color:var(--muted)}
+.rwbtn{
+  width:100%;padding:10px;border-radius:6px;border:1px solid var(--line);
+  background:var(--panel2);color:var(--muted);font-family:var(--mono);
+  font-size:13px;cursor:pointer;text-align:center;transition:all .12s;
+}
+.rwbtn.read{border-color:var(--t0);color:var(--t0)}
+.rwbtn.write{border-color:var(--lock);color:var(--lock)}
+
+/* S3 amdahl */
+.chart{width:100%;height:auto;display:block}
+.axis{stroke:var(--line);stroke-width:1}
+.curve{fill:none;stroke:var(--t0);stroke-width:2}
+.ceiling{stroke:var(--lock);stroke-width:1;stroke-dasharray:5 4}
+.marker{fill:var(--t1)}
+
+/* S4 timeline */
+.tl{width:100%;height:auto;display:block;margin-top:6px}
+.tl .seg{rx:3}
+.tl .lockseg{stroke:var(--lock);stroke-width:1.5;fill-opacity:.9}
+.tl .waitseg{fill:none;stroke:var(--muted);stroke-width:1;stroke-dasharray:3 3}
+.steps{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 4px}
+.stepchip{
+  font-size:12px;border:1px solid var(--line);border-radius:5px;
+  padding:4px 10px;color:var(--muted);
+}
+.stepchip.locked{border-color:var(--lock);color:var(--lock)}
+
+/* S5 race */
+.race{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:640px){.race{grid-template-columns:1fr}}
+.racecol{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:14px}
+.racecol h4{font-family:var(--disp);font-size:13px;letter-spacing:.08em;margin-bottom:10px}
+.lanes{display:flex;flex-direction:column;gap:7px;margin-bottom:12px}
+.lane{display:flex;align-items:center;gap:8px}
+.lanetag{font-size:11px;width:22px;color:var(--muted)}
+.lanebar{flex:1;height:14px;background:var(--bg);border:1px solid var(--line);border-radius:4px;overflow:hidden}
+.lanefill{height:100%;width:0%;transition:width .1s linear}
+.centerbox{
+  border:1px solid var(--line);border-radius:6px;padding:8px 10px;
+  font-size:12px;color:var(--muted);text-align:center;
+}
+.centerbox.busy{border-color:var(--lock)}
+.odometer{font-family:var(--disp);font-size:22px;color:var(--ink)}
+.odometer.hot{color:var(--lock)}
+
+/* S6 partition */
+.cells{display:grid;grid-template-columns:repeat(12,1fr);gap:5px;margin:12px 0}
+@media(max-width:560px){.cells{grid-template-columns:repeat(8,1fr)}}
+.cell{
+  aspect-ratio:1;border-radius:5px;border:1px solid var(--line);
+  display:flex;align-items:center;justify-content:center;
+  font-size:10.5px;color:rgba(10,14,20,.85);font-weight:600;
+  background:var(--panel2);
+}
+.cell.orphan{background:var(--panel2);color:var(--muted);border-style:dashed}
+.cell.dup{
+  background-image:repeating-linear-gradient(45deg,transparent 0 4px,rgba(255,93,93,.55) 4px 8px);
+}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--muted);margin-top:8px}
+.sw{display:inline-block;width:11px;height:11px;border-radius:3px;vertical-align:-1px;margin-right:5px}
+
+/* S7 counter */
+.paths{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:640px){.paths{grid-template-columns:1fr}}
+.path{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:14px}
+.path h4{font-family:var(--disp);font-size:13px;letter-spacing:.08em;margin-bottom:10px}
+.micro{list-style:none;margin:0 0 12px}
+.micro li{
+  font-size:12.5px;color:var(--muted);padding:5px 10px;border-radius:5px;
+  border:1px solid transparent;margin-bottom:4px;
+}
+.micro li.lit{border-color:var(--t1);color:var(--ink)}
+.bignum{font-family:var(--disp);font-size:26px}
+
+/* S8 decision */
+.scen{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:16px;margin-bottom:14px}
+.scen p{font-size:13.5px;margin-bottom:10px}
+.tools{display:flex;flex-wrap:wrap;gap:6px}
+.tool{
+  font-family:var(--mono);font-size:12px;color:var(--muted);
+  background:var(--panel);border:1px solid var(--line);border-radius:5px;
+  padding:5px 10px;cursor:pointer;transition:all .12s;
+}
+.tool:hover{border-color:var(--muted);color:var(--ink)}
+.tool.hit{border-color:var(--ok);color:var(--ok)}
+.tool.mid{border-color:var(--t1);color:var(--t1)}
+.tool.miss{border-color:var(--lock);color:var(--lock)}
+.verdict{font-size:12.5px;margin-top:10px;color:var(--muted);min-height:18px}
+.verdict b{font-weight:600}
+.verdict .vgood{color:var(--ok)}
+.verdict .vmid{color:var(--t1)}
+.verdict .vbad{color:var(--lock)}
+
+footer{margin-top:90px;border-top:1px solid var(--line);padding-top:18px;
+  font-size:12px;color:var(--muted)}
+:focus-visible{outline:2px solid var(--t0);outline-offset:2px}
+@media (prefers-reduced-motion: reduce){
+  *{transition:none!important;animation:none!important;scroll-behavior:auto}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">systems programming · threads · shared state</div>
+  <h1>Sharing to Write<br><span class="dim">Arc, Mutex, and the cost of a door</span></h1>
+  <p class="lede">Threads that only read can share almost for free. Threads that <b>write</b> need an arrangement, and every arrangement has a price. This guide is about choosing the cheapest arrangement that is still correct, and recognizing the many cases where the answer is <b>no lock at all</b>.</p>
+  <nav class="toc">
+    <a href="#s1">1 shared by default</a>
+    <a href="#s2">2 the wall</a>
+    <a href="#s3">3 mutex anatomy</a>
+    <a href="#s4">4 holding the door</a>
+    <a href="#s5">5 two philosophies</a>
+    <a href="#s6">6 dividing work</a>
+    <a href="#s7">7 the counter shortcut</a>
+    <a href="#s8">8 decision landscape</a>
+  </nav>
+</header>
+
+<!-- ============ 1 ============ -->
+<section id="s1">
+  <div class="secnum">section 1</div>
+  <h2>Memory is shared by default</h2>
+  <p>Start below the language. The operating system builds one wall, and it builds it between <em>processes</em>: each process gets its own address space, its own page tables, its own view of memory. One process cannot reach another's bytes without asking the kernel.</p>
+  <p>Threads live on the other side of that design. All threads of a process share <em>one</em> address space. Every thread can already reach every byte the process owns: the same heap, the same globals, the same everything. The hardware raises no objection when two threads write the same address in the same nanosecond.</p>
+
+  <div class="widget">
+    <div class="wtitle">address spaces: the wall the OS builds, and where it does not</div>
+    <svg class="diagram" viewBox="0 0 840 250" role="img" aria-label="Two processes with separate memory versus one process with four threads sharing one memory">
+      <!-- left: two processes -->
+      <text x="105" y="22" class="svglabel big" text-anchor="middle">two processes</text>
+      <rect x="20" y="40" width="170" height="80" rx="8" fill="none" stroke="#1f2836"/>
+      <text x="105" y="66" class="svglabel" text-anchor="middle">process A</text>
+      <rect x="45" y="78" width="120" height="30" rx="5" fill="#121824" stroke="#45d0c2"/>
+      <text x="105" y="97" class="svglabel" text-anchor="middle">memory A</text>
+      <rect x="20" y="140" width="170" height="80" rx="8" fill="none" stroke="#1f2836"/>
+      <text x="105" y="166" class="svglabel" text-anchor="middle">process B</text>
+      <rect x="45" y="178" width="120" height="30" rx="5" fill="#121824" stroke="#f0b34e"/>
+      <text x="105" y="197" class="svglabel" text-anchor="middle">memory B</text>
+      <line x1="20" y1="130" x2="190" y2="130" stroke="#ff5d5d" stroke-width="2" stroke-dasharray="6 4"/>
+      <text x="105" y="243" class="svglabel" text-anchor="middle" fill="#ff5d5d">wall: separate page tables</text>
+
+      <!-- divider -->
+      <line x1="290" y1="30" x2="290" y2="230" stroke="#1f2836"/>
+
+      <!-- right: one process four threads -->
+      <text x="590" y="22" class="svglabel big" text-anchor="middle">one process, four threads</text>
+      <rect x="360" y="40" width="460" height="180" rx="10" fill="none" stroke="#1f2836"/>
+      <rect x="470" y="150" width="240" height="46" rx="6" fill="#121824" stroke="#8a96a8"/>
+      <text x="590" y="178" class="svglabel big" text-anchor="middle">one shared memory</text>
+      <g font-family="JetBrains Mono" font-size="11">
+        <rect x="392" y="62" width="64" height="26" rx="5" fill="#0e131d" stroke="#45d0c2"/>
+        <text x="424" y="79" text-anchor="middle" fill="#45d0c2">t0</text>
+        <rect x="502" y="62" width="64" height="26" rx="5" fill="#0e131d" stroke="#f0b34e"/>
+        <text x="534" y="79" text-anchor="middle" fill="#f0b34e">t1</text>
+        <rect x="612" y="62" width="64" height="26" rx="5" fill="#0e131d" stroke="#b48ef2"/>
+        <text x="644" y="79" text-anchor="middle" fill="#b48ef2">t2</text>
+        <rect x="722" y="62" width="64" height="26" rx="5" fill="#0e131d" stroke="#ef7a93"/>
+        <text x="754" y="79" text-anchor="middle" fill="#ef7a93">t3</text>
+      </g>
+      <g stroke-width="1.5" fill="none">
+        <path d="M424 90 C 424 120, 520 125, 545 148" stroke="#45d0c2"/>
+        <path d="M534 90 C 534 118, 565 125, 575 148" stroke="#f0b34e"/>
+        <path d="M644 90 C 644 118, 615 125, 605 148" stroke="#b48ef2"/>
+        <path d="M754 90 C 754 120, 660 125, 635 148" stroke="#ef7a93"/>
+      </g>
+      <text x="590" y="243" class="svglabel" text-anchor="middle">no wall: every thread reaches every byte</text>
+    </svg>
+  </div>
+
+  <p>So "can threads share data" is never the question. The machine says yes before anyone asks. The real question is what <em>discipline</em> governs the sharing, because unrestricted simultaneous access to the same bytes produces answers that depend on nanosecond timing.</p>
+  <p>Rust's contribution is not sharing. Sharing is the default condition of the hardware. Rust's contribution is <b>refusal</b>: a set of compile-time rules that reject programs whose correctness would depend on timing. Everything in this guide is one of the machine's permissive defaults meeting one of those refusals, and the escape hatch the standard library provides.</p>
+</section>
+
+<!-- ============ 2 ============ -->
+<section id="s2">
+  <div class="secnum">section 2</div>
+  <h2>Reading is free, writing is the wall</h2>
+  <p>Rust compresses all of its sharing discipline into one rule, and the rule is worth memorizing in exactly this form:</p>
+  <p style="font-family:var(--disp);font-size:18px;color:var(--ink)">any number of readers, <span style="color:var(--muted)">or</span> exactly one writer. <span style="color:var(--lock)">never both.</span></p>
+  <p>The rule is sometimes written <em>aliasing XOR mutation</em>: many names for the same data, or the power to change it, never both at once. It is enforced on references at compile time, before the program exists.</p>
+
+  <div class="widget">
+    <div class="wtitle">the rule, as a machine: set each thread's intent</div>
+    <div class="rwgrid" id="rwgrid"></div>
+    <div class="readout" id="rwverdict"></div>
+    <p class="hint">Click a cell to cycle idle → read → write. The verdict follows the one rule above.</p>
+  </div>
+
+  <p>Where does <code>Arc</code> sit in this? <code>Arc&lt;T&gt;</code> manufactures aliasing on purpose: many owners, on many threads, of one value. Because aliasing is its whole job, <code>Arc</code> will hand out <code>&amp;T</code> freely and <code>&amp;mut T</code> essentially never. Ten threads holding an <code>Arc&lt;Vec&lt;i32&gt;&gt;</code> can all read the vector at once. None of them can push to it. The compiler is not being cautious; it is applying the rule literally. Ten aliases exist, so mutation is off the table.</p>
+
+  <pre><span class="cm">// ten threads may hold this at once, and all may read.</span>
+<span class="kw">let</span> readings: Arc&lt;Vec&lt;i32&gt;&gt; = Arc::new(load());
+
+<span class="hl"><span class="cm">// but this line does not compile from inside a thread:</span></span>
+<span class="hl">readings.push(<span class="st">42</span>);   <span class="cm">// error: cannot borrow as mutable</span></span></pre>
+
+  <p>This is not a limitation to route around. It is half of the design. The read-only case is the <em>good</em> case, and the machine agrees:</p>
+
+  <div class="note verified"><span class="tag">standard architecture fact</span>
+  Under the cache-coherence protocols in mainstream CPUs, a cache line being read by many cores can sit in every core's cache simultaneously, in a shared state. The moment one core writes that line, every other core's copy is invalidated and must be re-fetched. Read-only data parallelizes at the hardware level; written data is dragged from core to core.</div>
+
+  <p>So when the work genuinely needs no writes to shared state, <code>Arc</code> alone finishes the story. The rest of this guide exists for the other case: the threads have something to <em>say</em>, a total to add, a table to update, a result to record. For that, the rule must be enforced at runtime instead of compile time, one thread at a time. That runtime enforcer is the mutex.</p>
+</section>
+
+<!-- ============ 3 ============ -->
+<section id="s3">
+  <div class="secnum">section 3</div>
+  <h2>Mutex anatomy: what a lock physically is</h2>
+  <p>Strip the abstraction. A mutex is a word of memory, one machine word holding a state like <em>unlocked</em> or <em>locked</em>, placed next to the data it protects. Locking is an atomic compare-exchange on that word: "if you are unlocked, become locked, and tell me whether I won." One indivisible hardware operation.</p>
+  <p>The price depends entirely on whether anyone else is at the door.</p>
+  <ul>
+    <li><b>Uncontended:</b> the compare-exchange succeeds on the first try. No kernel, no waiting. Cost on the order of nanoseconds, comparable to a handful of arithmetic instructions.</li>
+    <li><b>Contended:</b> the word says locked. The thread typically spins briefly, then asks the OS to put it to sleep until the holder releases (on Linux this is the futex mechanism). Sleeping and waking a thread costs on the order of microseconds, thousands of times the uncontended path. And the cache line holding the lock word starts ping-ponging between cores, each transfer costing far more than the arithmetic it guards.</li>
+  </ul>
+
+  <div class="note verified"><span class="tag">verified in rust</span>
+  In Rust the mutex owns its data: <code>Mutex&lt;T&gt;</code> wraps the value inside itself, and <code>lock()</code> returns a guard, the only path to the data. There is no way to reach <code>T</code> while forgetting to lock, because the door is the only entrance. This differs from C and C++, where a mutex and the data it protects are related only by programmer discipline. The <code>.unwrap()</code> after <code>lock()</code> handles poisoning: if a thread panics while holding the lock, the mutex is marked poisoned so other threads learn the protected data may be half-updated.</div>
+
+  <pre><span class="kw">let</span> tally = Arc::new(Mutex::new(<span class="st">0</span>));
+<span class="cm">// ... inside a thread:</span>
+<span class="kw">let mut</span> guard = tally.<span class="fn">lock</span>().unwrap();  <span class="cm">// wait here if occupied</span>
+*guard += partial;                          <span class="cm">// exclusive access</span>
+<span class="cm">// guard dropped: door reopens</span></pre>
+
+  <p>The deeper cost is not the lock operation itself. It is what the lock does to the shape of the program: everything between lock and unlock runs <b>one thread at a time</b>. That region is serial code wearing a concurrent costume. And there is a hard ceiling on what serial code allows, no matter how many cores arrive to help:</p>
+
+  <div class="widget">
+    <div class="wtitle">the serial ceiling</div>
+    <div class="controls">
+      <label class="ctrl">threads
+        <input type="range" id="amN" min="1" max="16" value="4">
+        <output id="amNout">4</output>
+      </label>
+      <label class="ctrl">% of each task spent inside the lock
+        <input type="range" id="amF" min="1" max="100" value="10">
+        <output id="amFout">10%</output>
+      </label>
+    </div>
+    <svg class="chart" id="amchart" viewBox="0 0 700 300" role="img" aria-label="Speedup versus thread count with a ceiling set by the locked fraction"></svg>
+    <div class="readout" id="amread"></div>
+    <p class="hint">The dashed line is the ceiling: with a fraction <i>f</i> of the work serialized behind the lock, speedup can never exceed 1 / <i>f</i>, no matter the core count.</p>
+  </div>
+
+  <div class="note model"><span class="tag">illustrative model</span>
+  The curve plots the classic serial-fraction formula (speedup = 1 / (f + (1 − f) / N)), not a live measurement. Real programs bend further below it: cache-line transfers, wake-up latency, and memory bandwidth all push down. Treat the ceiling as optimistic, which makes the argument stronger, not weaker.</div>
+
+  <p>Read the widget backwards and it becomes design advice. The lever that matters is not the thread slider. It is the lock slider: shrinking the fraction of work behind the door raises the ceiling for every core count at once. Which raises the practical question of the next section: what decides that fraction?</p>
+</section>
+
+<!-- ============ 4 ============ -->
+<section id="s4">
+  <div class="secnum">section 4</div>
+  <h2>Holding the door: the guard's lifetime is a dial</h2>
+  <p>In Rust nothing unlocks a mutex explicitly. The guard returned by <code>lock()</code> unlocks it when the guard is dropped, at the end of its scope, or earlier if dropped by hand:</p>
+
+  <pre><span class="kw">let mut</span> guard = shared.<span class="fn">lock</span>().unwrap();
+<span class="fn">update</span>(&amp;<span class="kw">mut</span> guard, value);
+<span class="fn">drop</span>(guard);            <span class="cm">// door reopens here, not at the closing brace</span>
+<span class="cm">// ... expensive local work continues, unlocked</span></pre>
+
+  <p>That <code>drop</code> is not ceremony. The serialized region of the program is exactly the guard's lifetime, so the placement of that one line decides how much of each iteration runs one-at-a-time. Most accidental serialization in real code is nothing more exotic than a guard held a few lines too long, usually across formatting, I/O, or allocation that never needed protection.</p>
+
+  <div class="widget">
+    <div class="wtitle">drag the release point, watch two threads breathe or suffocate</div>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:8px">Each iteration has five steps. Only step 3 touches shared state. Choose where the guard drops:</p>
+    <div class="steps" id="scopesteps"></div>
+    <div class="controls">
+      <label class="ctrl">release the lock after step
+        <input type="range" id="scopeR" min="3" max="5" value="5">
+        <output id="scopeRout">5</output>
+      </label>
+    </div>
+    <svg class="tl" id="scopetl" viewBox="0 0 760 150" role="img" aria-label="Two thread timelines showing serialization from lock scope"></svg>
+    <div class="readout" id="scoperead"></div>
+    <p class="hint">Solid red outline = holding the lock. Dashed = waiting for it. Two iterations per thread.</p>
+  </div>
+
+  <p>The discipline that falls out: lock late, release early, and let nothing live inside the critical section except the touch of shared state itself. Compute before the door. Format and print after it. The guard is a scalpel, not a blanket.</p>
+
+  <div class="note judgment"><span class="tag">judgment</span>
+  A useful review habit: read every critical section and ask of each line, "does this line need the other threads stopped?" Any line answering no is a candidate to move out. This is craft, not a compiler rule; the borrow checker is indifferent to how long a guard lives, so scope hygiene is on the programmer.</div>
+</section>
+
+<!-- ============ 5 ============ -->
+<section id="s5">
+  <div class="secnum">section 5</div>
+  <h2>Two philosophies: shared clipboard vs private notebooks</h2>
+  <p>Now the central design fork. Suppose N threads each process a slice of the work, and each produces contributions that must combine into one final answer, a total, a maximum, a top-k table. There are exactly two shapes for where the combining happens.</p>
+  <h3>Philosophy 1: the shared clipboard</h3>
+  <p>One structure, wrapped in <code>Arc&lt;Mutex&lt;...&gt;&gt;</code>, and every thread walks to it for every contribution. The final answer is always sitting there, current as of the last unlock.</p>
+  <pre><span class="kw">let</span> best = Arc::new(Mutex::new([<span class="st">0</span>; <span class="st">3</span>]));   <span class="cm">// shared clipboard</span>
+<span class="cm">// each thread, for each group it processes:</span>
+<span class="kw">let mut</span> guard = best.<span class="fn">lock</span>().unwrap();
+<span class="fn">insert_top3</span>(&amp;<span class="kw">mut</span> guard, total);
+<span class="fn">drop</span>(guard);</pre>
+  <h3>Philosophy 2: private notebooks</h3>
+  <p>Each thread keeps its own local structure, plain stack data, no wrapper, no lock. Combining happens once, after <code>join</code>, in the parent. The thread's return value rides back through its <code>JoinHandle</code>.</p>
+  <pre><span class="kw">let</span> handle = thread::spawn(<span class="kw">move</span> || {
+    <span class="kw">let mut</span> local = [<span class="st">0</span>; <span class="st">3</span>];        <span class="cm">// private notebook</span>
+    <span class="cm">// ... insert_top3(&amp;mut local, total) for each group ...</span>
+    local                            <span class="cm">// returned through the handle</span>
+});
+<span class="cm">// parent, after all joins: merge N notebooks, N small steps, zero locks</span></pre>
+
+  <div class="widget">
+    <div class="wtitle">same work, same answer, different number of doors</div>
+    <div class="controls">
+      <button class="act" id="raceGo">run both</button>
+      <button class="act" id="raceReset">reset</button>
+    </div>
+    <div class="race">
+      <div class="racecol">
+        <h4 style="color:var(--lock)">shared clipboard</h4>
+        <div class="lanes" id="lanesA"></div>
+        <div class="centerbox" id="boxA">clipboard · lock acquisitions: <span class="odometer hot" id="odoA">0</span></div>
+      </div>
+      <div class="racecol">
+        <h4 style="color:var(--ok)">private notebooks</h4>
+        <div class="lanes" id="lanesB"></div>
+        <div class="centerbox" id="boxB">merge after join · lock acquisitions: <span class="odometer" id="odoB">0</span></div>
+      </div>
+    </div>
+    <div class="readout" id="raceread">4 threads × 12 items each. Press run.</div>
+    <p class="hint">Illustrative animation: clipboard threads queue whenever another thread is depositing; notebook threads never wait on each other.</p>
+  </div>
+
+  <p>Both philosophies produce the identical answer. The clipboard takes the lock once per <em>contribution</em>, 48 times here, thousands of times on real input. The notebooks take it zero times, and pay instead with N merge steps at the very end, four small function calls. When the combining operation can be deferred, the notebook wins so decisively that the honest summary is:</p>
+  <p style="font-family:var(--disp);font-size:17px;color:var(--ink)">the cheapest lock is the one never taken. before reaching for Arc&lt;Mutex&gt;, ask whether the sharing can be designed away.</p>
+
+  <div class="note judgment"><span class="tag">judgment</span>
+  The notebook trick requires the combine step to tolerate postponement: sums, counts, maxima, top-k tables all merge cleanly after the fact. The clipboard becomes the right call when postponement breaks the problem: when the program needs the live value mid-flight (a progress display another thread reads), when threads must react to the global state as it evolves (stop early once a target is found, feed a shared cache whose entries later work reuses), or when per-thread copies would be too large to hold N times. "Arc plus Mutex is often avoidable" and "Arc plus Mutex is sometimes exactly right" are both true; the skill is telling the cases apart, which section 8 turns into practice.</div>
+</section>
+
+<!-- ============ 6 ============ -->
+<section id="s6">
+  <div class="secnum">section 6</div>
+  <h2>Dividing the work: stripes, blocks, and silent arithmetic bugs</h2>
+  <p>Both philosophies begin the same way: the input must be split across threads. Two standard partitions exist, and both are pure index arithmetic.</p>
+  <ul>
+    <li><b>Interleaved (striding):</b> worker <code>id</code> takes items <code>id</code>, <code>id + N</code>, <code>id + 2N</code>, ... Every worker starts at its own id and steps by the worker count. No chunk-size math, no slicing, and the leftover items when the count does not divide evenly distribute themselves.</li>
+    <li><b>Blocks (chunking):</b> worker <code>id</code> takes one contiguous range. Requires ceiling division for the chunk size (<code>len.div_ceil(n)</code>), and the last chunk runs shorter.</li>
+  </ul>
+  <pre><span class="cm">// interleaved: the whole partition is two lines</span>
+<span class="kw">let mut</span> i = id;
+<span class="kw">while</span> i &lt; items.len() {
+    <span class="cm">// ... process items[i] ...</span>
+    i += num_threads;      <span class="cm">// the stride MUST equal the worker count</span>
+}</pre>
+
+  <div class="widget">
+    <div class="wtitle">24 items, colored by owner. break the arithmetic and watch what the compiler cannot see</div>
+    <div class="controls">
+      <button class="act on" id="modeInter">interleaved</button>
+      <button class="act" id="modeBlock">blocks</button>
+      <label class="ctrl" id="wctrl">workers
+        <input type="range" id="pW" min="2" max="6" value="4">
+        <output id="pWout">4</output>
+      </label>
+      <label class="ctrl" id="sctrl">stride
+        <input type="range" id="pS" min="2" max="6" value="4">
+        <output id="pSout">4</output>
+      </label>
+    </div>
+    <div class="cells" id="pcells"></div>
+    <div class="legend" id="plegend"></div>
+    <div class="readout" id="pread"></div>
+    <p class="hint">In interleaved mode the stride and the worker count are separate sliders on purpose. They should never disagree; move them apart to see why.</p>
+  </div>
+
+  <p>The failure modes deserve names, because the compiler catches neither. This is arithmetic, not aliasing, and the borrow checker is blind to it:</p>
+  <ul>
+    <li><b>Stride &gt; workers: orphans.</b> Some items are visited by nobody. The program runs cleanly, joins cleanly, and returns a confidently wrong answer.</li>
+    <li><b>Stride &lt; workers: duplicates.</b> Two workers walk the same residue class and some items are counted twice.</li>
+  </ul>
+
+  <div class="note verified"><span class="tag">worth staring at</span>
+  Whether duplicates are fatal depends on the algebra of the combine step. A <em>maximum</em> shrugs off double visits: max(x, x) = x, the operation is idempotent. A <em>sum</em> does not: counting an item twice changes the answer. Orphans are fatal to everything. So the same partition bug can be invisible in one program and catastrophic in its neighbor, which is exactly why it survives testing.</div>
+
+  <div class="note judgment"><span class="tag">judgment</span>
+  On cache behavior: contiguous blocks stream through memory in order, which prefetchers love; interleaving makes each worker hop by N elements. For an array of small elements this can matter; for this guide's shape of work, where each item is itself a heap-allocated group, both partitions chase pointers anyway and the difference is likely noise. Correct arithmetic first, locality second, and measure before believing either claim about speed.</div>
+</section>
+
+<!-- ============ 7 ============ -->
+<section id="s7">
+  <div class="secnum">section 7</div>
+  <h2>The counter shortcut: when the data is one word</h2>
+  <p>One special case is common enough to earn its own tool. When the shared state is a single machine word, a counter, a flag, an id dispenser, wrapping it in a mutex means building a door to guard one coin. The hardware offers something smaller: atomic operations, single instructions that read-modify-write one word indivisibly.</p>
+
+  <div class="widget">
+    <div class="wtitle">one increment, two prices</div>
+    <div class="paths">
+      <div class="path">
+        <h4>Mutex&lt;i64&gt;</h4>
+        <ul class="micro" id="microA">
+          <li>compare-exchange the lock word</li>
+          <li>read the value</li>
+          <li>write value + 1</li>
+          <li>store unlocked, maybe wake a sleeper</li>
+        </ul>
+        <button class="act" data-inc="A">+1</button>
+        <span class="bignum" style="margin-left:12px" id="numA">0</span>
+      </div>
+      <div class="path">
+        <h4>AtomicI64</h4>
+        <ul class="micro" id="microB">
+          <li>fetch_add: one indivisible instruction</li>
+        </ul>
+        <button class="act" data-inc="B">+1</button>
+        <span class="bignum" style="margin-left:12px" id="numB">0</span>
+      </div>
+    </div>
+    <p class="hint">Both are correct. One is a door with a protocol; the other is the coin defending itself.</p>
+  </div>
+
+  <pre><span class="kw">use</span> std::sync::atomic::{AtomicI64, Ordering};
+
+<span class="kw">let</span> count = Arc::new(AtomicI64::new(<span class="st">0</span>));
+<span class="cm">// any thread, no guard, no unwrap, cannot be held too long:</span>
+count.<span class="fn">fetch_add</span>(<span class="st">1</span>, Ordering::Relaxed);</pre>
+
+  <p>Honest scope: atomics operate on <b>one word at a time</b>. A compound structure, say a three-slot leaderboard where inserting a value shifts two others, cannot be one atomic operation, because it is three dependent writes and the hardware guarantees indivisibility for one. Between two of those writes, another thread could observe the table mid-shift. Multi-word invariants are mutex territory (or notebook territory). Techniques exist to build lock-free structures from compare-exchange loops; they are real, they are hard, and they are beyond this course.</p>
+
+  <div class="note verified"><span class="tag">closing the loop</span>
+  The <em>A</em> in Arc stands for atomic, and it is exactly this machinery. Arc's reference count is an atomic integer: <code>clone</code> is a fetch_add, dropping is a fetch_sub, and the thread whose decrement reaches zero frees the value. The tool this course has been leaning on since threads began is built from the primitive on this page.</div>
+</section>
+
+<!-- ============ 8 ============ -->
+<section id="s8">
+  <div class="secnum">section 8</div>
+  <h2>The decision landscape</h2>
+  <p>The full menu, cheapest discipline first. Every row is correct <em>somewhere</em>; cost rises going down, so the craft is stopping at the first row that fits.</p>
+  <ul>
+    <li><b>Move it</b>: one thread needs it, ownership transfers, nothing is shared.</li>
+    <li><b>Scoped borrow</b> (<code>thread::scope</code>): threads provably end before the owner; plain <code>&amp;</code> references work.</li>
+    <li><b>Clone it</b>: the data is small; independent copies are cheaper than any coordination.</li>
+    <li><b>Channel</b>: values flow one way between threads; transfer, not sharing.</li>
+    <li><b>Arc</b>: many long-lived threads read one large value; nobody writes.</li>
+    <li><b>Arc&lt;Atomic&gt;</b>: shared writes, but the state is one word.</li>
+    <li><b>Arc&lt;Mutex&gt;</b>: shared writes to compound state that genuinely cannot wait for a merge.</li>
+  </ul>
+
+  <div class="widget">
+    <div class="wtitle">five situations. pick the cheapest arrangement that is still correct</div>
+    <div id="scenarios"></div>
+    <div class="readout" id="scenscore">fits found: 0 / 5</div>
+    <p class="hint">Every button gives a verdict: good fit, works but heavier than needed, or wrong with the reason. Wrong answers here are cheaper than wrong answers in production.</p>
+  </div>
+
+  <p>A last calibration. Nothing on this page makes a program faster by itself; threads are a bet that coordination costs less than the work saved, and the bet must be checked with a stopwatch on real input, in release mode. What this page gives is the other half: the discipline that keeps the fast program <em>correct</em>, and the eye for the many designs where the discipline costs nothing because the sharing was never necessary.</p>
+</section>
+
+<footer>
+  single-file interactive guide · shared-state concurrency · animations are illustrative models, marked where they simplify
+</footer>
+
+</div>
+<script>
+(function(){
+"use strict";
+const TC = ['var(--t0)','var(--t1)','var(--t2)','var(--t3)'];
+const TCraw = ['#45d0c2','#f0b34e','#b48ef2','#ef7a93'];
+const $ = id => document.getElementById(id);
+
+/* ---------- S2: reader/writer grid ---------- */
+(function(){
+  const states = [1,1,0,0]; // 0 idle 1 read 2 write
+  const names = ['thread t0','thread t1','thread t2','thread t3'];
+  const grid = $('rwgrid');
+  const cells = [];
+  names.forEach((n,i)=>{
+    const label = document.createElement('div');
+    label.className = 'rwname'; label.textContent = n;
+    label.style.color = TCraw[i];
+    const b = document.createElement('button');
+    b.className = 'rwbtn'; b.type = 'button';
+    b.addEventListener('click', ()=>{ states[i] = (states[i]+1)%3; render(); });
+    grid.appendChild(label); grid.appendChild(b);
+    cells.push(b);
+  });
+  function render(){
+    states.forEach((s,i)=>{
+      const b = cells[i];
+      b.classList.toggle('read', s===1);
+      b.classList.toggle('write', s===2);
+      b.textContent = s===0 ? 'idle' : s===1 ? 'reading  &T' : 'writing  &mut T';
+    });
+    const readers = states.filter(s=>s===1).length;
+    const writers = states.filter(s=>s===2).length;
+    const v = $('rwverdict');
+    v.classList.remove('bad','good');
+    if (writers===0){
+      v.classList.add('good');
+      v.innerHTML = readers===0
+        ? 'nothing borrowed. trivially fine.'
+        : '<b>compiles.</b> ' + readers + ' reader' + (readers>1?'s':'') + ', zero writers. aliasing without mutation is always admitted.';
+    } else if (writers===1 && readers===0){
+      v.classList.add('good');
+      v.innerHTML = '<b>compiles.</b> exactly one writer, zero readers. mutation without aliasing is always admitted.';
+    } else if (writers>1){
+      v.classList.add('bad');
+      v.innerHTML = '<b>refused.</b> two writers means two &mut to the same data: error[E0499], cannot borrow as mutable more than once. the final bytes would depend on timing.';
+    } else {
+      v.classList.add('bad');
+      v.innerHTML = '<b>refused.</b> a writer while readers exist: error[E0502]. a reader could observe the value mid-change.';
+    }
+  }
+  render();
+})();
+
+/* ---------- S3: serial ceiling chart ---------- */
+(function(){
+  const svg = $('amchart');
+  const NS = 'http://www.w3.org/2000/svg';
+  const L=54, R=16, T=16, B=40, W=700, H=300;
+  const plotW = W-L-R, plotH = H-T-B;
+  const NMAX = 16, SMAX = 16;
+  const x = n => L + (n-1)/(NMAX-1)*plotW;
+  const y = s => T + (1 - (s-0)/SMAX)*plotH;
+  function el(tag, attrs){ const e=document.createElementNS(NS,tag); for(const k in attrs) e.setAttribute(k,attrs[k]); return e; }
+  function draw(){
+    const N = +$('amN').value, f = +$('amF').value/100;
+    $('amNout').textContent = N;
+    $('amFout').textContent = Math.round(f*100)+'%';
+    svg.innerHTML = '';
+    // axes
+    svg.appendChild(el('line',{x1:L,y1:T,x2:L,y2:H-B,class:'axis'}));
+    svg.appendChild(el('line',{x1:L,y1:H-B,x2:W-R,y2:H-B,class:'axis'}));
+    for (let s=0;s<=SMAX;s+=4){
+      svg.appendChild(el('line',{x1:L-4,y1:y(s),x2:L,y2:y(s),class:'axis'}));
+      const t = el('text',{x:L-9,y:y(s)+4,'text-anchor':'end',class:'svglabel'}); t.textContent='×'+s; svg.appendChild(t);
+      if (s>0) svg.appendChild(el('line',{x1:L,y1:y(s),x2:W-R,y2:y(s),class:'axis','stroke-opacity':.35}));
+    }
+    for (let n=1;n<=NMAX;n+= (n===1?3:4)){
+      const t = el('text',{x:x(n),y:H-B+18,'text-anchor':'middle',class:'svglabel'}); t.textContent=n; svg.appendChild(t);
+    }
+    const xl = el('text',{x:L+plotW/2,y:H-6,'text-anchor':'middle',class:'svglabel'}); xl.textContent='threads'; svg.appendChild(xl);
+    // ceiling
+    const ceil = 1/f;
+    if (ceil <= SMAX){
+      svg.appendChild(el('line',{x1:L,y1:y(ceil),x2:W-R,y2:y(ceil),class:'ceiling'}));
+      const ct = el('text',{x:W-R-4,y:y(ceil)-6,'text-anchor':'end',class:'svglabel'}); 
+      ct.setAttribute('fill','#ff5d5d'); ct.textContent='ceiling ×'+ceil.toFixed(1); svg.appendChild(ct);
+    }
+    // curve
+    let d='';
+    for (let n=1;n<=NMAX;n+=0.25){
+      const s = 1/(f + (1-f)/n);
+      d += (d?' L':'M') + x(n).toFixed(1) + ' ' + y(Math.min(s,SMAX)).toFixed(1);
+    }
+    svg.appendChild(el('path',{d,class:'curve'}));
+    // marker
+    const sN = 1/(f + (1-f)/N);
+    svg.appendChild(el('circle',{cx:x(N),cy:y(Math.min(sN,SMAX)),r:5,class:'marker'}));
+    const eff = sN/N*100;
+    $('amread').innerHTML = 'at <b>'+N+'</b> thread'+(N>1?'s':'')+' with <b>'+Math.round(f*100)+'%</b> locked: speedup <b>×'+sN.toFixed(2)+'</b>, so each core delivers <b>'+eff.toFixed(0)+'%</b> of itself. ceiling regardless of cores: <b>×'+(1/f).toFixed(1)+'</b>.';
+  }
+  $('amN').addEventListener('input',draw);
+  $('amF').addEventListener('input',draw);
+  draw();
+})();
+
+/* ---------- S4: lock scope timeline ---------- */
+(function(){
+  const stepNames = ['1 parse line','2 compute total','3 update shared','4 format summary','5 write log'];
+  const stepDur   = [2,3,1,2,3];
+  const chipsBox = $('scopesteps');
+  const chips = stepNames.map((n,i)=>{
+    const c = document.createElement('span'); c.className='stepchip'; c.textContent=n;
+    chipsBox.appendChild(c); return c;
+  });
+  const svg = $('scopetl');
+  const NS='http://www.w3.org/2000/svg';
+  function el(tag,attrs){const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);return e;}
+  function simulate(release){
+    // two threads, two iterations each; lock acquired at start of step 3 (index 2),
+    // released after step index release-1. returns per-thread list of segments.
+    const ITER = 2;
+    const th = [ {t:0, iter:0, step:0, segs:[], waitFrom:null},
+                 {t:1, iter:0, step:0, segs:[], waitFrom:null} ]; // t1 staggered by 1
+    let lockHolder = -1, lockFreeAt = 0;
+    // event loop in half-units
+    // simpler: schedule greedily thread by thread with a shared lock timeline
+    const segs=[[],[]];
+    const ready=[0,1]; // next free time per thread (t1 starts at 1)
+    let lockBusyUntil = 0; let lockQueue = [];
+    // process in time order: simulate step-by-step per thread using a simple loop
+    const state = [ {time:0, iter:0}, {time:1, iter:0} ];
+    // lock intervals list to check conflicts
+    const lockIv = [];
+    function acquire(tid, want){
+      // find earliest start >= want not overlapping existing lock intervals, given duration
+      const durLock = stepDur.slice(2, release).reduce((a,b)=>a+b,0);
+      let start = want;
+      let placed = false;
+      while(!placed){
+        placed = true;
+        for (const iv of lockIv){
+          if (start < iv[1] && start + durLock > iv[0]){ start = iv[1]; placed=false; }
+        }
+      }
+      lockIv.push([start, start+durLock]);
+      return [start, durLock];
+    }
+    // deterministic order: process events by current time, alternating
+    // run each thread's iterations, but lock acquisition serialized via lockIv
+    // to keep ordering fair, advance the thread with the smaller current time first
+    const done=[false,false];
+    while(!done[0] || !done[1]){
+      const tid = (done[1] || (!done[0] && state[0].time <= state[1].time)) ? 0 : 1;
+      const st = state[tid];
+      let t = st.time;
+      // steps before lock
+      for (let s=0;s<2;s++){ segs[tid].push({s, a:t, b:t+stepDur[s], lock:false}); t+=stepDur[s]; }
+      // locked steps 2..release-1
+      const [ls, ld] = acquire(tid, t);
+      if (ls > t) segs[tid].push({s:-1, a:t, b:ls, lock:false, wait:true});
+      let lt = ls;
+      for (let s=2;s<release;s++){ segs[tid].push({s, a:lt, b:lt+stepDur[s], lock:true}); lt+=stepDur[s]; }
+      t = lt;
+      // remaining steps unlocked
+      for (let s=release;s<5;s++){ segs[tid].push({s, a:t, b:t+stepDur[s], lock:false}); t+=stepDur[s]; }
+      st.iter++; st.time = t;
+      if (st.iter>=ITER) done[tid]=true;
+    }
+    const wall = Math.max(state[0].time, state[1].time);
+    return {segs, wall};
+  }
+  function draw(){
+    const release = +$('scopeR').value; // release after step 'release' (1-indexed), lock covers steps 3..release
+    $('scopeRout').textContent = release;
+    chips.forEach((c,i)=>c.classList.toggle('locked', i>=2 && i<release));
+    const {segs, wall} = simulate(release);
+    const best = simulate(3).wall;
+    svg.innerHTML='';
+    const L=46,R=14,T=18,rowH=34,gap=22,W=760;
+    const px = t => L + t/wall*(W-L-R);
+    [0,1].forEach(tid=>{
+      const yy = T + tid*(rowH+gap);
+      const lbl = el('text',{x:8,y:yy+rowH/2+4,class:'svglabel'});
+      lbl.setAttribute('fill',TCraw[tid]); lbl.textContent='t'+tid; svg.appendChild(lbl);
+      segs[tid].forEach(g=>{
+        if (g.wait){
+          svg.appendChild(el('rect',{x:px(g.a),y:yy+6,width:Math.max(px(g.b)-px(g.a),1),height:rowH-12,class:'seg waitseg'}));
+          return;
+        }
+        const r = el('rect',{x:px(g.a),y:yy,width:Math.max(px(g.b)-px(g.a)-1.5,1),height:rowH,class:'seg'+(g.lock?' lockseg':''),fill:TCraw[tid],'fill-opacity':g.lock?0.85:0.35});
+        svg.appendChild(r);
+      });
+    });
+    // time axis
+    svg.appendChild(el('line',{x1:L,y1:T+2*rowH+gap+12,x2:W-R,y2:T+2*rowH+gap+12,class:'axis'}));
+    const tl = el('text',{x:W-R,y:T+2*rowH+gap+28,'text-anchor':'end',class:'svglabel'});
+    tl.textContent='wall time: '+wall+' units'; svg.appendChild(tl);
+    const over = ((wall-best)/best*100);
+    const rd = $('scoperead');
+    rd.classList.remove('bad','good');
+    rd.classList.add(release===3?'good':'bad');
+    rd.innerHTML = release===3
+      ? '<b>lock covers only step 3.</b> wall time '+wall+' units, the minimum this schedule allows. the threads overlap everywhere except the one step that truly needs exclusivity.'
+      : 'lock held through step '+release+': wall time <b>'+wall+'</b> units vs <b>'+best+'</b> at the tight scope, <b>'+over.toFixed(0)+'% slower</b>, and the extra steps under the lock ('+stepNames.slice(3,release).map(s=>s.slice(2)).join(', ')+') never touched shared state.';
+  }
+  $('scopeR').addEventListener('input',draw);
+  draw();
+})();
+
+/* ---------- S5: clipboard vs notebooks race ---------- */
+(function(){
+  const N=4, ITEMS=12;
+  const lanesA=$('lanesA'), lanesB=$('lanesB');
+  const fillsA=[],fillsB=[];
+  [lanesA,lanesB].forEach((box,side)=>{
+    for(let i=0;i<N;i++){
+      const lane=document.createElement('div');lane.className='lane';
+      const tag=document.createElement('span');tag.className='lanetag';tag.textContent='t'+i;tag.style.color=TCraw[i];
+      const bar=document.createElement('div');bar.className='lanebar';
+      const fill=document.createElement('div');fill.className='lanefill';fill.style.background=TCraw[i];
+      bar.appendChild(fill);lane.appendChild(tag);lane.appendChild(bar);box.appendChild(lane);
+      (side===0?fillsA:fillsB).push(fill);
+    }
+  });
+  let timer=null;
+  function reset(){
+    if(timer){clearInterval(timer);timer=null;}
+    fillsA.forEach(f=>f.style.width='0%');fillsB.forEach(f=>f.style.width='0%');
+    $('odoA').textContent='0';$('odoB').textContent='0';
+    $('boxA').classList.remove('busy');
+    $('raceread').textContent='4 threads × 12 items each. Press run.';
+    $('raceGo').disabled=false;
+  }
+  $('raceReset').addEventListener('click',reset);
+  $('raceGo').addEventListener('click',()=>{
+    reset();
+    $('raceGo').disabled=true;
+    // model: each item = 1 compute tick. clipboard: deposit needs the lock,
+    // one deposit per tick globally, others queue (compute of next item can't
+    // start until deposit done in this simple model => serialization visible).
+    // notebooks: all 4 progress every tick; then 4 merge ticks.
+    const a={done:[0,0,0,0],locks:0,turn:0,phase:'compute',computed:[false,false,false,false]};
+    const b={done:[0,0,0,0],locks:0,merged:0,finished:false};
+    let tick=0, wallA=null, wallB=null;
+    timer=setInterval(()=>{
+      tick++;
+      // --- clipboard side: per tick, every thread either computes or waits to deposit.
+      if(wallA===null){
+        // threads with computed item wait for the single deposit slot (round robin)
+        // computing is fast and parallel: every thread readies its next item
+        for(let i=0;i<N;i++){
+          if(a.done[i]<ITEMS && !a.computed[i]) a.computed[i]=true;
+        }
+        // exactly one deposit per tick
+        let dep=-1;
+        for(let k=0;k<N;k++){const i=(a.turn+k)%N; if(a.computed[i]&&a.done[i]<ITEMS){dep=i;break;}}
+        if(dep>=0){
+          a.computed[dep]=false;a.done[dep]++;a.locks++;a.turn=dep+1;
+          $('boxA').classList.add('busy');
+        } else $('boxA').classList.remove('busy');
+        fillsA.forEach((f,i)=>f.style.width=(a.done[i]/ITEMS*100)+'%');
+        $('odoA').textContent=a.locks;
+        if(a.done.every(d=>d>=ITEMS)){wallA=tick;$('boxA').classList.remove('busy');}
+      }
+      // --- notebook side: everyone computes+records locally each tick
+      if(wallB===null){
+        if(!b.finished){
+          let all=true;
+          for(let i=0;i<N;i++){ if(b.done[i]<ITEMS){b.done[i]++;} if(b.done[i]<ITEMS)all=false; }
+          fillsB.forEach((f,i)=>f.style.width=(b.done[i]/ITEMS*100)+'%');
+          if(all)b.finished=true;
+        } else {
+          b.merged++;$('odoB').textContent=b.merged; // merges shown on odometer as the only coordinated steps
+          if(b.merged>=N){wallB=tick;}
+        }
+      }
+      if(wallA!==null&&wallB!==null){
+        clearInterval(timer);timer=null;$('raceGo').disabled=false;
+        $('raceread').innerHTML='same 48 items, same final answer. clipboard: <b>'+a.locks+' lock acquisitions</b>, finished at tick <b>'+wallA+'</b>. notebooks: <b>0 locks during the work</b>, '+N+' merge steps after join, finished at tick <b>'+wallB+'</b>.';
+      }
+    },110);
+  });
+  reset();
+})();
+
+/* ---------- S6: partition grid ---------- */
+(function(){
+  const ITEMS=24;
+  let mode='inter';
+  const cellsBox=$('pcells');
+  const cells=[];
+  for(let i=0;i<ITEMS;i++){const c=document.createElement('div');c.className='cell';c.textContent=i;cellsBox.appendChild(c);cells.push(c);}
+  function render(){
+    const W=+$('pW').value, S=+$('pS').value;
+    $('pWout').textContent=W;$('pSout').textContent=S;
+    $('sctrl').style.display = mode==='inter'?'':'none';
+    $('modeInter').classList.toggle('on',mode==='inter');
+    $('modeBlock').classList.toggle('on',mode==='block');
+    const owners = Array.from({length:ITEMS},()=>[]);
+    if(mode==='inter'){
+      for(let id=0;id<W;id++) for(let i=id;i<ITEMS;i+=S) owners[i].push(id);
+    } else {
+      const chunk=Math.ceil(ITEMS/W);
+      for(let id=0;id<W;id++) for(let i=id*chunk;i<Math.min((id+1)*chunk,ITEMS);i++) owners[i].push(id);
+    }
+    let orphans=0,dups=0;
+    cells.forEach((c,i)=>{
+      const o=owners[i];
+      c.classList.remove('orphan','dup');
+      if(o.length===0){c.classList.add('orphan');c.style.background='';c.style.borderColor='';orphans++;}
+      else{
+        c.style.background=TCraw[o[0]%4];
+        if(o.length>1){c.classList.add('dup');dups++;}
+      }
+    });
+    const lg=$('plegend');lg.innerHTML='';
+    for(let id=0;id<W;id++){const s=document.createElement('span');s.innerHTML='<span class="sw" style="background:'+TCraw[id%4]+'"></span>worker '+id;lg.appendChild(s);}
+    if(orphans){const s=document.createElement('span');s.innerHTML='<span class="sw" style="border:1px dashed var(--muted)"></span>never visited';lg.appendChild(s);}
+    if(dups){const s=document.createElement('span');s.innerHTML='<span class="sw" style="background:repeating-linear-gradient(45deg,transparent 0 3px,rgba(255,93,93,.7) 3px 6px)"></span>visited twice';lg.appendChild(s);}
+    const rd=$('pread');rd.classList.remove('bad','good');
+    if(mode==='block'){
+      rd.classList.add('good');
+      rd.innerHTML='blocks: chunk size = ceil(24 / '+W+') = <b>'+Math.ceil(ITEMS/W)+'</b>. every item owned exactly once; the last worker'+(ITEMS%W? ' runs short':' runs full')+'.';
+    } else if(orphans===0&&dups===0){
+      rd.classList.add('good');
+      rd.innerHTML='stride '+S+' = workers '+W+': every item owned <b>exactly once</b>. correct.';
+    } else if(orphans>0){
+      rd.classList.add('bad');
+      rd.innerHTML='<b>stride '+S+' &gt; workers '+W+':</b> '+orphans+' items never visited. no crash, no error, a clean exit with a wrong answer. sum, max, everything: wrong.';
+    } else {
+      rd.classList.add('bad');
+      rd.innerHTML='<b>stride '+S+' &lt; workers '+W+':</b> '+dups+' items visited twice. a <i>max</i> survives this (idempotent). a <i>sum</i> silently doubles those items.';
+    }
+  }
+  $('modeInter').addEventListener('click',()=>{mode='inter';render();});
+  $('modeBlock').addEventListener('click',()=>{mode='block';render();});
+  $('pW').addEventListener('input',render);
+  $('pS').addEventListener('input',render);
+  render();
+})();
+
+/* ---------- S7: counter micro-steps ---------- */
+(function(){
+  let na=0,nb=0,busyA=false;
+  const liA=[...$('microA').children], liB=[...$('microB').children];
+  document.querySelectorAll('[data-inc]').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      if(btn.dataset.inc==='A'){
+        if(busyA)return;busyA=true;
+        let k=0;
+        const step=()=>{
+          liA.forEach(l=>l.classList.remove('lit'));
+          if(k<liA.length){liA[k].classList.add('lit');k++;setTimeout(step,260);}
+          else{na++;$('numA').textContent=na;busyA=false;}
+        };step();
+      } else {
+        liB[0].classList.add('lit');
+        setTimeout(()=>{liB[0].classList.remove('lit');nb++;$('numB').textContent=nb;},260);
+      }
+    });
+  });
+})();
+
+/* ---------- S8: decision scenarios ---------- */
+(function(){
+  const TOOLS=['move it','scoped borrow','clone it','channel','Arc','Arc<Atomic>','Arc<Mutex>'];
+  // verdict: 2 good, 1 works-but-heavier, 0 wrong ; each with reason
+  const SC=[
+    {text:'A 200 MB read-only lookup table. Worker threads are created by a function that returns their JoinHandles to the caller, so the threads outlive the function that spawned them. Every thread only reads.',
+     v:{'move it':[0,'one value cannot move into many threads.'],
+        'scoped borrow':[0,'scope requires the threads to end inside the function; these handles escape it.'],
+        'clone it':[1,'correct, but N × 200 MB of memory and copy time for identical bytes.'],
+        'channel':[0,'nothing flows; every thread needs the whole table the whole time.'],
+        'Arc':[2,'one copy, shared headcount, read-only access, freed by whichever thread finishes last.'],
+        'Arc<Atomic>':[0,'atomics hold one word, not a 200 MB table.'],
+        'Arc<Mutex>':[1,'works, but nobody writes: the lock serializes readers who never needed serializing.']}},
+    {text:'Each thread computes a partial total over its share of the input. The program needs one grand total, and only after all threads finish.',
+     v:{'move it':[2,'split the input, move each piece in, return each partial through its JoinHandle, add them after join. zero shared state.'],
+        'scoped borrow':[2,'scoped threads borrow their slices and return partials; the merge happens after the scope. equally clean.'],
+        'clone it':[1,'correct but pays a copy of the input for no benefit over moving slices.'],
+        'channel':[1,'workers can send partials to the parent; fine, slightly more machinery than returning through the handle.'],
+        'Arc':[0,'Arc alone is read-only; the total needs writes somewhere.'],
+        'Arc<Atomic>':[1,'a shared atomic total works, and for one integer it is cheap; still coordination the merge-after-join version does without.'],
+        'Arc<Mutex>':[1,'works, but every partial queues at a door, and the answer was only needed once, at the end. private notebooks beat the clipboard here.']}},
+    {text:'All worker threads should stop as soon as any one of them finds a valid result. Each checks a stop signal at the top of its loop.',
+     v:{'move it':[0,'a moved flag belongs to one thread; the others cannot see it change.'],
+        'scoped borrow':[0,'a plain &bool borrow gives no safe way to write the flag while others read it.'],
+        'clone it':[0,'each thread would watch its own private copy, which never changes.'],
+        'channel':[1,'possible with try_recv polling, but a broadcast-to-everyone shape fights the one-receiver design of mpsc.'],
+        'Arc':[0,'read-only sharing cannot raise the signal.'],
+        'Arc<Atomic>':[2,'Arc<AtomicBool>: writers store true once, everyone loads it each iteration, no lock on the hot path.'],
+        'Arc<Mutex>':[1,'Mutex<bool> is correct but takes a lock on every single loop iteration to read one bit.']}},
+    {text:'Workers run for minutes. The main thread displays a live progress table (items done per worker, current best result) that must be readable while the workers are still running.',
+     v:{'move it':[0,'moved state is invisible to the displaying thread.'],
+        'scoped borrow':[0,'reading state that workers are writing needs synchronization; a plain borrow of mutable state across threads is refused.'],
+        'clone it':[0,'a clone taken at spawn time is a photograph, not a live feed.'],
+        'channel':[1,'workers can stream progress events to main; a real pattern, though main must now maintain the table from the event stream.'],
+        'Arc':[0,'read-only: the workers could never update the table.'],
+        'Arc<Atomic>':[1,'a set of atomic counters covers items-done well; "current best result" as compound state outgrows one word.'],
+        'Arc<Mutex>':[2,'mid-flight visibility of compound state is exactly the clipboard case: this is where the mutex earns its price.']}},
+    {text:'A small config struct, a few hundred bytes, that every worker needs to consult. Workers are spawned and joined inside one function; nobody modifies the config.',
+     v:{'move it':[0,'one config cannot move into five threads.'],
+        'scoped borrow':[2,'the threads end inside the function, so thread::scope lets every worker borrow &config for free. the compiler proves the lifetime.'],
+        'clone it':[2,'a few hundred bytes per thread is nothing; five independent copies and zero coordination is a perfectly honest answer.'],
+        'channel':[0,'nothing flows between threads here.'],
+        'Arc':[1,'works everywhere, but here it is ceremony: the headcount machinery guards data that a brace or a cheap copy already handles.'],
+        'Arc<Atomic>':[0,'a struct is not one machine word.'],
+        'Arc<Mutex>':[1,'a lock for data nobody writes: pure overhead.']}}
+  ];
+  const box=$('scenarios');
+  let found=0; const gotIt=new Set();
+  SC.forEach((sc,si)=>{
+    const d=document.createElement('div');d.className='scen';
+    const p=document.createElement('p');p.textContent=(si+1)+'. '+sc.text;d.appendChild(p);
+    const tb=document.createElement('div');tb.className='tools';
+    const vd=document.createElement('div');vd.className='verdict';vd.textContent='pick the cheapest arrangement that is still correct.';
+    TOOLS.forEach(tool=>{
+      const b=document.createElement('button');b.className='tool';b.type='button';b.textContent=tool;
+      b.addEventListener('click',()=>{
+        const [score,why]=sc.v[tool];
+        tb.querySelectorAll('.tool').forEach(x=>x.classList.remove('hit','mid','miss'));
+        b.classList.add(score===2?'hit':score===1?'mid':'miss');
+        vd.innerHTML=(score===2?'<b class="vgood">good fit.</b> ':score===1?'<b class="vmid">works, but heavier than needed.</b> ':'<b class="vbad">wrong.</b> ')+why;
+        if(score===2&&!gotIt.has(si)){gotIt.add(si);found++;$('scenscore').innerHTML='fits found: <b>'+found+'</b> / 5';}
+      });
+      tb.appendChild(b);
+    });
+    d.appendChild(tb);d.appendChild(vd);box.appendChild(d);
+  });
+})();
+
+})();
+</script>
+</body>
+</html>
