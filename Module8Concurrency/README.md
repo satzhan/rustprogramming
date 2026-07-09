@@ -3,3 +3,5 @@ https://satzhan.github.io/rustprogramming/Module8Concurrency/concurrency-demo.ht
 https://satzhan.github.io/rustprogramming/Module8Concurrency/arc-two-timelines.html
 
 https://satzhan.github.io/rustprogramming/Module8Concurrency/arc-who-turns-off-the-lights.html
+
+https://satzhan.github.io/rustprogramming/Module8Concurrency/arc-mutex-sharing-demo.html
