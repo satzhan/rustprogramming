@@ -1,0 +1,556 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Strong Balanced Roster Randomizer</title>
+<style>
+  :root{
+    --bg:#0f172a;
+    --panel:#111c33;
+    --panel2:#16213b;
+    --text:#e5e7eb;
+    --muted:#9ca3af;
+    --line:#334155;
+    --accent:#38bdf8;
+    --good:#22c55e;
+    --warn:#f59e0b;
+    --bad:#ef4444;
+    --chip:#1e293b;
+    --input:#0b1224;
+    --shadow:0 18px 55px rgba(0,0,0,.35);
+    --radius:18px;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background:
+      radial-gradient(circle at top left, rgba(56,189,248,.18), transparent 38rem),
+      radial-gradient(circle at top right, rgba(34,197,94,.10), transparent 30rem),
+      var(--bg);
+    color:var(--text);
+    min-height:100vh;
+  }
+  main{max-width:1180px;margin:0 auto;padding:28px 18px 60px}
+  header{display:flex;gap:18px;align-items:flex-start;justify-content:space-between;margin-bottom:18px}
+  h1{font-size:clamp(1.7rem,4vw,3rem);line-height:1.05;margin:0 0 10px;font-weight:850;letter-spacing:-.04em}
+  p{color:var(--muted);line-height:1.55;margin:.35rem 0}
+  .card{
+    background:linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.02));
+    border:1px solid rgba(148,163,184,.24);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    overflow:hidden;
+  }
+  .grid{display:grid;grid-template-columns:1fr;gap:16px}
+  @media (min-width:920px){.grid{grid-template-columns:430px 1fr}}
+  .section{padding:18px}
+  label{display:block;font-weight:700;margin-bottom:8px;color:#f8fafc}
+  textarea,input[type="text"]{
+    width:100%;
+    background:var(--input);
+    color:var(--text);
+    border:1px solid rgba(148,163,184,.28);
+    border-radius:14px;
+    padding:12px 13px;
+    outline:none;
+    font:inherit;
+  }
+  textarea{min-height:330px;resize:vertical;line-height:1.45}
+  textarea:focus,input:focus{border-color:rgba(56,189,248,.72);box-shadow:0 0 0 3px rgba(56,189,248,.16)}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .between{justify-content:space-between}
+  button{
+    appearance:none;
+    border:0;
+    border-radius:999px;
+    padding:11px 15px;
+    font-weight:800;
+    color:#06111d;
+    background:var(--accent);
+    cursor:pointer;
+    transition:transform .08s ease, filter .12s ease, opacity .12s ease;
+  }
+  button:hover{filter:brightness(1.08)}
+  button:active{transform:translateY(1px)}
+  button.secondary{background:#334155;color:#e5e7eb;border:1px solid rgba(148,163,184,.25)}
+  button.ghost{background:transparent;color:#cbd5e1;border:1px solid rgba(148,163,184,.32)}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  .opts{display:grid;gap:11px;margin-top:14px}
+  .check{
+    display:flex;gap:10px;align-items:flex-start;
+    background:rgba(15,23,42,.55);
+    border:1px solid rgba(148,163,184,.18);
+    border-radius:14px;
+    padding:11px;
+  }
+  .check input{margin-top:3px;transform:scale(1.12)}
+  .check span{display:block;color:#e5e7eb;font-weight:750}
+  .check small{display:block;color:var(--muted);line-height:1.35;margin-top:2px}
+  .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+  .status{margin-top:12px;color:var(--muted);font-size:.94rem;white-space:pre-wrap}
+  .badges{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 2px}
+  .badge{border-radius:999px;padding:6px 10px;font-weight:800;font-size:.82rem;background:var(--chip);border:1px solid rgba(148,163,184,.22)}
+  .badge.good{color:#bbf7d0;border-color:rgba(34,197,94,.35);background:rgba(34,197,94,.10)}
+  .badge.warn{color:#fde68a;border-color:rgba(245,158,11,.42);background:rgba(245,158,11,.10)}
+  .badge.bad{color:#fecaca;border-color:rgba(239,68,68,.42);background:rgba(239,68,68,.10)}
+  table{width:100%;border-collapse:separate;border-spacing:0;overflow:hidden;border-radius:14px;border:1px solid rgba(148,163,184,.22)}
+  th,td{padding:10px 11px;text-align:left;border-bottom:1px solid rgba(148,163,184,.15);vertical-align:top}
+  th{font-size:.78rem;text-transform:uppercase;letter-spacing:.08em;color:#cbd5e1;background:rgba(15,23,42,.76);position:sticky;top:0;z-index:1}
+  td{background:rgba(15,23,42,.35)}
+  tr:last-child td{border-bottom:0}
+  .tablewrap{overflow:auto;max-height:620px;border-radius:14px;margin-top:12px}
+  .empty{display:grid;place-items:center;min-height:390px;text-align:center;color:var(--muted);padding:28px}
+  .pill{display:inline-flex;align-items:center;gap:7px;background:rgba(15,23,42,.7);border:1px solid rgba(148,163,184,.24);padding:8px 11px;border-radius:999px;color:#cbd5e1;font-weight:750;font-size:.88rem}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace}
+  details{margin-top:12px;background:rgba(15,23,42,.42);border:1px solid rgba(148,163,184,.18);border-radius:14px;padding:11px 13px;color:var(--muted)}
+  summary{cursor:pointer;color:#e5e7eb;font-weight:800}
+  .mini{font-size:.9rem;color:var(--muted)}
+  .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);padding:10px 14px;border-radius:999px;background:#020617;color:#e5e7eb;border:1px solid rgba(148,163,184,.35);box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:opacity .18s ease}
+  .toast.show{opacity:1}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <div class="pill">Strong balanced 2-in / 2-out randomizer</div>
+      <h1>Roster connection randomizer</h1>
+      <p>Paste a roster, then generate two peer connections for every student. The generator keeps every student at exactly two outgoing and two incoming connections whenever the class size allows it.</p>
+    </div>
+  </header>
+
+  <div class="grid">
+    <section class="card section">
+      <label for="roster">Roster</label>
+      <textarea id="roster" spellcheck="false" placeholder="Paste one student per line, for example:
+Amina Patel
+Ben Garcia
+Chloe Nguyen
+David Kim
+Elena Brooks"></textarea>
+      <p class="mini">One student per line is best. Commas also work. Duplicate names are automatically numbered.</p>
+
+      <div class="opts">
+        <label class="check">
+          <input id="avoidRecip" type="checkbox" checked />
+          <div>
+            <span>Avoid reciprocal pairs when possible</span>
+            <small>Prevents A → B and B → A. This is possible for most rosters of 5+ students, but impossible for very small rosters.</small>
+          </div>
+        </label>
+        <label class="check">
+          <input id="mixMore" type="checkbox" checked />
+          <div>
+            <span>Extra mixing passes</span>
+            <small>Starts from a balanced construction, then swaps edges many times while preserving exactly 2-in and 2-out.</small>
+          </div>
+        </label>
+        <label class="check">
+          <input id="showIncoming" type="checkbox" checked />
+          <div>
+            <span>Show who each student receives from</span>
+            <small>Useful for checking fairness and explaining the result to the class.</small>
+          </div>
+        </label>
+      </div>
+
+      <label for="seed" style="margin-top:14px">Seed <span class="mini">optional, for repeatable results</span></label>
+      <input id="seed" type="text" placeholder="Leave blank for a fresh random seed" />
+
+      <div class="actions">
+        <button id="go">Randomize connections</button>
+        <button id="example" class="secondary">Load example</button>
+        <button id="clear" class="ghost">Clear</button>
+      </div>
+      <div id="status" class="status"></div>
+
+      <details>
+        <summary>What makes this stronger than the circle version?</summary>
+        <p>Instead of putting students in one shuffled circle and assigning the next two neighbors, this builds two independent balanced layers. Each layer gives every student one target and makes every student receive once. Then it performs random edge swaps that preserve the exact incoming/outgoing counts.</p>
+        <p>So the final result is still mathematically balanced, but the connections are scattered rather than looking like a seating-circle pattern.</p>
+      </details>
+    </section>
+
+    <section class="card section">
+      <div class="row between">
+        <div>
+          <h2 style="margin:0;font-size:1.2rem">Connections</h2>
+          <p id="subtitle" class="mini">Generate a roster to see the table.</p>
+        </div>
+        <div class="row">
+          <button id="copy" class="secondary" disabled>Copy CSV</button>
+          <button id="download" class="secondary" disabled>Download CSV</button>
+        </div>
+      </div>
+      <div id="badges" class="badges"></div>
+      <div id="output" class="empty">No connections yet.</div>
+    </section>
+  </div>
+</main>
+<div id="toast" class="toast"></div>
+
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  const rosterEl = $('roster');
+  const seedEl = $('seed');
+  const statusEl = $('status');
+  const outputEl = $('output');
+  const badgesEl = $('badges');
+  const subtitleEl = $('subtitle');
+  const copyBtn = $('copy');
+  const downloadBtn = $('download');
+  let lastRows = [];
+  let lastCsv = '';
+
+  function toast(msg){
+    const t = $('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(()=>t.classList.remove('show'), 1800);
+  }
+
+  function xmur3(str) {
+    let h = 1779033703 ^ str.length;
+    for (let i = 0; i < str.length; i++) {
+      h = Math.imul(h ^ str.charCodeAt(i), 3432918353);
+      h = h << 13 | h >>> 19;
+    }
+    return function() {
+      h = Math.imul(h ^ h >>> 16, 2246822507);
+      h = Math.imul(h ^ h >>> 13, 3266489909);
+      return (h ^= h >>> 16) >>> 0;
+    };
+  }
+  function mulberry32(a) {
+    return function() {
+      let t = a += 0x6D2B79F5;
+      t = Math.imul(t ^ t >>> 15, t | 1);
+      t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  function makeRng(seedText){
+    const seed = seedText && seedText.trim() ? seedText.trim() : String(Date.now()) + ':' + Math.random();
+    return { seed, rand: mulberry32(xmur3(seed)()) };
+  }
+  function shuffle(a, rand){
+    for(let i=a.length-1;i>0;i--){
+      const j = Math.floor(rand() * (i + 1));
+      [a[i],a[j]] = [a[j],a[i]];
+    }
+    return a;
+  }
+
+  function parseRoster(text){
+    const raw = text
+      .split(/\n|,/)
+      .map(s => s.replace(/^\s*(?:\d+[\).:-]?\s+|[-*•]\s+)/, '').trim())
+      .filter(Boolean);
+    const seen = new Map();
+    const names = [];
+    const adjusted = [];
+    for(const name of raw){
+      const key = name.toLowerCase();
+      const count = seen.get(key) || 0;
+      seen.set(key, count + 1);
+      if(count === 0) names.push(name);
+      else {
+        const fixed = `${name} (${count + 1})`;
+        names.push(fixed);
+        adjusted.push(fixed);
+      }
+    }
+    return {names, adjusted};
+  }
+
+  function matching(n, rand, allowed, maxOps){
+    const assign = Array(n).fill(-1);
+    const used = Array(n).fill(false);
+    let ops = 0;
+
+    function availableFor(i){
+      const c = [];
+      for(let j=0;j<n;j++) if(!used[j] && allowed(i,j,assign)) c.push(j);
+      shuffle(c, rand);
+      return c;
+    }
+
+    function dfs(done){
+      if(++ops > maxOps) return false;
+      if(done === n) return true;
+      let best = -1, bestList = null;
+      for(let i=0;i<n;i++){
+        if(assign[i] !== -1) continue;
+        const c = availableFor(i);
+        if(c.length === 0) return false;
+        if(bestList === null || c.length < bestList.length || (c.length === bestList.length && rand() < .5)){
+          best = i;
+          bestList = c;
+          if(c.length === 1) break;
+        }
+      }
+      for(const j of bestList){
+        assign[best] = j;
+        used[j] = true;
+        if(dfs(done + 1)) return true;
+        used[j] = false;
+        assign[best] = -1;
+      }
+      return false;
+    }
+    return dfs(0) ? assign : null;
+  }
+
+  function hasEdge(edges, a, b, exceptSource=-1, exceptSlot=-1){
+    if(a < 0 || b < 0 || a >= edges.length) return false;
+    for(let s=0;s<edges[a].length;s++){
+      if(a === exceptSource && s === exceptSlot) continue;
+      if(edges[a][s] === b) return true;
+    }
+    return false;
+  }
+
+  function validate(edges, avoidRecip){
+    const n = edges.length;
+    const inDeg = Array(n).fill(0);
+    let self = 0, dup = 0, recip = 0;
+    const seenDirected = new Set();
+    for(let i=0;i<n;i++){
+      const local = new Set();
+      for(const j of edges[i]){
+        if(j === i) self++;
+        if(local.has(j)) dup++;
+        local.add(j);
+        const key = `${i}->${j}`;
+        if(seenDirected.has(key)) dup++;
+        seenDirected.add(key);
+        inDeg[j]++;
+      }
+    }
+    for(let i=0;i<n;i++) for(const j of edges[i]) if(i < j && hasEdge(edges,j,i)) recip++;
+    const outOk = edges.every(e => e.length === 2 && new Set(e).size === 2);
+    const inOk = inDeg.every(x => x === 2);
+    return {outOk, inOk, self, dup, recip, inDeg, recipOk: !avoidRecip || recip === 0};
+  }
+
+  function mixEdges(edges, rand, avoidRecip, passes){
+    const n = edges.length;
+    let swaps = 0;
+    for(let t=0;t<passes;t++){
+      const a = Math.floor(rand()*n), b = Math.floor(rand()*n);
+      if(a === b) continue;
+      const sa = Math.floor(rand()*2), sb = Math.floor(rand()*2);
+      const x = edges[a][sa], y = edges[b][sb];
+      if(x === y) continue;
+      if(y === a || x === b) continue;
+      if(hasEdge(edges,a,y,a,sa) || hasEdge(edges,b,x,b,sb)) continue;
+      if(avoidRecip){
+        if(hasEdge(edges,y,a,b,sb)) continue;
+        if(hasEdge(edges,x,b,a,sa)) continue;
+      }
+      edges[a][sa] = y;
+      edges[b][sb] = x;
+      swaps++;
+    }
+    return swaps;
+  }
+
+  function build(n, rand, preferNoRecip, mixMore){
+    if(n < 3) throw new Error('Need at least 3 students. With 1 or 2 students, each person cannot have 2 distinct connections without self-connections.');
+    let avoidRecip = preferNoRecip && n >= 5;
+    const notes = [];
+    if(preferNoRecip && n < 5){
+      notes.push('Reciprocal-pair avoidance was relaxed because rosters with fewer than 5 students cannot reliably satisfy it with 2-in/2-out.');
+      avoidRecip = false;
+    }
+
+    function attempt(avoid){
+      const maxOps = Math.max(40000, n*n*60);
+      const p1 = matching(n, rand, (i,j,assign) => {
+        if(i === j) return false;
+        if(assign[j] === i) return false;
+        return true;
+      }, maxOps);
+      if(!p1) return null;
+
+      const p2 = matching(n, rand, (i,j,assign) => {
+        if(i === j) return false;
+        if(j === p1[i]) return false;
+        if(assign[j] === i) return false;
+        if(avoid && p1[j] === i) return false;
+        return true;
+      }, maxOps);
+      if(!p2) return null;
+
+      const edges = Array.from({length:n}, (_,i)=>[p1[i],p2[i]]);
+      const v = validate(edges, avoid);
+      if(!v.outOk || !v.inOk || v.self || v.dup || !v.recipOk) return null;
+      const passes = mixMore ? Math.max(500, n*80) : Math.max(80, n*15);
+      const swaps = mixEdges(edges, rand, avoid, passes);
+      const v2 = validate(edges, avoid);
+      if(!v2.outOk || !v2.inOk || v2.self || v2.dup || !v2.recipOk) return null;
+      return {edges, swaps, avoidRecip:avoid};
+    }
+
+    for(let tries=0; tries<220; tries++){
+      const got = attempt(avoidRecip);
+      if(got) return {...got, notes};
+    }
+    if(avoidRecip){
+      notes.push('Could not satisfy reciprocal-pair avoidance for this roster after many attempts, so it was relaxed. The assignment is still exactly 2-in/2-out.');
+      for(let tries=0; tries<220; tries++){
+        const got = attempt(false);
+        if(got) return {...got, notes, avoidRecip:false};
+      }
+    }
+    throw new Error('Could not generate a balanced assignment. Try a different roster size or turn off reciprocal-pair avoidance.');
+  }
+
+  function rowsFrom(names, edges){
+    const incoming = Array.from({length:names.length}, ()=>[]);
+    for(let i=0;i<edges.length;i++) for(const j of edges[i]) incoming[j].push(i);
+    return names.map((name,i)=>({
+      student:name,
+      share1:names[edges[i][0]],
+      share2:names[edges[i][1]],
+      receives:incoming[i].map(k=>names[k]).join('; '),
+      incomingCount:incoming[i].length,
+      outgoingCount:edges[i].length
+    }));
+  }
+
+  function csvEscape(x){
+    const s = String(x ?? '');
+    return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
+  }
+  function toCsv(rows){
+    const header = ['Student','Share with 1','Share with 2','Receives from','Outgoing count','Incoming count'];
+    const body = rows.map(r => [r.student,r.share1,r.share2,r.receives,r.outgoingCount,r.incomingCount].map(csvEscape).join(','));
+    return [header.join(','), ...body].join('\n');
+  }
+
+  function badge(text, kind){
+    const b = document.createElement('span');
+    b.className = `badge ${kind}`;
+    b.textContent = text;
+    badgesEl.appendChild(b);
+  }
+
+  function render(names, edges, result, seed){
+    const rows = rowsFrom(names, edges);
+    lastRows = rows;
+    lastCsv = toCsv(rows);
+    copyBtn.disabled = downloadBtn.disabled = false;
+    const v = validate(edges, result.avoidRecip);
+
+    badgesEl.innerHTML = '';
+    badge(v.outOk && !v.self && !v.dup ? '2 outgoing each' : 'Outgoing problem', v.outOk && !v.self && !v.dup ? 'good' : 'bad');
+    badge(v.inOk ? '2 incoming each' : 'Incoming problem', v.inOk ? 'good' : 'bad');
+    badge(v.self === 0 ? 'No self-connections' : `${v.self} self-connection(s)`, v.self === 0 ? 'good' : 'bad');
+    badge(v.dup === 0 ? 'No duplicate edges' : `${v.dup} duplicate edge(s)`, v.dup === 0 ? 'good' : 'bad');
+    if(result.avoidRecip) badge(v.recip === 0 ? 'No reciprocal pairs' : `${v.recip} reciprocal pair(s)`, v.recip === 0 ? 'good' : 'bad');
+    else badge(v.recip === 0 ? 'No reciprocal pairs' : `${v.recip} reciprocal pair(s)`, v.recip === 0 ? 'good' : 'warn');
+    badge(`${result.swaps} mixing swaps`, 'good');
+
+    subtitleEl.textContent = `${names.length} students · seed: ${seed}`;
+    const showIncoming = $('showIncoming').checked;
+    let html = '<div class="tablewrap"><table><thead><tr><th>#</th><th>Student</th><th>Share with 1</th><th>Share with 2</th>';
+    if(showIncoming) html += '<th>Receives from</th>';
+    html += '<th>Check</th></tr></thead><tbody>';
+    rows.forEach((r,idx)=>{
+      html += `<tr><td class="mono">${idx+1}</td><td>${esc(r.student)}</td><td>${esc(r.share1)}</td><td>${esc(r.share2)}</td>`;
+      if(showIncoming) html += `<td>${esc(r.receives)}</td>`;
+      html += `<td class="mono">out ${r.outgoingCount} / in ${r.incomingCount}</td></tr>`;
+    });
+    html += '</tbody></table></div>';
+    outputEl.className = '';
+    outputEl.innerHTML = html;
+  }
+
+  function esc(s){
+    return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  }
+
+  $('go').addEventListener('click', () => {
+    try{
+      const {names, adjusted} = parseRoster(rosterEl.value);
+      if(names.length < 3) throw new Error('Paste at least 3 students.');
+      const {seed, rand} = makeRng(seedEl.value);
+      if(!seedEl.value.trim()) seedEl.value = seed;
+      const result = build(names.length, rand, $('avoidRecip').checked, $('mixMore').checked);
+      render(names, result.edges, result, seed);
+      const notes = [];
+      notes.push(`Generated a strong balanced assignment for ${names.length} students.`);
+      if(adjusted.length) notes.push(`Duplicate names were numbered: ${adjusted.join(', ')}`);
+      if(result.notes.length) notes.push(...result.notes);
+      if(result.avoidRecip) notes.push('Reciprocal pairs were avoided.');
+      else notes.push('The assignment remains balanced, but reciprocal pairs may exist.');
+      statusEl.textContent = notes.join('\n');
+    }catch(err){
+      statusEl.textContent = err.message || String(err);
+      badgesEl.innerHTML = '';
+      subtitleEl.textContent = 'Generate a roster to see the table.';
+      outputEl.className = 'empty';
+      outputEl.textContent = 'No valid assignment generated.';
+      copyBtn.disabled = downloadBtn.disabled = true;
+      lastRows = [];
+      lastCsv = '';
+    }
+  });
+
+  $('example').addEventListener('click', () => {
+    rosterEl.value = [
+      'Amina Patel','Ben Garcia','Chloe Nguyen','David Kim','Elena Brooks','Farah Ali','Gabriel Torres','Hannah Lee','Isaac Johnson','Jasmine Chen','Kai Robinson','Lina Ahmed','Mateo Rivera','Nora Singh','Owen Davis','Priya Shah'
+    ].join('\n');
+    seedEl.value = '';
+    statusEl.textContent = 'Example roster loaded.';
+  });
+
+  $('clear').addEventListener('click', () => {
+    rosterEl.value = '';
+    seedEl.value = '';
+    statusEl.textContent = '';
+    badgesEl.innerHTML = '';
+    subtitleEl.textContent = 'Generate a roster to see the table.';
+    outputEl.className = 'empty';
+    outputEl.textContent = 'No connections yet.';
+    copyBtn.disabled = downloadBtn.disabled = true;
+    lastRows = [];
+    lastCsv = '';
+  });
+
+  copyBtn.addEventListener('click', async () => {
+    if(!lastCsv) return;
+    try{
+      await navigator.clipboard.writeText(lastCsv);
+      toast('CSV copied');
+    }catch{
+      const tmp = document.createElement('textarea');
+      tmp.value = lastCsv;
+      document.body.appendChild(tmp);
+      tmp.select();
+      document.execCommand('copy');
+      tmp.remove();
+      toast('CSV copied');
+    }
+  });
+
+  downloadBtn.addEventListener('click', () => {
+    if(!lastCsv) return;
+    const blob = new Blob([lastCsv], {type:'text/csv;charset=utf-8'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'roster_connections.csv';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  });
+})();
+</script>
+</body>
+</html>
