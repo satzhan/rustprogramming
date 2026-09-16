@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Life of a Value: Rust ownership as a story</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;0,7..72,700;1,7..72,400&family=IBM+Plex+Mono:wght@400;500&family=Caveat:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --paper: #F2F4F1;
+  --ink: #1C2230;
+  --soft: #5A6675;
+  --pencil: #A8323F;
+  --gloss: #2D5C61;
+  --rule: #C7CFCA;
+  --code: #E2E8E3;
+  --codeink: #1C2230;
+  --comment: #6B7784;
+  --guess: #E9EEF0;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #151A20;
+    --ink: #DCE2E7;
+    --soft: #95A2AF;
+    --pencil: #E47983;
+    --gloss: #7FBDC2;
+    --rule: #34404B;
+    --code: #1E252D;
+    --codeink: #DCE2E7;
+    --comment: #8593A0;
+    --guess: #1B2229;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #151A20;
+  --ink: #DCE2E7;
+  --soft: #95A2AF;
+  --pencil: #E47983;
+  --gloss: #7FBDC2;
+  --rule: #34404B;
+  --code: #1E252D;
+  --codeink: #DCE2E7;
+  --comment: #8593A0;
+  --guess: #1B2229;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "Literata", Georgia, "Times New Roman", serif;
+  font-size: 1.0625rem;
+  line-height: 1.72;
+}
+.page { max-width: 62rem; margin: 0 auto; padding: 3rem 1.5rem 5rem; }
+
+header.title { max-width: 40rem; margin-bottom: 3rem; }
+header.title h1 {
+  font-size: clamp(2.3rem, 6vw, 3.6rem);
+  line-height: 1.05;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  margin: 0 0 0.6rem;
+}
+header.title .sub { font-size: 1.2rem; color: var(--soft); font-style: italic; margin: 0; }
+
+h2 {
+  font-size: 1.75rem;
+  line-height: 1.2;
+  margin: 4.5rem 0 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--rule);
+  max-width: 40rem;
+}
+h2 .num { color: var(--soft); font-weight: 400; margin-right: 0.35em; }
+p { margin: 0 0 1rem; }
+a { color: var(--gloss); }
+a:focus-visible, summary:focus-visible, button:focus-visible { outline: 2px solid var(--gloss); outline-offset: 3px; }
+
+.lede p, .prose { max-width: 40rem; }
+
+.beat {
+  display: grid;
+  grid-template-columns: minmax(0, 40rem) 15rem;
+  column-gap: 2.75rem;
+  margin: 0 0 1.6rem;
+}
+.beat > .say { grid-column: 1; min-width: 0; }
+.beat > .gloss {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: start;
+  margin-top: 0.3rem;
+  padding-left: 0.85rem;
+  border-left: 2px solid var(--rule);
+  font-family: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  font-size: 0.78rem;
+  line-height: 1.55;
+  color: var(--gloss);
+}
+.gloss code { background: none; padding: 0; color: inherit; font-size: inherit; }
+.gloss span { display: block; }
+.gloss em { font-family: "Literata", Georgia, serif; font-size: 0.85rem; color: var(--soft); }
+
+code {
+  font-family: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  font-size: 0.86em;
+  background: var(--code);
+  padding: 0.08em 0.3em;
+  border-radius: 3px;
+}
+pre {
+  background: var(--code);
+  color: var(--codeink);
+  border-radius: 4px;
+  padding: 0.9rem 1rem;
+  overflow-x: auto;
+  margin: 0.4rem 0 1rem;
+  font-size: 0.86rem;
+  line-height: 1.55;
+}
+pre code { background: none; padding: 0; font-size: inherit; }
+pre .c { color: var(--comment); font-style: italic; }
+pre .bad { text-decoration: underline wavy var(--pencil); text-underline-offset: 3px; }
+pre.out { background: transparent; border: 1px dashed var(--rule); }
+
+.red {
+  color: var(--pencil);
+  margin: -0.3rem 0 1rem;
+  padding-left: 0.9rem;
+  border-left: 3px solid var(--pencil);
+  line-height: 1.45;
+}
+.red .hand { font-family: "Caveat", "Segoe Print", cursive; font-size: 1.45rem; font-weight: 700; margin-right: 0.3rem; }
+.red code { background: none; color: inherit; padding: 0; }
+
+details.guess {
+  background: var(--guess);
+  border-radius: 4px;
+  padding: 0.7rem 1rem;
+  margin: 0.4rem 0 1.2rem;
+}
+details.guess summary { cursor: pointer; font-style: italic; color: var(--soft); }
+details.guess[open] summary { margin-bottom: 0.5rem; }
+
+table.cast { border-collapse: collapse; margin: 1rem 0 1.5rem; width: 100%; max-width: 40rem; }
+table.cast td { padding: 0.45rem 0.6rem; border-bottom: 1px solid var(--rule); vertical-align: top; }
+table.cast td:first-child { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 0.82rem; color: var(--gloss); width: 45%; }
+.tablewrap { overflow-x: auto; }
+
+nav.toc { max-width: 40rem; margin: 2rem 0 0; }
+nav.toc ol { padding-left: 1.4rem; margin: 0.4rem 0 0; }
+nav.toc li { margin: 0.15rem 0; }
+
+.leak { max-width: 40rem; }
+footer { max-width: 40rem; margin-top: 4rem; padding-top: 1rem; border-top: 1px solid var(--rule); color: var(--soft); font-size: 0.9rem; }
+
+.themebtn {
+  position: fixed; top: 0.8rem; right: 0.8rem;
+  font: inherit; font-size: 0.85rem;
+  background: var(--paper); color: var(--soft);
+  border: 1px solid var(--rule); border-radius: 4px; padding: 0.2rem 0.6rem; cursor: pointer;
+}
+
+@media (max-width: 58rem) {
+  .beat { grid-template-columns: minmax(0, 1fr); }
+  .beat > .gloss {
+    grid-column: 1; grid-row: auto; order: -1;
+    margin: 0 0 0.45rem;
+  }
+  .beat > .say { order: 0; }
+  .beat { display: flex; flex-direction: column; }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+</head>
+<body>
+<button class="themebtn" id="themebtn" type="button" aria-label="Switch light or dark theme">Light / dark</button>
+<main class="page">
+
+<header class="title">
+  <h1>The Life of a Value</h1>
+  <p class="sub">Rust ownership, told as a story, with the real names written in the margin</p>
+</header>
+
+<section class="lede">
+<p>The textbook version of ownership fits on an index card. Every value has an owner. There's only one owner at a time. When the owner goes away, the value goes away.</p>
+<p>All true. It's also about as useful as saying chess is "move pieces until the other king is stuck." You can memorize that in ten seconds and still have no idea why your bishop won't go where you want it to. The interesting part of ownership is what happens when that little rule runs into the rest of the language, and it runs into almost everything.</p>
+<p>So here's a way to hold it in your head. Picture every owner as a character in a story. Characters carry items. They hand items to each other, lend them out, pry pieces off them, and sooner or later they leave the story. Whatever they were carrying leaves with them.</p>
+<p>There's one more person in this story, and you never see them on stage: the editor. Before anything is performed, the editor reads the entire script and sends it back covered in red pencil if anybody does something the world doesn't allow. The editor is the Rust compiler. Nearly every rule in this guide is checked on paper, before your program runs a single line. Where that's not the case, I'll point it out, because it matters.</p>
+<p>The narrow column on the right (or the line above each paragraph, if you're on a phone) gives you the actual Rust names for whatever the story is talking about. Read the story, glance over, try the code. Every example here was compiled, and the red-pencil notes carry the real error codes you'll see from <code>rustc</code>.</p>
+
+<div class="tablewrap">
+<table class="cast">
+  <tr><td>owner (a <code>let</code> binding, a field, a container)</td><td>a character</td></tr>
+  <tr><td>value</td><td>an item the character carries</td></tr>
+  <tr><td>scope, the <code>{ }</code> block</td><td>the character's scene</td></tr>
+  <tr><td>drop, <code>Drop</code>, RAII</td><td>the character exits and their items dissolve with them</td></tr>
+  <tr><td>move</td><td>handing an item to someone else</td></tr>
+  <tr><td>borrow, <code>&amp;T</code> and <code>&amp;mut T</code></td><td>lending an item</td></tr>
+  <tr><td>compiler, borrow checker</td><td>the editor with the red pencil</td></tr>
+</table>
+</div>
+
+<nav class="toc" aria-label="Chapters">
+<strong>The chapters</strong>
+<ol>
+  <li><a href="#ch1">Who gets to be a character</a></li>
+  <li><a href="#ch2">Handing things over</a></li>
+  <li><a href="#ch3">Taking pieces off</a></li>
+  <li><a href="#ch4">Leaving the story</a></li>
+  <li><a href="#ch5">Copying instead of handing over</a></li>
+  <li><a href="#ch6">Lending</a></li>
+  <li><a href="#ch7">Originals and windows</a></li>
+  <li><a href="#ch8">Changing the rules of possession</a></li>
+  <li><a href="#ch9">Companions and parallel storylines</a></li>
+  <li><a href="#ch10">Dark magic</a></li>
+  <li><a href="#leaks">Where the story breaks down</a></li>
+  <li><a href="#try">Things to try on your own</a></li>
+</ol>
+</nav>
+</section>
+
+<!-- ============ 1 ============ -->
+<h2 id="ch1"><span class="num">1</span>Who gets to be a character</h2>
+
+<div class="beat">
+  <div class="say">
+    <p>The obvious characters have names. Write <code>let sword = String::from("steel");</code> and someone named <code>sword</code> walks on stage holding something. That's the character every tutorial talks about, and it's the reason people think the story ends there. It doesn't.</p>
+  </div>
+  <aside class="gloss"><span><code>let</code> binding</span><span>the owner</span></aside>
+</div>
+
+<div class="beat">
+  <div class="say">
+    <p>Items can hold other items. A backpack has pockets, and the pockets have stuff in them. A struct owns its fields. A tuple owns its elements. An array owns every one of its slots. So ownership isn't really a list of characters and their belongings. It's a tree, like a set of nesting dolls: a character at the root, items under them, items under those.</p>
+    <p>Hang on to that picture. Most of the rules later on come down to one question: which branch of the tree are you touching?</p>
+  </div>
+  <aside class="gloss"><span>struct fields</span><span>tuple elements</span><span>array elements</span><em>the ownership tree</em></aside>
+</div>
+
+<div class="beat">
+  <div class="say">
+    <p>Some items are bigger on the inside. A <code>String</code> sitting in your variable is small. It's really just three numbers: where the text is, how long it is, and how much room has been reserved. The text itself lives somewhere else, out on the heap.</p>
+    <p>Think of a coat check. The ticket is in your pocket and the coat is in the back room. You own the ticket, and the ticket is responsible for the coat. That's still one owner, not two. It's one owner holding a thing that knows where the coat is.</p>
+  </div>
+  <aside class="gloss"><span><code>String</code>, <code>Vec&lt;T&gt;</code>, <code>Box&lt;T&gt;</code></span><span>stack part: pointer, length, capacity</span><span>heap buffer</span></aside>
+</div>
+
+<div class="beat">
+  <div class="say">
+    <p>Then there are the extras, the people with no names who walk on for one line. In <code>make_title().len()</code>, the <code>String</code> that <code>make_title</code> hands back never gets a name. It exists long enough for <code>.len()</code> to look at it, and at the semicolon it walks off, item and all.</p>
+  </div>
+  <aside class="gloss"><span>temporaries</span><span>dropped at the end of the statement</span></aside>
+</div>
+
+<div class="beat">
+  <div class="say">
+    <p>A closure can be a character too. If you write <code>move || ...</code>, you're hiring a companion and handing them your gear outright. From then on it's theirs.</p>
+  </div>
+  <aside class="gloss"><span>closures</span><span><code>move |..| { .. }</code></span><span>capture by value</span></aside>
+</div>
+
+<div class="beat">
+  <div class="say">
+    <p>And some things aren't carried by anyone. They're landmarks, part of the world itself, like a mountain on the map. The text of <code>"hello"</code> is baked right into your program file. Nobody owns it and it never leaves, which is why you can point at it for as long as you like.</p>
+    <p>A small correction to something you may have read earlier in this course: string literals don't live on the stack. The little reference you hold can sit on the stack, but the bytes it points at are in the program's read-only data.</p>
+  </div>
+  <aside class="gloss"><span><code>static</code></span><span>string literals: <code>&amp;'static str</code></span><em>lives for the whole program</em></aside>
+</div>
+
+<!-- ============ 2 ============ -->
+<h2 id="ch2"><span class="num">2</span>Handing things over</h2>
+
+<div class="beat">
+  <div class="say">
+    <p>Here's the scene everybody meets first.</p>
+<pre><code>fn main() {
+    let scroll = String::from("map to the treasure");
+    let hero = scroll;          <span class="c">// scroll hands it over</span>
+    println!("{}", <span class="bad">scroll</span>);    <span class="c">// scroll speaks about it anyway</span>
+    println!("{}", hero);
+}</code></pre>
+    <p class="red"><span class="hand">Editor:</span> <code>error[E0382]</code>: borrow of moved value: <code>scroll</code></p>
+    <p>The item went from one character to another, and the first one's hands are empty. Passing a value into a function does the same thing. So does returning one.</p>
+  </div>
+  <aside class="gloss"><span>move</span><span><code>let b = a;</code></span><span>passing arguments</span><span><code>return</code></span><span>E0382 use of moved value</span></aside>
+</div>
+
+<div class="beat">
+  <div class="say">
+    <p>So what physically happened on that second line? Less than you'd guess. The three numbers of the coat-check ticket got copied into <code>hero</code>'s spot, and that's all. Nobody went back to <code>scroll</code>'s spot to wipe it. The coat didn't move either.</p>
+    <p>The whole "transfer" is paperwork. It's like changing the name on the deed to a house: the house stays put, and the editor simply crosses out the old name and won't let it speak about the house again. One consequence surprised me the first time I saw it. Moving a <code>String</code> with a million characters costs exactly as much as moving one with a single character.</p>
+  </div>
+  <aside class="gloss"><span>a move is a bitwise copy of the stack part</span><span>plus the source being marked invalid at compile time</span></aside>
+</div>
+
+<div class="beat">
+  <div class="say">
+    <p>Empty hands aren't a permanent condition. If the binding was declared <code>mut</code>, you can give it something new and it's a proper character again.</p>
+<pre><code>let mut bag = String::from("rope");
+let given = bag;                 <span class="c">// bag is empty-handed now</span>
+bag = String::from("lantern");   <span class="c">// and now it isn't</span>
+println!("{} {}", bag, given);   <span class="c">// lantern rope</span></code></pre>
+  </div>
+  <aside class="gloss"><span>reassigning a moved-from variable</span><span>reinitialization</span></aside>
+</div>
+
+<div class="beat">
+  <div class="say">
+    <p>Loops trip people up. Imagine a character walking laps, handing out an amulet on each lap. On lap one, fine. On lap two, what's in their hand? Nothing.</p>
+<pre><code>fn take(_s: String) {}
+
+fn main() {
+    let gift = String::from("amulet");
+    for _ in 0..2 {
+        take(<span class="bad">gift</span>);
+    }
+}</code></pre>
+    <p class="red"><span class="hand">Editor:</span> <code>error[E0382]</code>: use of moved value, value moved here, in previous iteration of loop</p>
+    <p>The fix is to restock before the next lap:</p>
+<pre><code>let mut gift = String::from("amulet");
+for _ in 0..2 {
+    take(gift);
+    gift = String::from("another amulet");
+}</code></pre>
+    <p>The editor is happy, because on every lap there's something in hand to give.</p>
+  </div>
+  <aside class="gloss"><span>moves inside <code>loop</code>, <code>for</code>, <code>while</code></span><span>"value moved in previous iteration"</span></aside>
+</div>
+
+<div class="beat">
+  <div class="say">
+    <p>When you call a method, look at how the method takes its receiver, because that's the method telling you what it plans to do with your item.</p>
+    <p>If it takes <code>self</code>, the item goes up on the altar and doesn't come back. <code>s.into_bytes()</code> is like trading in your car: you get something for it, but the car is gone. If it takes <code>&amp;self</code>, it only wants to look. If it takes <code>&amp;mut self</code>, it wants to tinker, and you get the item back afterwards, possibly changed.</p>
+  </div>
+  <aside class="gloss"><span><code>fn m(self)</code> consumes</span><span><code>fn m(&amp;self)</code> reads</span><span><code>fn m(&amp;mut self)</code> modifies</span><em>e.g. <code>String::into_bytes</code></em></aside>
+</div>
+
+<div class="beat">
+  <div class="say">
+    <p>A <code>for</code> loop over a collection is a handover too, which is easy to miss because there's no <code>let</code> in sight.</p>
+<pre><code>let bag = vec![String::from("rope"), String::from("torch")];
+for item in bag {
+    println!("{}", item);
+}
+println!("{}", <span class="bad">bag</span>.len());</code></pre>
+    <p class="red"><span class="hand">Editor:</span> <code>error[E0382]</code>: borrow of moved value: <code>bag</code></p>
+    <p>The loop took the whole bag and unpacked it item by item. When the loop ends, there's no bag. If you only wanted to look, write <code>for item in &amp;bag</code>. If you wanted to change the items in place, write <code>for item in &amp;mut bag</code>.</p>
+  </div>
+  <aside class="gloss"><span><code>for x in v</code> calls <code>IntoIterator::into_iter(v)</code></span><span><code>for x in &amp;v</code> borrows</span><span><code>for x in &amp;mut v</code> borrows mutably</span></aside>
+</div>
+
+<div class="beat">
+  <div class="say">
+    <p>One more thing about handing over. Whether you're allowed to change an item depends on who's holding it, not on the item. Each new holder applies for their own license.</p>
+<pre><code>let x = String::from("plain sword");
+let y = x;
+let mut z = y;                    <span class="c">// z has a crafting license</span>
+z.push_str(", sharpened");</code></pre>
+    <p>Neither <code>x</code> nor <code>y</code> could have sharpened it. <code>z</code> can, because <code>mut</code> belongs to the name, not to the <code>String</code>.</p>
+  </div>
+  <aside class="gloss"><span><code>mut</code> is on the binding</span><span>not part of the type</span></aside>
+</div>
+
+<!-- ============ 3 ============ -->
+<h2 id="ch3"><span class="num">3</span>Taking pieces off</h2>
+
+<div class="beat">
+  <div class="say">
+    <p>Remember the tree. Since items hold items, you can sometimes take just one branch.</p>
+<pre><code>struct Knight { name: String, sword: String }
+
+let k = Knight { name: String::from("Ada"), sword: String::from("gem blade") };
+let blade = k.sword;          <span class="c">// pry the gem blade loose</span>
+println!("{}", k.name);       <span class="c">// the rest of the knight is still here</span></code></pre>
+    <p>That's fine. What you can't do now is treat the knight as a whole, because a piece is missing. Write <code>let whole = k;</code> after that and you get <code>error[E0382]</code>, use of partially moved value. The parts that are left still get cleaned up normally when <code>k</code>'s scene ends.</p>
+  </div>
+  <aside class="gloss"><span>partial move</span><span><code>let f = s.field;</code></span></aside>
+</div>
+
+<div class="beat">
+  <div class="say">
+    <p>There's an exception. Some items come with a disposal ceremony, a bit of code that runs when they're destroyed. You can't pry parts off those, for the same reason you can't return a sealed appliance after opening it up: the ceremony expects the whole thing to be there.</p>
+<pre><code>struct Relic { gem: String }
+impl Drop for Relic { fn drop(&amp;mut self) { } }
+
+let r = Relic { gem: String::from("ruby") };
+let g = <span class="bad">r.gem</span>;</code></pre>
+    <p class="red"><span class="hand">Editor:</span> <code>error[E0509]</code>: cannot move out of type <code>Relic</code>, which implements the <code>Drop</code> trait</p>
+  </div>
+  <aside class="gloss"><span><code>impl Drop</code></span><span>no partial moves out of it</span><span>E0509</span></aside>
+</div>
+
+<div class="beat">
+  <div class="say">
+    <p>You also can't hand over something that isn't yours. If someone lent you an item, it's theirs. If you're looking at a slot in a vector, you're looking at a museum display, and museums don't let you walk out with the exhibits. If it's a landmark, it belongs to the world.</p>
+<pre><code>let shelf = vec![String::from("idol")];
+let idol = <span class="bad">shelf[0]</span>;</code></pre>
+    <p class="red"><span class="hand">Editor:</span> <code>error[E0507]</code>: cannot move out of index of <code>Vec&lt;String&gt;</code></p>
+    <p>Why not? Think about what would happen. The vector still believes slot zero holds a string. When the vector is cleaned up, it would clean up slot zero. So would <code>idol</code>. That's the same coat thrown away twice.</p>
+  </div>
+  <aside class="gloss"><span>can't move out of <code>*r</code></span><span>can't move out of <code>v[i]</code></span><span>can't move out of a <code>static</code></span><span>E0507, E0508</span></aside>
+</div>
+
+<div class="beat">
+  <div class="say">
+    <p>So how do you get it out? You do the adventure-movie trick with the golden idol: put something on the pedestal as you lift the treasure off, so the slot is never empty.</p>
+<pre><code>let mut shelf = vec![String::from("idol")];
+let idol = std::mem::take(&amp;mut shelf[0]);
+<span class="c">// got "idol", shelf now [""]</span></code></pre>
+    <p><code>take</code> puts down the type's default value, an empty string here. <code>replace</code> lets you pick the substitute yourself. For an <code>Option</code>, <code>.take()</code> leaves <code>None</code> behind.</p>
+  </div>
+  <aside class="gloss"><span><code>std::mem::take</code></span><span><code>std::mem::replace</code></span><span><code>std::mem::swap</code></span><span><code>Option::take</code></span><em>take uses <code>Default</code></em></aside>
+</div>
+
+<div class="beat">
+  <div class="say">
+    <p>Patterns grab. When you write <code>let (name, _) = pair;</code> or a <code>match</code> arm that binds a <code>String</code> field by value, that field gets handed to the new name. If you only wanted to look, match on a reference instead, and the bindings become references for you:</p>
+<pre><code>let pair = (String::from("map"), 7);
+match &amp;pair {
+    (name, n) =&gt; println!("{} {}", name, n),  <span class="c">// name is a &amp;String</span>
+}
+let (name, _) = pair;                        <span class="c">// this one really takes it</span></code></pre>
+    <p>The older way to say "just look" inside a pattern is the <code>ref</code> keyword. You'll still see it in plenty of code.</p>
+  </div>
+  <aside class="gloss"><span>destructuring moves by default</span><span><code>ref</code>, <code>ref mut</code></span><span>match ergonomics / default binding modes</span></aside>
+</div>
+
+<!-- ============ 4 ============ -->
+<h2 id="ch4"><span class="num">4</span>Leaving the story</h2>
+
+<div class="beat">
+  <div class="say">
+    <p>To watch characters leave, it helps to have items that announce their own departure. Here's one. We'll use it for the rest of the chapter.</p>
+<pre><code>struct Loud(&amp;'static str);
+
+impl Drop for Loud {
+    fn drop(&amp;mut self) {
+        println!("{} leaves", self.0);
+    }
+}</code></pre>
+    <p>When a character's scene ends, meaning the closing <code>}</code> of the block where they were declared, their items dissolve. That's the moment memory gets freed. It works like a hotel checkout that clears the room automatically: you don't call housekeeping, you just leave.</p>
+  </div>
+  <aside class="gloss"><span>the <code>Drop</code> trait</span><span>runs at end of scope</span><em>this pattern is called RAII</em></aside>
+</div>
+
+<div class="beat">
+  <div class="say">
+    <p>Now, who leaves first? Try to predict it before you open the answer.</p>
+<pre><code>struct Pack { first: Loud, second: Loud }
+
+fn main() {
+    let _veteran  = Loud("veteran");
+    let _newcomer = Loud("newcomer");
+    let _pack = Pack { first: Loud("pocket one"),
+                       second: Loud("pocket two") };
+    println!("the scene ends");
+}</code></pre>
+    <details class="guess">
+      <summary>Guess the output, then open</summary>
+<pre class="out"><code>the scene ends
+pocket one leaves
+pocket two leaves
+newcomer leaves
+veteran leaves</code></pre>
+      <p>Two different orders are at work. Characters leave in reverse order of arrival, like a stack of plates. That's deliberate: a newcomer might depend on the veteran who was there first, so the newcomer has to go before the veteran does. Inside a pack, though, the pockets empty in the order they were written down. The pack arrived last, so it left first, and its pockets went one, two.</p>
+    </details>
+    <p>The same picture explains why dissolving is recursive. When a <code>Vec&lt;String&gt;</code> goes, every <code>String</code> in it goes, and every buffer those strings pointed at goes too. The whole branch of the tree comes down.</p>
+  </div>
+  <aside class="gloss"><span>drop order</span><span>locals: reverse declaration order</span><span>fields and elements: declaration order</span><span>drop glue (recursive)</span></aside>
+</div>
+
+<div class="beat">
+  <div class="say">
+    <p>You might expect some special "destroy this now" command. There isn't one, really. <code>std::mem::drop</code> is defined, in the actual standard library, like this:</p>
+<pre><code>pub fn drop&lt;T&gt;(_x: T) {}</code></pre>
+    <p>That's the whole function. You hand your item to a character whose scene is one line long. They leave, and the item leaves with them. Ending the owner is the destruction. (You're not allowed to call the <code>.drop()</code> method yourself, by the way. The editor would catch you running the ceremony twice.)</p>
+  </div>
+  <aside class="gloss"><span><code>std::mem::drop(x)</code></span><span>an ordinary move</span><span>calling <code>x.drop()</code> directly is E0040</span></aside>
+</div>
+
+<div class="beat">
+  <div class="say">
+    <p>Here's the first place the editor can't settle everything on paper.</p>
+<pre><code>let coin = std::env::args().count() &gt; 1;
+let amulet = Loud("amulet");
+if coin { drop(amulet); }
+println!("the scene ends");</code></pre>
+    <p>Did the amulet get handed away or not? It depends on something that only happens when the program runs. So the compiler quietly leaves a note for the narrator, a hidden flag saying "was it given away?" At the end of the scene the flag gets checked, and the item dissolves only if it's still here. Run it with no arguments and you'll see "the scene ends" first, then "amulet leaves." Pass any argument and the order flips.</p>
+  </div>
+  <aside class="gloss"><span>drop flags</span><em>a real runtime check</em></aside>
+</div>
+
+<div class="beat">
+  <div class="say">
+    <p>Extras can get promoted. Normally a temporary leaves at the semicolon, but if you immediately take a reference to it and give that reference a name, Rust keeps the extra around for as long as the name needs it.</p>
+<pre><code>let r = &amp;Loud("promoted extra");
+println!("still here: {}", r.0);
+<span class="c">// "promoted extra leaves" prints at the end of the scene</span></code></pre>
+    <p>The exact rules for how long temporaries live were adjusted in the 2024 edition, mostly for temporaries in the last expression of a block and in <code>if let</code>. If you ever see a surprising drop time, check which edition your project uses.</p>
+  </div>
+  <aside class="gloss"><span>temporary lifetime extension</span><span><code>let r = &amp;make();</code></span></aside>
+</div>
+
+<div class="beat">
+  <div class="say">
+    <p>Pointing isn't grabbing. Here's a puzzle that catches experienced people.</p>
+<pre><code>let keeper = Loud("keeper");
+let _ = keeper;
+let _ = Loud("extra");
+let _named = Loud("named extra");
+println!("the scene ends");</code></pre>
+    <details class="guess">
+      <summary>Guess the output, then open</summary>
+<pre class="out"><code>extra leaves
+the scene ends
+named extra leaves
+keeper leaves</code></pre>
+      <p>The lone underscore means "don't bind anything." So <code>let _ = keeper;</code> just points at the keeper and says "that one," and the keeper keeps its item. <code>let _ = Loud("extra");</code> points at an extra who has no name, and nobody takes the item, so the extra leaves at the semicolon. <code>_named</code> starts with an underscore but it's a real name. It takes the item and lives to the end of the scene.</p>
+    </details>
+  </div>
+  <aside class="gloss"><span><code>let _ = x;</code> does not move</span><span><code>let _y = x;</code> does</span></aside>
+</div>
+
+<div class="beat">
+  <div class="say">
+    <p>Now something that surprises people who think Rust promises "no memory leaks." It doesn't promise that. What it promises is that nothing dissolves twice and nothing is used after it's gone. An item disappearing without its ceremony is allowed, and there are several ways to do it on purpose or by accident:</p>
+    <p><code>std::mem::forget</code> throws an item into the void. <code>Box::leak</code> turns an item into a permanent landmark and gives you a <code>&amp;'static mut</code> to it. And two guilds that each hold the other's charter never disband, like two people each waiting for the other to hang up the phone. That's a reference cycle with <code>Rc</code>, and chapter 8 comes back to it.</p>
+  </div>
+  <aside class="gloss"><span><code>std::mem::forget</code></span><span><code>Box::leak</code></span><span><code>Rc</code> cycles</span><em>leaks are memory-safe in Rust</em></aside>
+</div>
+
+<!-- ============ 5 ============ -->
+<h2 id="ch5"><span class="num">5</span>Copying instead of handing over</h2>
+
+<div class="beat">
+  <div class="say">
+    <p>Why doesn't this fail the way the scroll did?</p>
+<pre><code>let a: i32 = 5;
+let b = a;
+println!("{} {}", a, b);   <span class="c">// 5 5</span></code></pre>
+    <p>Because an integer isn't an object you carry around. It's more like a fact. If I tell you a phone number, I don't forget it. We both have it now, completely independently. Types that behave this way are marked <code>Copy</code>: the integers, floats, <code>bool</code>, <code>char</code>, shared references, and tuples and arrays made only of those.</p>
+  </div>
+  <aside class="gloss"><span>the <code>Copy</code> trait</span><span>implicit bitwise duplicate</span><span>source stays valid</span></aside>
+</div>
+
+<div class="beat">
+  <div class="say">
+    <p>Could a <code>String</code> be <code>Copy</code>? Think about what the copy would be: a second coat-check ticket for the same coat. Now both tickets get turned in at the end of the night, and the coat gets thrown away twice. That's the whole reason a type can't be both <code>Copy</code> and have a <code>Drop</code> ceremony. The compiler simply won't let you declare both.</p>
+  </div>
+  <aside class="gloss"><span><code>Copy</code> and <code>Drop</code> are mutually exclusive</span><em>otherwise: double free</em></aside>
+</div>
+
+<div class="beat">
+  <div class="say">
+    <p>If you really do want two coats, you commission a tailor. <code>.clone()</code> makes a genuine second item with its own heap memory. It's explicit on purpose, because it can cost real time and memory, and Rust wants you to see that cost written in your code.</p>
+  </div>
+  <aside class="gloss"><span><code>.clone()</code></span><span>the <code>Clone</code> trait</span><span>deep copy, usually allocates</span></aside>
+</div>
+
+<div class="beat">
+  <div class="say">
+    <p>References follow the same logic. A visitor's pass to a museum can be photocopied as much as you like, since a hundred people looking doesn't hurt anything. A work order to repair one particular blade can't be photocopied, because two smiths hammering the same blade at the same time is a mess. So <code>&amp;T</code> is <code>Copy</code> and <code>&amp;mut T</code> isn't.</p>
+  </div>
+  <aside class="gloss"><span><code>&amp;T</code> is <code>Copy</code></span><span><code>&amp;mut T</code> is not</span><em>two <code>&amp;mut</code> at once = a data race</em></aside>
+</div>
+
+<!-- ============ 6 ============ -->
+<h2 id="ch6"><span class="num">6</span>Lending</h2>
+
+<div class="beat">
+  <div class="say">
+    <p>Handing things over all the time would be exhausting, so characters also lend. The borrower gets to use the item, and the owner keeps it. But lending comes with conditions, and every one of them exists to protect the owner's item.</p>
+    <p>First condition: no loan can outlive the lender. When the lender's scene ends, their items dissolve, so a loan still floating around afterwards would be pointing at nothing. It's like a library that's closing for good: every book has to be back before the doors lock.</p>
+<pre><code>let loan;
+{
+    let lender = String::from("lantern");
+    loan = <span class="bad">&amp;lender</span>;
+}                           <span class="c">// lender's scene ends here</span>
+println!("{}", loan);       <span class="c">// ...but the loan is used here</span></code></pre>
+    <p class="red"><span class="hand">Editor:</span> <code>error[E0597]</code>: <code>lender</code> does not live long enough</p>
+  </div>
+  <aside class="gloss"><span>borrowing: <code>&amp;x</code></span><span>lifetimes</span><span>E0597</span></aside>
+</div>
+
+<div class="beat">
+  <div class="say">
+    <p>Second condition: while an item is lent out for viewing, it's frozen. The owner still owns it, but can't give it away, destroy it, or change it.</p>
+<pre><code>let mut shield = String::from("shield");
+let look = &amp;shield;
+<span class="bad">shield.push('!')</span>;          <span class="c">// changing it while someone is looking</span>
+println!("{}", look);</code></pre>
+    <p class="red"><span class="hand">Editor:</span> <code>error[E0502]</code>: cannot borrow <code>shield</code> as mutable because it is also borrowed as immutable</p>
+    <p>Now swap the last two lines:</p>
+<pre><code>let mut shield = String::from("shield");
+let look = &amp;shield;
+println!("{}", look);       <span class="c">// last time look is used</span>
+shield.push('!');           <span class="c">// fine</span></code></pre>
+    <p>That compiles. The loan doesn't last until the end of the block. It lasts until the borrower last uses it, and the owner gets full rights back right after. For years Rust didn't work this way and the old behavior was a constant annoyance, so if you read older blog posts complaining about this, that's why.</p>
+  </div>
+  <aside class="gloss"><span>shared borrow <code>&amp;T</code> freezes the owner</span><span>E0502</span><span>NLL: non-lexical lifetimes</span><em>exception: interior mutability, chapter 8</em></aside>
+</div>
+
+<div class="beat">
+  <div class="say">
+    <p>Third condition: while the item is out for repair, the owner can't even look at it. Your car is in the shop; you don't get to sit in it.</p>
+<pre><code>let mut shield = String::from("shield");
+let fix = &amp;mut shield;
+println!("{}", <span class="bad">shield</span>);     <span class="c">// peeking during the repair</span>
+fix.push('!');</code></pre>
+    <p class="red"><span class="hand">Editor:</span> <code>error[E0502]</code>: cannot borrow <code>shield</code> as immutable because it is also borrowed as mutable</p>
+    <p>Why so strict? Because a repair might change the item in a way that makes whatever you were looking at meaningless. The last example in this chapter shows exactly that.</p>
+  </div>
+  <aside class="gloss"><span>mutable borrow <code>&amp;mut T</code></span><span>exclusive: no other access at all</span><em>aliasing XOR mutation</em></aside>
+</div>
+
+<div class="beat">
+  <div class="say">
+    <p>A character leaving the stage can't hand you a note that points at their own belongings. Those belongings are about to dissolve.</p>
+<pre><code>fn note(_s: &amp;String) -&gt; &amp;str {
+    let local = String::from("my own belongings");
+    <span class="bad">&amp;local</span>
+}</code></pre>
+    <p class="red"><span class="hand">Editor:</span> <code>error[E0515]</code>: cannot return reference to local variable <code>local</code></p>
+    <p>A returned reference has to point at something that will still exist after the function ends. In practice that means something the caller lent in, or a landmark.</p>
+  </div>
+  <aside class="gloss"><span>returning <code>&amp;T</code></span><span>must come from an input or be <code>'static</code></span><span>E0515</span></aside>
+</div>
+
+<div class="beat">
+  <div class="say">
+    <p>If a struct holds a reference, it's holding a map to somebody else's stash. The map has to say whose stash, so the editor can check the map never outlives the stash.</p>
+<pre><code>struct Map&lt;'a&gt; { stash: &amp;'a str }
+
+let treasure = String::from("under the old oak");
+let m = Map { stash: &amp;treasure };</code></pre>
+    <p>That <code>'a</code> doesn't do anything at runtime. It's a label, a way of writing "this map depends on whoever owns the treasure" into the type.</p>
+  </div>
+  <aside class="gloss"><span>lifetime parameters</span><span><code>struct S&lt;'a&gt; { r: &amp;'a T }</code></span></aside>
+</div>
+
+<div class="beat">
+  <div class="say">
+    <p>Back to the tree. Since fields are separate branches, you can lend the shield to one person and the sword to another, both for repair, at the same time.</p>
+<pre><code>struct Kit { shield: String, sword: String }
+
+let a = &amp;mut kit.shield;
+let b = &amp;mut kit.sword;      <span class="c">// fine, different branches</span>
+a.push('!');
+b.push('!');</code></pre>
+    <p>But try getting the sword through a method:</p>
+<pre><code>impl Kit {
+    fn sword_mut(&amp;mut self) -&gt; &amp;mut String { &amp;mut self.sword }
+}
+
+let a = &amp;mut kit.shield;
+let b = <span class="bad">kit.sword_mut()</span>;
+a.push('!');</code></pre>
+    <p class="red"><span class="hand">Editor:</span> <code>error[E0499]</code>: cannot borrow <code>kit</code> as mutable more than once at a time</p>
+    <p>This one feels unfair at first. You know the method only touches the sword. But the editor doesn't read the method's body when checking your call. It reads the signature, and the signature says <code>&amp;mut self</code>: "lend me the whole kit." The signature is a promise, and the editor holds you to exactly what it says.</p>
+  </div>
+  <aside class="gloss"><span>disjoint field borrows</span><span>borrow checking is per function</span><span>signatures are the contract</span><span>E0499</span></aside>
+</div>
+
+<div class="beat">
+  <div class="say">
+    <p>Here's the concrete example I promised. You can't make a bag bigger while someone is counting what's inside.</p>
+<pre><code>let mut bag = vec![1, 2, 3];
+for x in &amp;bag {
+    if *x == 2 { <span class="bad">bag.push(4)</span>; }
+}</code></pre>
+    <p class="red"><span class="hand">Editor:</span> <code>error[E0502]</code>: cannot borrow <code>bag</code> as mutable because it is also borrowed as immutable</p>
+    <p>This isn't the editor being fussy. When a vector runs out of room, <code>push</code> moves everything to a bigger room somewhere else on the heap and frees the old one. The loop would keep counting in the old room, which is now empty and possibly handed to someone else. In C++ this is a real bug that ships in real programs. Here, it's a red mark on the script.</p>
+  </div>
+  <aside class="gloss"><span>iterator invalidation</span><span>reallocation on <code>push</code></span></aside>
+</div>
+
+<!-- ============ 7 ============ -->
+<h2 id="ch7"><span class="num">7</span>Originals and windows</h2>
+
+<div class="beat">
+  <div class="say">
+    <p>Once you have both owning and lending, a pattern shows up all over the standard library: the same kind of data comes in two forms, the original and a window onto someone's original. A house and a photo of the house.</p>
+    <p><code>String</code> is a scroll you own, <code>&amp;str</code> is a window onto some text. <code>Vec&lt;T&gt;</code> is a shelf you own, <code>&amp;[T]</code> is a window onto a row of items. Same with <code>PathBuf</code> and <code>&amp;Path</code>, and <code>Box&lt;T&gt;</code> and <code>&amp;T</code>. A good habit: take windows as function parameters when you only need to read. A <code>&amp;String</code> turns into a <code>&amp;str</code> automatically, so taking <code>&amp;str</code> lets callers pass either.</p>
+  </div>
+  <aside class="gloss"><span><code>String</code> / <code>&amp;str</code></span><span><code>Vec&lt;T&gt;</code> / <code>&amp;[T]</code></span><span><code>PathBuf</code> / <code>&amp;Path</code></span><span><code>Box&lt;T&gt;</code> / <code>&amp;T</code></span><em>deref coercion</em></aside>
+</div>
+
+<div class="beat">
+  <div class="say">
+    <p>To go from window to original, you transcribe: look through the window and write out your own scroll. That's <code>.to_owned()</code> or <code>.to_string()</code>, and it allocates new memory, so it isn't free.</p>
+  </div>
+  <aside class="gloss"><span><code>.to_owned()</code></span><span><code>.to_string()</code></span><span>the <code>ToOwned</code> trait</span></aside>
+</div>
+
+<div class="beat">
+  <div class="say">
+    <p>Sometimes you don't know in advance whether you'll need your own copy. A library book is a good model: you read it for free, and only if you want to write in the margins do you go buy your own.</p>
+<pre><code>use std::borrow::Cow;
+
+fn tidy(s: &amp;str) -&gt; Cow&lt;str&gt; {
+    if s.contains(' ') {
+        Cow::Owned(s.replace(' ', "_"))   <span class="c">// had to buy a copy</span>
+    } else {
+        Cow::Borrowed(s)                  <span class="c">// just the library copy</span>
+    }
+}</code></pre>
+    <p><code>tidy("clean")</code> costs nothing. <code>tidy("needs work")</code> allocates, because it had to change something.</p>
+  </div>
+  <aside class="gloss"><span><code>Cow&lt;'a, T&gt;</code></span><em>clone-on-write</em></aside>
+</div>
+
+<!-- ============ 8 ============ -->
+<h2 id="ch8"><span class="num">8</span>Changing the rules of possession</h2>
+
+<div class="beat">
+  <div class="say">
+    <p>"One owner" is a strong rule, and sometimes the thing you're modeling really does have many owners. A node in a graph that several other nodes point to, say. For that, Rust has guild property. It works like a timeshare: many members each hold a token, and the property only goes away when the last member gives up their token.</p>
+<pre><code>use std::rc::Rc;
+
+let hall = Rc::new(String::from("guildhall"));
+let member = Rc::clone(&amp;hall);
+println!("members: {}", Rc::strong_count(&amp;hall));   <span class="c">// 2</span></code></pre>
+    <p><code>Rc::clone</code> doesn't copy the hall. It hands out another token and bumps the member count.</p>
+  </div>
+  <aside class="gloss"><span><code>Rc&lt;T&gt;</code> single-threaded</span><span><code>Arc&lt;T&gt;</code> thread-safe</span><span><code>Rc::clone</code></span><span><code>Rc::strong_count</code></span><em>reference counting</em></aside>
+</div>
+
+<div class="beat">
+  <div class="say">
+    <p>What about the two guilds from chapter 4 that each held the other's charter? The fix is to let one side merely know the other's address, without being a member. Knowing where the guildhall is doesn't keep it open.</p>
+<pre><code>let address = Rc::downgrade(&amp;hall);
+drop(hall);
+drop(member);
+println!("still standing? {}", address.upgrade().is_some());</code></pre>
+    <details class="guess">
+      <summary>Guess what prints, then open</summary>
+      <p><code>still standing? false</code>. The last two members left, so the hall dissolved. The address still exists, but <code>upgrade()</code> checks and finds nothing there, so it returns <code>None</code>. That check is how a <code>Weak</code> stays safe.</p>
+    </details>
+  </div>
+  <aside class="gloss"><span><code>Weak&lt;T&gt;</code></span><span><code>Rc::downgrade</code></span><span><code>.upgrade()</code> returns <code>Option</code></span><em>breaks reference cycles</em></aside>
+</div>
+
+<div class="beat">
+  <div class="say">
+    <p>Guild property has a catch. With many members, nobody has exclusive rights, so an <code>Rc</code> only gives you <code>&amp;T</code>: look, don't touch. The one exception is when you happen to be the only member left. Then <code>Rc::get_mut</code> hands you a <code>&amp;mut</code>, and <code>Rc::make_mut</code> will even make you a private copy first if others are still around.</p>
+  </div>
+  <aside class="gloss"><span><code>Rc</code> derefs to <code>&amp;T</code> only</span><span><code>Rc::get_mut</code></span><span><code>Rc::make_mut</code></span></aside>
+</div>
+
+<div class="beat">
+  <div class="say">
+    <p>So how do you get shared ownership and change things? You station a referee on stage. Up to now, every rule was checked by the editor before the show. These types move the check into the performance itself.</p>
+    <p>A <code>RefCell</code> keeps a sign-out sheet. Every time someone borrows, it writes that down, and it refuses a repair while anyone is still signed out for viewing. Refuses loudly:</p>
+<pre><code>use std::cell::RefCell;
+
+let ledger = RefCell::new(String::from("sword"));
+let looking = ledger.borrow();
+let fixing = ledger.borrow_mut();    <span class="c">// compiles fine...</span></code></pre>
+<pre class="out"><code>thread 'main' panicked at ...
+already borrowed: BorrowMutError</code></pre>
+    <p>Notice what happened. It compiled. The rule is exactly the same one the editor enforces in chapter 6, but now it's caught during the run, and breaking it crashes the program instead of failing the build.</p>
+  </div>
+  <aside class="gloss"><span>interior mutability</span><span><code>RefCell&lt;T&gt;</code></span><span><code>.borrow()</code>, <code>.borrow_mut()</code></span><span>panics with <code>BorrowMutError</code></span><em>a real runtime check</em></aside>
+</div>
+
+<div class="beat">
+  <div class="say">
+    <p>A <code>Mutex</code> is a steward holding the only key, like the key to a single-person restroom. If someone else has it, you wait. <code>.lock()</code> is asking for the key, and when the guard it returns goes out of scope, the key goes back on the hook.</p>
+    <p>A <code>Cell</code> is cleverer and cheaper. It never lends the item at all. You can only swap a whole item in or copy one out, with <code>.set()</code> and <code>.get()</code>. Since nobody ever holds a reference to the inside, there's nothing to keep track of, so no sign-out sheet is needed.</p>
+    <p>Underneath all of these sits one primitive, <code>UnsafeCell</code>. It's the only legal way in Rust to change something through a <code>&amp;</code>.</p>
+  </div>
+  <aside class="gloss"><span><code>Mutex&lt;T&gt;</code>, <code>.lock()</code></span><span><code>RwLock&lt;T&gt;</code></span><span><code>Cell&lt;T&gt;</code>, <code>.get()</code>, <code>.set()</code></span><span><code>UnsafeCell&lt;T&gt;</code></span><span><code>OnceCell</code>, atomics</span></aside>
+</div>
+
+<div class="beat">
+  <div class="say">
+    <p>Last, an odd one. Remember that a move copies bytes to a new place. For almost everything, that's harmless. But picture a shrine whose inscriptions give directions measured from the shrine itself: "the key is three paces north of here." Move the shrine and the inscriptions are lies. Some data is like that, it contains pointers into itself, and Rust's async code produces it all the time.</p>
+    <p><code>Pin</code> nails such an item to the floor, promising it will never move again. Most types don't care where they are, and those are marked <code>Unpin</code>; for them, pinning is a formality and they can still be moved.</p>
+  </div>
+  <aside class="gloss"><span><code>Pin&lt;P&gt;</code></span><span><code>Unpin</code> / <code>!Unpin</code></span><em>self-referential data, async futures</em></aside>
+</div>
+
+<!-- ============ 9 ============ -->
+<h2 id="ch9"><span class="num">9</span>Companions and parallel storylines</h2>
+
+<div class="beat">
+  <div class="say">
+    <p>A closure decides for itself how to hold what it uses. It picks the lightest grip that works: just look if looking is enough, borrow for repair if it changes something, carry it only if it has to. Writing <code>move</code> forces it to carry everything.</p>
+    <p>Separately, the closure's body decides how many times it can be called. If the body gives away something it's carrying, it can only do that once. It's a companion with a single-use potion.</p>
+<pre><code>let potion = String::from("potion");
+let drink = move || { let p = potion; println!("drank {}", p); };
+drink();
+<span class="bad">drink</span>();</code></pre>
+    <p class="red"><span class="hand">Editor:</span> <code>error[E0382]</code>: use of moved value: <code>drink</code></p>
+    <p>The first call consumed the closure itself. A closure that only tinkers with its gear can be called many times (<code>FnMut</code>), and one that only looks can be called anywhere, anytime (<code>Fn</code>).</p>
+  </div>
+  <aside class="gloss"><span>capture modes: <code>&amp;</code>, <code>&amp;mut</code>, by value</span><span><code>move</code></span><span><code>FnOnce</code>, <code>FnMut</code>, <code>Fn</code></span><em>edition 2021: captures individual fields</em></aside>
+</div>
+
+<div class="beat">
+  <div class="say">
+    <p>Threads are storylines running side by side. Now there's a new question: which items are allowed to cross from one storyline to another?</p>
+<pre><code>use std::rc::Rc;
+use std::thread;
+
+let token = Rc::new(5);
+thread::spawn(move || println!("{}", token));</code></pre>
+    <p class="red"><span class="hand">Editor:</span> <code>error[E0277]</code>: <code>Rc&lt;i32&gt;</code> cannot be sent between threads safely</p>
+    <p>An <code>Rc</code>'s member count is kept in pencil with nobody guarding it. If two storylines both added or removed a member at the same moment, the count could come out wrong, and a wrong count means dissolving too early or never. <code>Arc</code> keeps its count with atomic operations, which are safe to update from several threads at once, so <code>Arc</code> may cross.</p>
+    <p>There's a second marker for items that may be <em>looked at</em> from several storylines at once. A <code>RefCell</code> can be handed to another thread, but not shared between two, because its sign-out sheet isn't guarded either.</p>
+  </div>
+  <aside class="gloss"><span><code>Send</code>: ownership may move to another thread</span><span><code>Sync</code>: <code>&amp;T</code> may be shared across threads</span><span><code>Rc</code> is neither</span><span><code>RefCell</code> is <code>Send</code>, not <code>Sync</code></span><span>E0277</span></aside>
+</div>
+
+<div class="beat">
+  <div class="say">
+    <p>A spawned thread is an expedition of unknown length. You don't know when it comes back, so it can't borrow anything from camp: camp might be packed up before it returns.</p>
+<pre><code>let supplies = vec![1, 2, 3];
+let h = thread::spawn(<span class="bad">|| println!("{:?}", supplies)</span>);</code></pre>
+    <p class="red"><span class="hand">Editor:</span> <code>error[E0373]</code>: closure may outlive the current function, but it borrows <code>supplies</code></p>
+    <p>That's why you see <code>move</code> on nearly every <code>thread::spawn</code>. The party carries its own supplies.</p>
+    <p>If you can promise every expedition returns before camp breaks, borrowing is fine again:</p>
+<pre><code>thread::scope(|s| {
+    s.spawn(|| println!("scout sees {:?}", supplies));
+    s.spawn(|| println!("cook sees {:?}", supplies));
+});                                  <span class="c">// both are back by here</span>
+println!("camp still has {:?}", supplies);</code></pre>
+  </div>
+  <aside class="gloss"><span><code>thread::spawn</code> needs <code>F: Send + 'static</code></span><span>E0373</span><span><code>std::thread::scope</code></span></aside>
+</div>
+
+<div class="beat">
+  <div class="say">
+    <p>To share one changeable thing among many storylines, put the two ideas from chapter 8 together: guild property that's safe across threads, holding a steward with a key.</p>
+<pre><code>use std::sync::{Arc, Mutex};
+
+let chest = Arc::new(Mutex::new(0));
+for _ in 0..4 {
+    let chest = Arc::clone(&amp;chest);
+    crew.push(thread::spawn(move || {
+        *chest.lock().unwrap() += 1;
+    }));
+}</code></pre>
+    <p>Each thread gets its own membership token, and they take turns with the key. You'll write this shape many times.</p>
+  </div>
+  <aside class="gloss"><span><code>Arc&lt;Mutex&lt;T&gt;&gt;</code></span><em>shared ownership plus interior mutability</em></aside>
+</div>
+
+<div class="beat">
+  <div class="say">
+    <p>Finally, couriers. Sending a value down a channel is like mailing a package: once it's in the mailbox, it's not in your hands.</p>
+<pre><code>let (tx, rx) = std::sync::mpsc::channel();
+let parcel = String::from("letter");
+tx.send(parcel).unwrap();
+println!("{}", <span class="bad">parcel</span>);</code></pre>
+    <p class="red"><span class="hand">Editor:</span> <code>error[E0382]</code>: borrow of moved value: <code>parcel</code></p>
+    <p>That's the same error as the very first scroll example. Nothing new is going on. <code>send</code> takes its argument by value, and that's the whole trick: ownership is how Rust knows only one thread can touch the letter at a time.</p>
+  </div>
+  <aside class="gloss"><span><code>mpsc::channel</code></span><span><code>tx.send(x)</code> moves <code>x</code></span></aside>
+</div>
+
+<!-- ============ 10 ============ -->
+<h2 id="ch10"><span class="num">10</span>Dark magic</h2>
+
+<div class="beat">
+  <div class="say">
+    <p>Inside an <code>unsafe</code> block you're allowed to do a few things the editor can't verify. It doesn't switch the editor off. Ordinary references are still checked exactly as before. It just gives you some extra spells, and you vouch for them.</p>
+    <p><code>std::ptr::read</code> is a forgery spell. It copies an item's bytes into a new character without crossing out the original. Now two characters believe the item is theirs, and when both scenes end, the ceremony runs twice. That's a double free, which is exactly the kind of bug the whole ownership system exists to prevent.</p>
+  </div>
+  <aside class="gloss"><span><code>unsafe { }</code></span><span><code>std::ptr::read</code></span><span>raw pointers <code>*const T</code>, <code>*mut T</code></span><em>risk: double drop</em></aside>
+</div>
+
+<div class="beat">
+  <div class="say">
+    <p>So there are also spells for doing the bookkeeping yourself. <code>ManuallyDrop</code> lifts the automatic dissolving: the item stays when the scene ends, and it's your job to dispose of it (or to leak it on purpose). <code>MaybeUninit</code> is a reserved seat. The seat exists, nobody is in it yet, and you promise to fill it before anyone checks who's sitting there.</p>
+    <p>One honest caveat. The exact rules that unsafe code must follow about aliasing aren't officially finished. There are candidate models, called Stacked Borrows and Tree Borrows, and a tool named Miri that checks your code against them, but neither is the final word yet.</p>
+  </div>
+  <aside class="gloss"><span><code>ManuallyDrop&lt;T&gt;</code></span><span><code>MaybeUninit&lt;T&gt;</code>, <code>.write()</code>, <code>.assume_init()</code></span><span>Miri</span></aside>
+</div>
+
+<!-- ============ leaks ============ -->
+<h2 id="leaks">Where the story breaks down</h2>
+
+<div class="leak prose">
+<p>Every analogy is wrong somewhere, and it's worth knowing where, so you don't lean on it in the wrong place.</p>
+<p>A move is not a character physically carrying the whole item across the stage. Only the small part, the coat-check ticket, gets copied. The coat stays in the back room. That's the reason moving a huge vector is cheap, and the story doesn't show it unless you remember the coat check.</p>
+<p>The editor isn't the only enforcer. Three things in this guide happen while the program runs: drop flags (chapter 4), <code>RefCell</code>'s sign-out sheet, which panics, and <code>Mutex</code>'s key, which makes threads wait (chapter 8). Everything else is settled before the program starts.</p>
+<p>And the editor is cautious, not perfect. It rejects some programs that would actually have been safe. The best-known case is returning a borrow conditionally from inside a loop. A newer borrow checker, called Polonius, is being built to accept more of those. I don't know its current status; check the Rust blog if it matters to you. When the editor rejects something you're sure is fine, it's worth asking two questions: is there really no way this could go wrong, and if not, can I restructure so the editor can see that too?</p>
+</div>
+
+<h2 id="try">Things to try on your own</h2>
+<div class="prose">
+<p>Change the drop-order example so the pack is declared first. Before running it, write down the order you expect.</p>
+<p>Take the <code>sword_mut</code> example and find two different ways to make it compile without changing what it does.</p>
+<p>Write a function that takes <code>&amp;str</code> and returns the longest word in it, without allocating. Then try to make it return a word from a <code>String</code> that was created inside the function, and read what the editor says.</p>
+<p>Build two <code>Rc</code> nodes that point at each other and add a <code>Drop</code> print to them. Confirm nothing prints. Then change one pointer to <code>Weak</code> and watch both leave.</p>
+</div>
+
+<footer>
+<p>Every code sample was compiled with <code>rustc</code>, edition 2021. Error codes are exact; the wording of messages can differ slightly between compiler versions. For the full explanation of any code, run <code>rustc --explain E0382</code> (or whichever number you got).</p>
+</footer>
+
+</main>
+<script>
+(function () {
+  var btn = document.getElementById('themebtn');
+  var root = document.documentElement;
+  var key = 'ownership-guide-theme';
+  try {
+    var saved = localStorage.getItem(key);
+    if (saved === 'light' || saved === 'dark') root.setAttribute('data-theme', saved);
+  } catch (e) {}
+  btn.addEventListener('click', function () {
+    var current = root.getAttribute('data-theme');
+    if (!current) {
+      current = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    var next = current === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem(key, next); } catch (e) {}
+  });
+})();
+</script>
+</body>
+</html>
