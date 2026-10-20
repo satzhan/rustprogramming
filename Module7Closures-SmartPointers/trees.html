@@ -1,0 +1,2609 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trees, With Keys You Can Copy</title>
+<meta name="description" content="Binary trees in Rust built from Option&lt;Rc&lt;RefCell&lt;TreeNode&gt;&gt;&gt;: copying keys, opening doors, walking, building and rewiring trees, and what each move costs the machine.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Saira+Stencil+One&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+
+:root {
+  --bg: #eef1f2;
+  --panel: #f7f9f9;
+  --ink: #1d252b;
+  --ink-soft: #46535c;
+  --steel: #4f6574;
+  --steel-pale: #d7e0e5;
+  --steel-faint: #e4eaed;
+  --brass: #8a7224;
+  --brass-pale: #efe6c4;
+  --hook: #8b98a3;
+  --felt: #2f6a52;
+  --cardboard: #9b7a4d;
+  --nope: #a2464b;
+  --code-bg: #e2e8eb;
+  --fact: #0f766e;
+  --judgment: #b45309;
+  --model: #6d28d9;
+  --hk: #5a3e94; --ht: #1d5c7a; --hv: #7a5a10; --hs: #2f6a52; --hn: #9a4a1c; --hc: #6f7d86; --hm: #8a2f5a; --hf: #2b4a5c; --ha: #6f7d86;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #14191d; --panel: #1a2126; --ink: #e2e7ea; --ink-soft: #a9b6bf;
+    --steel: #8fa7b8; --steel-pale: #2a363f; --steel-faint: #20292f;
+    --brass: #d2b65c; --brass-pale: #3a3420; --hook: #6d7c88; --felt: #66b48f;
+    --cardboard: #c49b62; --nope: #e0787d; --code-bg: #1f272d;
+    --fact: #2dd4bf; --judgment: #f59e0b; --model: #b69cff;
+    --hk: #c3a6ff; --ht: #7cc4e4; --hv: #e3c46a; --hs: #8fd3ad; --hn: #f0a070; --hc: #7f8e98; --hm: #f08cba; --hf: #b8d4e6; --ha: #7f8e98;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #14191d; --panel: #1a2126; --ink: #e2e7ea; --ink-soft: #a9b6bf;
+  --steel: #8fa7b8; --steel-pale: #2a363f; --steel-faint: #20292f;
+  --brass: #d2b65c; --brass-pale: #3a3420; --hook: #6d7c88; --felt: #66b48f;
+  --cardboard: #c49b62; --nope: #e0787d; --code-bg: #1f272d;
+  --fact: #2dd4bf; --judgment: #f59e0b; --model: #b69cff;
+  --hk: #c3a6ff; --ht: #7cc4e4; --hv: #e3c46a; --hs: #8fd3ad; --hn: #f0a070; --hc: #7f8e98; --hm: #f08cba; --hf: #b8d4e6; --ha: #7f8e98;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } * { transition: none !important; } }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Literata", Charter, "Bitstream Charter", Georgia, serif;
+  font-size: 1.06rem;
+  line-height: 1.72;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--steel); text-underline-offset: 3px; }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+@media (min-width: 1100px) {
+  .layout { grid-template-columns: 250px minmax(0, 1fr); column-gap: 56px; }
+}
+
+/* ---------- locker-door contents rail ---------- */
+.rail { display: none; }
+@media (min-width: 1100px) {
+  .rail {
+    display: block;
+    position: sticky;
+    top: 0;
+    align-self: start;
+    height: 100vh;
+    overflow-y: auto;
+    padding: 36px 0 24px;
+  }
+}
+.rail ol, .mobile-toc ol { list-style: none; margin: 0; padding: 0; }
+.rail li + li { margin-top: 3px; }
+.rail a, .mobile-toc a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: var(--ink-soft);
+  font-size: 0.86rem;
+  line-height: 1.25;
+  padding: 3px 4px;
+  border-radius: 4px;
+}
+.rail a:hover, .mobile-toc a:hover { color: var(--ink); background: var(--steel-faint); }
+.door {
+  flex: none;
+  position: relative;
+  width: 26px;
+  height: 34px;
+  border: 1.5px solid var(--steel);
+  border-radius: 3px;
+  background: var(--steel-pale);
+  font-family: "Saira Stencil One", "Arial Narrow", sans-serif;
+  font-size: 0.95rem;
+  color: var(--steel);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 2px;
+}
+.door::before, .door::after {
+  content: "";
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  height: 0;
+  border-top: 1.5px solid var(--steel);
+  opacity: 0.55;
+}
+.door::before { top: 5px; }
+.door::after { top: 9px; }
+.rail a.active { color: var(--ink); }
+.rail a.active .door { border-color: var(--brass); background: var(--brass-pale); color: var(--brass); }
+.rail a.active .door::before, .rail a.active .door::after { border-color: var(--brass); }
+
+.mobile-toc { margin: 8px 0 28px; border: 1px solid var(--steel-pale); border-radius: 6px; background: var(--panel); }
+.mobile-toc summary { cursor: pointer; padding: 10px 14px; color: var(--ink-soft); font-size: 0.95rem; }
+.mobile-toc ol { padding: 4px 10px 12px; }
+@media (min-width: 1100px) { .mobile-toc { display: none; } }
+
+/* ---------- main column ---------- */
+main { min-width: 0; max-width: 720px; padding: 40px 0 120px; }
+.theme-btn {
+  position: fixed; top: 12px; right: 12px; z-index: 5;
+  font: inherit; font-size: 0.82rem;
+  color: var(--ink-soft); background: var(--panel);
+  border: 1px solid var(--steel-pale); border-radius: 999px;
+  padding: 4px 12px; cursor: pointer;
+}
+.hero h1 {
+  font-family: "Saira Stencil One", "Arial Narrow", Impact, sans-serif;
+  font-weight: 400;
+  font-size: clamp(2.4rem, 7vw, 4.1rem);
+  line-height: 1.02;
+  letter-spacing: 0.01em;
+  color: var(--steel);
+  margin: 18px 0 14px;
+}
+.hero .lede { font-size: 1.2rem; line-height: 1.6; color: var(--ink-soft); margin: 0 0 8px; max-width: 34em; }
+
+section.chapter { padding-top: 56px; }
+.ch-head { display: flex; align-items: center; gap: 14px; margin-bottom: 6px; }
+.ch-head .door { width: 34px; height: 44px; font-size: 1.25rem; padding-bottom: 3px; }
+.ch-head .door::before { top: 7px; left: 8px; right: 8px; }
+.ch-head .door::after { top: 12px; left: 8px; right: 8px; }
+h2 { font-size: 1.75rem; line-height: 1.2; font-weight: 600; margin: 0; letter-spacing: -0.005em; }
+h3 { font-size: 1.18rem; line-height: 1.3; font-weight: 600; margin: 2.2em 0 0.5em; }
+p { margin: 0 0 1.05em; }
+main ul, main ol { padding-left: 1.3em; margin: 0 0 1.1em; }
+main li { margin: 0.25em 0; }
+strong { font-weight: 600; }
+.aside { font-size: 0.97rem; color: var(--ink-soft); }
+.short { font-size: 1.15rem; }
+
+code { font-family: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 0.86em; }
+:not(pre) > code { background: var(--code-bg); padding: 0.08em 0.32em; border-radius: 3px; overflow-wrap: anywhere; }
+pre.out { margin: 0 0 1.3em; padding: 10px 14px; border: 1px dashed var(--steel-pale); border-radius: 4px; overflow-x: auto; font-size: 0.84rem; line-height: 1.5; color: var(--ink-soft); }
+pre.out code { white-space: pre; }
+pre.code {
+  margin: 0 0 1.3em;
+  padding: 14px 16px;
+  background: var(--code-bg);
+  border-left: 3px solid var(--steel);
+  border-radius: 4px;
+  overflow-x: auto;
+  font-size: 0.93rem;
+  line-height: 1.55;
+  tab-size: 4;
+}
+pre.code code { font-size: 0.86rem; white-space: pre; }
+.hk { color: var(--hk); } .ht { color: var(--ht); } .hv { color: var(--hv); font-weight: 500; }
+.hs { color: var(--hs); } .hn { color: var(--hn); } .hc { color: var(--hc); font-style: italic; }
+.hm { color: var(--hm); } .hf { color: var(--hf); } .ha { color: var(--ha); }
+
+/* fact / judgment / model labels */
+.tag {
+  display: inline-block;
+  font-variant: small-caps;
+  font-size: 0.86em;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+  padding: 0 0.38em 0.08em;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  margin-right: 0.35em;
+  vertical-align: 0.06em;
+}
+.tag.fact { color: var(--fact); }
+.tag.judgment { color: var(--judgment); }
+.tag.model { color: var(--model); }
+
+/* won't-compile notes */
+.nope-note {
+  margin: 0.4em 0 1.5em;
+  padding: 2px 0 2px 16px;
+  border-left: 2px dashed var(--nope);
+}
+.nope-note .nope-head { font-size: 0.95rem; color: var(--nope); margin: 0 0 0.4em; font-style: italic; }
+.nope-note p { font-size: 0.98rem; }
+pre.code.nope-code { border-left-color: var(--nope); background: transparent; border: 1px dashed var(--steel-pale); border-left: 3px solid var(--nope); }
+
+/* diagrams */
+figure { margin: 1.4em 0 1.8em; }
+figure svg { display: block; width: 100%; height: auto; }
+figcaption { font-size: 0.9rem; color: var(--ink-soft); margin-top: 0.5em; }
+.d-locker { fill: var(--steel-pale); stroke: var(--steel); stroke-width: 2; }
+.d-vent { stroke: var(--steel); stroke-width: 2; opacity: 0.5; }
+.d-num { font-family: "Saira Stencil One", "Arial Narrow", sans-serif; fill: var(--steel); }
+.d-val { font-family: "IBM Plex Mono", ui-monospace, monospace; fill: var(--ink); font-weight: 500; }
+.d-text { font-family: "Literata", Georgia, serif; fill: var(--ink-soft); }
+.d-mono { font-family: "IBM Plex Mono", ui-monospace, monospace; fill: var(--ink); }
+.d-key { fill: var(--brass); }
+.d-keyline { stroke: var(--brass); stroke-width: 2; fill: none; }
+.d-hook { fill: none; stroke: var(--hook); stroke-width: 2; stroke-dasharray: 4 3; }
+.d-arrow { stroke: var(--steel); stroke-width: 2; fill: none; }
+.d-arrowhead { fill: var(--steel); }
+.d-box { fill: var(--panel); stroke: var(--steel); stroke-width: 1.5; }
+.d-region { fill: none; stroke: var(--steel-pale); stroke-width: 2; }
+.d-felt { fill: var(--felt); opacity: 0.14; }
+.d-nope { stroke: var(--nope); stroke-width: 2; fill: none; }
+.d-nopetext { fill: var(--nope); font-family: "Literata", Georgia, serif; }
+.d-hl { fill: none; stroke: var(--brass); stroke-width: 2.5; }
+.d-bar { fill: var(--steel); }
+.d-grid { stroke: var(--steel-pale); stroke-width: 1; }
+
+/* steppers */
+.stepper {
+  margin: 1.4em 0 1.9em;
+  border: 1px solid var(--steel-pale);
+  border-radius: 8px;
+  background: var(--panel);
+  overflow: hidden;
+}
+.stepper .st-code { margin: 0; border-radius: 0; border-left: 0; font-size: 0.86rem; padding: 10px 0; }
+.stepper .st-code code { display: block; }
+.stepper .st-line { display: block; padding: 0 14px; border-left: 3px solid transparent; }
+.stepper .st-line.on { background: var(--brass-pale); border-left-color: var(--brass); }
+.stepper .st-stage { padding: 14px 14px 4px; overflow-x: auto; }
+.stepper .st-row { display: flex; align-items: center; gap: 10px; min-height: 46px; margin-bottom: 6px; }
+.stepper .st-name { flex: none; width: 64px; text-align: right; font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 0.85rem; color: var(--ink-soft); }
+.stepper .st-chain { display: flex; align-items: center; flex-wrap: nowrap; }
+.stepper .st-scalar { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 0.95rem; }
+.stepper .st-moved { font-style: italic; font-size: 0.88rem; color: var(--hook); }
+.peg {
+  position: relative;
+  flex: none;
+  width: 26px;
+  height: 2px;
+  background: var(--steel);
+  margin: 0 2px;
+}
+.peg::after {
+  content: "";
+  position: absolute; right: -2px; top: -4px;
+  border-left: 6px solid var(--steel);
+  border-top: 5px solid transparent; border-bottom: 5px solid transparent;
+}
+.peg.empty { width: auto; height: auto; background: none; margin: 0 4px; }
+.peg.empty::after { display: none; }
+.peg.empty span { display: inline-block; font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 0.78rem; color: var(--hook); border: 1.5px dashed var(--hook); border-radius: 12px; padding: 1px 8px; }
+.peg.hole { width: auto; height: auto; background: none; margin: 0 4px; }
+.peg.hole::after { display: none; }
+.peg.hole span { display: inline-block; font-size: 0.78rem; color: var(--nope); border: 1.5px dashed var(--nope); border-radius: 12px; padding: 1px 8px; font-style: italic; }
+.peg.mark { outline: 2.5px solid var(--brass); outline-offset: 5px; border-radius: 4px; }
+.peg.empty.mark span, .peg.hole.mark span { outline: 2.5px solid var(--brass); outline-offset: 3px; }
+.peg .peg-tag, .lk .lk-tag {
+  position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+  font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 0.7rem; color: var(--brass); white-space: nowrap;
+}
+.lk {
+  position: relative;
+  flex: none;
+  min-width: 40px;
+  height: 40px;
+  padding: 0 8px;
+  display: flex; align-items: center; justify-content: center;
+  border: 1.5px solid var(--steel);
+  border-radius: 4px;
+  background: var(--steel-pale);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-weight: 500;
+}
+.lk.dummy { border-style: dashed; border-color: var(--cardboard); background: transparent; color: var(--cardboard); }
+.lk.fresh { border-color: var(--brass); background: var(--brass-pale); }
+.lk.freed { opacity: 0.45; text-decoration: line-through; border-style: dotted; }
+.lk.mark { outline: 2.5px solid var(--brass); outline-offset: 3px; }
+.lk .lk-tag { top: 44px; }
+.stepper .st-caption { padding: 8px 14px 4px; min-height: 3.4em; font-size: 0.97rem; }
+.stepper .st-controls { display: flex; align-items: center; gap: 8px; padding: 6px 14px 14px; }
+.stepper button {
+  font: inherit; font-size: 0.9rem;
+  padding: 4px 14px;
+  border: 1px solid var(--steel);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+.stepper button.primary { background: var(--steel); color: var(--bg); }
+.stepper button:disabled { opacity: 0.4; cursor: default; }
+.stepper .st-count { margin-left: auto; font-size: 0.85rem; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.stepper .st-code { border-bottom: 1px solid var(--steel-pale); }
+
+/* tables */
+.table-wrap { overflow-x: auto; margin: 0.6em 0 1.6em; }
+table { border-collapse: collapse; width: 100%; font-size: 0.92rem; line-height: 1.45; }
+th, td { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid var(--steel-pale); }
+th { font-weight: 600; color: var(--ink-soft); border-bottom: 1.5px solid var(--steel); }
+td:first-child { font-weight: 600; }
+
+.end-note { margin-top: 64px; padding-top: 20px; border-top: 1px solid var(--steel-pale); font-size: 0.92rem; color: var(--ink-soft); }
+
+/* ---------- additions for keys, signs and trees ---------- */
+:root {
+  --own: #2b8a3e; --look: #1c6dc4; --work: #df5f0c; --alarm: #c4262e;
+  --look-pale: #dce9f8; --work-pale: #fde5d3; --alarm-pale: #f8dede; --own-pale: #dcefe0;
+  --ticket: #a8446f; --brick: #9c573a; --brick-pale: #f1dfd4;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --own: #6cc584; --look: #79b2f2; --work: #ff9a57; --alarm: #ff6f73;
+    --look-pale: #1c2b3c; --work-pale: #3a2618; --alarm-pale: #3d1d1f; --own-pale: #1b3122;
+    --ticket: #e88ab4; --brick: #d6906c; --brick-pale: #3a2820;
+  }
+}
+:root[data-theme="dark"] {
+  --own: #6cc584; --look: #79b2f2; --work: #ff9a57; --alarm: #ff6f73;
+  --look-pale: #1c2b3c; --work-pale: #3a2618; --alarm-pale: #3d1d1f; --own-pale: #1b3122;
+  --ticket: #e88ab4; --brick: #d6906c; --brick-pale: #3a2820;
+}
+
+.c-own { color: var(--own); font-weight: 600; }
+.c-look { color: var(--look); font-weight: 600; }
+.c-work { color: var(--work); font-weight: 600; }
+.c-alarm { color: var(--alarm); font-weight: 600; }
+.c-tally { color: var(--brass); font-weight: 600; }
+
+/* compiles, then stops while running */
+.alarm-note {
+  margin: 0.4em 0 1.5em;
+  padding: 2px 0 2px 16px;
+  border-left: 3px solid var(--alarm);
+}
+.alarm-note .alarm-head { font-size: 0.95rem; color: var(--alarm); margin: 0 0 0.4em; font-style: italic; }
+.alarm-note p { font-size: 0.98rem; }
+pre.code.alarm-code { border-left-color: var(--alarm); background: var(--alarm-pale); }
+pre.out.alarm-out { border: 1px solid var(--alarm); color: var(--alarm); background: transparent; }
+
+/* small boxed aside, for older code */
+.box {
+  margin: 1.2em 0 1.6em;
+  padding: 12px 16px 4px;
+  border: 1px solid var(--steel-pale);
+  border-radius: 6px;
+  background: var(--panel);
+}
+.box .box-head { font-family: "Saira Stencil One", "Arial Narrow", sans-serif; color: var(--steel); letter-spacing: 0.02em; margin: 0 0 0.4em; font-size: 1.02rem; }
+.box p { font-size: 0.98rem; }
+
+/* diagram parts */
+.d-look { fill: var(--look); }
+.d-lookline { stroke: var(--look); stroke-width: 2; fill: none; }
+.d-work { fill: var(--work); }
+.d-own { stroke: var(--own); stroke-width: 2; fill: none; }
+.d-ownfill { fill: var(--own); }
+.d-owntext { fill: var(--own); font-family: "IBM Plex Mono", ui-monospace, monospace; }
+.d-looktext { fill: var(--look); font-family: "IBM Plex Mono", ui-monospace, monospace; }
+.d-tally { fill: var(--brass); }
+.d-tallytext { fill: var(--bg); font-family: "IBM Plex Mono", ui-monospace, monospace; font-weight: 500; }
+.d-brass { fill: var(--brass); font-family: "IBM Plex Mono", ui-monospace, monospace; }
+.d-ticket { fill: var(--ticket); }
+.d-tickettext { fill: var(--ticket); font-family: "Literata", Georgia, serif; }
+.d-brick { fill: var(--brick-pale); stroke: var(--brick); stroke-width: 2; }
+.d-bricktext { fill: var(--brick); font-family: "Literata", Georgia, serif; }
+.d-cell { fill: var(--panel); stroke: var(--steel); stroke-width: 1.5; }
+.d-cellflag { fill: var(--look-pale); stroke: var(--steel); stroke-width: 1.5; }
+.d-celltally { fill: var(--brass-pale); stroke: var(--steel); stroke-width: 1.5; }
+.d-path { stroke: var(--brass); stroke-width: 3; fill: none; }
+.d-bar2 { fill: var(--own); }
+.d-bar3 { fill: var(--brass); }
+.d-whisker { stroke: var(--ink-soft); stroke-width: 1.5; }
+
+/* the door sign */
+.door-sim {
+  margin: 1.4em 0 1.9em;
+  border: 1px solid var(--steel-pale);
+  border-radius: 8px;
+  background: var(--panel);
+  padding: 14px;
+}
+.ds-top { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+.ds-door { flex: none; width: 150px; }
+.ds-door svg { display: block; width: 100%; height: auto; }
+.ds-side { flex: 1 1 220px; min-width: 0; }
+.ds-flag { font-size: 0.95rem; color: var(--ink-soft); margin-bottom: 10px; }
+.ds-flag code { font-size: 1.05rem; color: var(--ink); background: var(--code-bg); padding: 0.1em 0.5em; border-radius: 3px; }
+.ds-guards { display: flex; flex-wrap: wrap; gap: 6px; min-height: 30px; }
+.ds-none { font-size: 0.9rem; color: var(--hook); font-style: italic; }
+.ds-log { margin: 12px 0 10px; padding: 10px 14px; background: var(--code-bg); border-left: 3px solid var(--steel); border-radius: 4px; overflow-x: auto; font-size: 0.84rem; line-height: 1.55; min-height: 2.2em; }
+.ds-log code { white-space: pre; }
+.ds-controls { display: flex; flex-wrap: wrap; gap: 8px; }
+.ds-controls button, .ds-guards button {
+  font: inherit; font-size: 0.86rem; cursor: pointer;
+  border: 1px solid var(--steel); border-radius: 999px;
+  background: transparent; color: var(--ink); padding: 3px 12px;
+}
+.ds-controls button[data-a="look"] { border-color: var(--look); color: var(--look); font-family: "IBM Plex Mono", ui-monospace, monospace; }
+.ds-controls button[data-a="work"] { border-color: var(--work); color: var(--work); font-family: "IBM Plex Mono", ui-monospace, monospace; }
+.ds-guards button { font-size: 0.75rem; padding: 0 8px; margin-left: 4px; }
+.ds-controls button:disabled, .ds-guards button:disabled { opacity: 0.4; cursor: default; }
+.ds-msg { margin-top: 10px; font-size: 0.95rem; min-height: 2.8em; }
+.ds-card { stroke-width: 2; }
+.ds-card.free { fill: var(--panel); stroke: var(--hook); }
+.ds-card.look { fill: var(--look-pale); stroke: var(--look); }
+.ds-card.work { fill: var(--work-pale); stroke: var(--work); }
+.ds-card.alarm { fill: var(--alarm-pale); stroke: var(--alarm); }
+.ds-cardtext { font-family: "IBM Plex Mono", ui-monospace, monospace; fill: var(--ink); }
+.ds-tick { stroke: var(--look); stroke-width: 3; stroke-linecap: round; }
+.ds-string { stroke: var(--hook); stroke-width: 1.5; }
+.ds-nail { fill: var(--steel); }
+.ds-handle { fill: var(--steel); }
+
+/* chips: keys, looks, work */
+.chip {
+  display: inline-flex; align-items: center;
+  font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 0.76rem;
+  border: 1.5px solid var(--steel-pale); border-radius: 4px;
+  padding: 1px 7px; white-space: nowrap; line-height: 1.6;
+}
+.chip.key { border-color: var(--own); color: var(--own); background: var(--own-pale); }
+.chip.look { border-color: var(--look); color: var(--look); background: var(--look-pale); }
+.chip.work { border-color: var(--work); color: var(--work); background: var(--work-pale); }
+.chip.val { color: var(--ink); }
+.chip.gone { border-style: dashed; color: var(--hook); font-style: italic; }
+
+/* tree steppers */
+.tstepper { margin: 1.4em 0 1.9em; border: 1px solid var(--steel-pale); border-radius: 8px; background: var(--panel); overflow: hidden; }
+.tstepper .st-code { margin: 0; border-radius: 0; border-left: 0; font-size: 0.86rem; padding: 10px 0; border-bottom: 1px solid var(--steel-pale); }
+.tstepper .st-code code { display: block; }
+.tstepper .st-line { display: block; padding: 0 14px; border-left: 3px solid transparent; }
+.tstepper .st-line.on { background: var(--brass-pale); border-left-color: var(--brass); }
+.ts-stage { padding: 12px 10px 0; overflow-x: auto; }
+.ts-svg { display: block; width: 100%; max-width: 460px; height: auto; margin: 0 auto; }
+.ts-vars { padding: 6px 14px 2px; }
+.ts-row { display: flex; align-items: baseline; gap: 10px; margin-bottom: 5px; }
+.ts-name { flex: none; width: 82px; text-align: right; font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 0.8rem; color: var(--ink-soft); }
+.ts-chips { display: flex; flex-wrap: wrap; gap: 5px; min-width: 0; }
+.ts-lk { fill: var(--steel-pale); stroke: var(--steel); stroke-width: 1.8; }
+.ts-lk.mark { stroke: var(--brass); stroke-width: 3; }
+.ts-lk.freed { fill: none; stroke: var(--hook); stroke-dasharray: 2 3; }
+.ts-freedtext { fill: var(--hook); font-family: "IBM Plex Mono", ui-monospace, monospace; }
+.ts-tally { fill: var(--brass); }
+.ts-tallytext { fill: var(--bg); font-family: "IBM Plex Mono", ui-monospace, monospace; font-weight: 500; }
+.ts-lk.looking { fill: var(--look-pale); stroke: var(--look); stroke-width: 2.4; }
+.ts-lk.working { fill: var(--work-pale); stroke: var(--work); stroke-width: 2.4; }
+.ts-signtext.work { fill: var(--work); font-family: "IBM Plex Mono", ui-monospace, monospace; font-weight: 500; letter-spacing: 0.04em; }
+.ts-tick { stroke: var(--look); stroke-width: 2; stroke-linecap: round; }
+.ts-hand { fill: var(--own); font-family: "IBM Plex Mono", ui-monospace, monospace; }
+.tstepper .st-caption { padding: 8px 14px 4px; min-height: 4.4em; font-size: 0.97rem; }
+.tstepper .st-controls { display: flex; align-items: center; gap: 8px; padding: 6px 14px 14px; }
+.tstepper button { font: inherit; font-size: 0.9rem; padding: 4px 14px; border: 1px solid var(--steel); border-radius: 999px; background: transparent; color: var(--ink); cursor: pointer; }
+.tstepper button.primary { background: var(--steel); color: var(--bg); }
+.tstepper button:disabled { opacity: 0.4; cursor: default; }
+.tstepper .st-count { margin-left: auto; font-size: 0.85rem; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 0.86rem; color: var(--ink-soft); margin: -0.6em 0 1.4em; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; }
+.sw.own { background: var(--own); } .sw.look { background: var(--look); } .sw.work { background: var(--work); } .sw.tally { background: var(--brass); border-radius: 50%; }
+
+/* dense diagrams scroll sideways inside their own box on narrow screens */
+@media (max-width: 600px) {
+  figure.wide { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  figure.wide svg { min-width: 560px; }
+  figure.wide figcaption { position: sticky; left: 0; max-width: calc(100vw - 32px); }
+}
+
+</style>
+</head>
+<body>
+<button class="theme-btn" type="button" id="themeBtn" aria-label="Switch light or dark theme">Dark</button>
+<div class="layout">
+<nav class="rail" aria-label="Contents">
+<ol>
+<li><a href="#s0"><span class="door">0</span>What we&#39;re working with</a></li>
+<li><a href="#s1"><span class="door">1</span>Keys you can copy</a></li>
+<li><a href="#s2"><span class="door">2</span>The sign on the door</a></li>
+<li><a href="#s3"><span class="door">3</span>Looking</a></li>
+<li><a href="#s4"><span class="door">4</span>Carrying things down</a></li>
+<li><a href="#s5"><span class="door">5</span>Answers that travel up</a></li>
+<li><a href="#s6"><span class="door">6</span>Level by level</a></li>
+<li><a href="#s7"><span class="door">7</span>Your own stack</a></li>
+<li><a href="#s8"><span class="door">8</span>Ordered trees</a></li>
+<li><a href="#s9"><span class="door">9</span>Building</a></li>
+<li><a href="#s10"><span class="door">10</span>Rewiring</a></li>
+<li><a href="#s11"><span class="door">11</span>The same node, not an equal one</a></li>
+<li><a href="#s12"><span class="door">12</span>Trees as graphs</a></li>
+<li><a href="#s13"><span class="door">13</span>Nodes that outlive a call</a></li>
+<li><a href="#s14"><span class="door">14</span>Costs you didn&#39;t write</a></li>
+<li><a href="#s15"><span class="door">15</span>The ledger</a></li>
+</ol>
+</nav>
+<main>
+<header class="hero">
+<h1>Trees, with keys you can copy</h1>
+<p class="lede">A tree node is a locker with two hooks. In Rust, the keys to these lockers can be copied, and every locker door carries a sign saying who is inside. This page is about holding those keys: looking at a tree, carrying numbers through it, building one, rewiring one, and knowing what every move costs the machine.</p>
+<details class="mobile-toc">
+<summary>Contents</summary>
+<ol>
+<li><a href="#s0"><span class="door">0</span>What we&#39;re working with</a></li>
+<li><a href="#s1"><span class="door">1</span>Keys you can copy</a></li>
+<li><a href="#s2"><span class="door">2</span>The sign on the door</a></li>
+<li><a href="#s3"><span class="door">3</span>Looking</a></li>
+<li><a href="#s4"><span class="door">4</span>Carrying things down</a></li>
+<li><a href="#s5"><span class="door">5</span>Answers that travel up</a></li>
+<li><a href="#s6"><span class="door">6</span>Level by level</a></li>
+<li><a href="#s7"><span class="door">7</span>Your own stack</a></li>
+<li><a href="#s8"><span class="door">8</span>Ordered trees</a></li>
+<li><a href="#s9"><span class="door">9</span>Building</a></li>
+<li><a href="#s10"><span class="door">10</span>Rewiring</a></li>
+<li><a href="#s11"><span class="door">11</span>The same node, not an equal one</a></li>
+<li><a href="#s12"><span class="door">12</span>Trees as graphs</a></li>
+<li><a href="#s13"><span class="door">13</span>Nodes that outlive a call</a></li>
+<li><a href="#s14"><span class="door">14</span>Costs you didn&#39;t write</a></li>
+<li><a href="#s15"><span class="door">15</span>The ledger</a></li>
+</ol>
+</details>
+</header>
+
+<section class="chapter" id="s0">
+<div class="ch-head"><span class="door">0</span><h2>What we're working with</h2></div>
+
+<p>Every tree on this page is built from one small struct. It comes already written. You use it, you never type it:</p>
+
+<pre class="code"><code><span class="ha">#[derive(Debug, PartialEq, Eq)]</span>
+<span class="hk">pub</span> <span class="hk">struct</span> <span class="ht">TreeNode</span> {
+    <span class="hk">pub</span> val: i32,
+    <span class="hk">pub</span> left: <span class="ht">Option</span>&lt;<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;&gt;,
+    <span class="hk">pub</span> right: <span class="ht">Option</span>&lt;<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;&gt;,
+}
+
+<span class="hk">impl</span> <span class="ht">TreeNode</span> {
+    <span class="ha">#[inline]</span>
+    <span class="hk">pub</span> <span class="hk">fn</span> <span class="hf">new</span>(val: i32) -&gt; <span class="hk">Self</span> {
+        <span class="ht">TreeNode</span> {
+            val,
+            left: <span class="hv">None</span>,
+            right: <span class="hv">None</span>,
+        }
+    }
+}</code></pre>
+
+<p>A number and two hooks, <code>left</code> and <code>right</code>. The type on those hooks is the subject of the whole page, and it's a mouthful, so read it from the inside out:</p>
+
+<ul>
+<li><code>TreeNode</code> is the locker itself: a number and two hooks.</li>
+<li><code>RefCell&lt;TreeNode&gt;</code> is that locker with a sign hanging on its door, saying whether anyone is inside.</li>
+<li><code>Rc&lt;...&gt;</code> is a <span class="c-own">key</span> to it. Not the only key. This kind can be copied.</li>
+<li><code>Option&lt;...&gt;</code> means the hook might be empty.</li>
+</ul>
+
+<p class="short">So <code>left</code> reads as <em>maybe a copyable key to a locker with a sign on its door.</em></p>
+
+<figure>
+<svg viewBox="0 0 600 300" role="img" aria-labelledby="d0t">
+<title id="d0t">A tree of five lockers. You hold one key, to the top locker holding 4. Its left hook holds a key to 2, its right hook a key to 7. Locker 2 holds keys to 1 and 3. Every other hook is empty.</title>
+<defs><marker id="ah0" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="d-arrowhead"/></marker>
+<marker id="ah0g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="d-ownfill"/></marker></defs>
+<text x="40" y="44" class="d-owntext" font-size="14">root</text>
+<path d="M80 52 L262 60" class="d-own" marker-end="url(#ah0g)"/>
+<text x="40" y="70" class="d-text" font-size="12">your one key</text>
+<rect x="272" y="40" width="56" height="42" rx="4" class="d-locker"/><text x="300" y="67" class="d-val" font-size="17" text-anchor="middle">4</text>
+<path d="M286 82 L184 126" class="d-arrow" marker-end="url(#ah0)"/>
+<path d="M314 82 L416 126" class="d-arrow" marker-end="url(#ah0)"/>
+<text x="222" y="98" class="d-text" font-size="12" text-anchor="middle">left</text>
+<text x="380" y="98" class="d-text" font-size="12" text-anchor="middle">right</text>
+<rect x="142" y="130" width="56" height="42" rx="4" class="d-locker"/><text x="170" y="157" class="d-val" font-size="17" text-anchor="middle">2</text>
+<rect x="402" y="130" width="56" height="42" rx="4" class="d-locker"/><text x="430" y="157" class="d-val" font-size="17" text-anchor="middle">7</text>
+<path d="M156 172 L106 216" class="d-arrow" marker-end="url(#ah0)"/>
+<path d="M184 172 L234 216" class="d-arrow" marker-end="url(#ah0)"/>
+<rect x="72" y="220" width="56" height="42" rx="4" class="d-locker"/><text x="100" y="247" class="d-val" font-size="17" text-anchor="middle">1</text>
+<rect x="212" y="220" width="56" height="42" rx="4" class="d-locker"/><text x="240" y="247" class="d-val" font-size="17" text-anchor="middle">3</text>
+<path d="M416 172 L408 186" class="d-hook"/><circle cx="406" cy="192" r="5" class="d-hook"/>
+<path d="M444 172 L452 186" class="d-hook"/><circle cx="454" cy="192" r="5" class="d-hook"/>
+<path d="M86 262 L78 276" class="d-hook"/><circle cx="76" cy="282" r="5" class="d-hook"/>
+<path d="M114 262 L122 276" class="d-hook"/><circle cx="124" cy="282" r="5" class="d-hook"/>
+<path d="M226 262 L218 276" class="d-hook"/><circle cx="216" cy="282" r="5" class="d-hook"/>
+<path d="M254 262 L262 276" class="d-hook"/><circle cx="264" cy="282" r="5" class="d-hook"/>
+<text x="500" y="270" class="d-text" font-size="12" text-anchor="middle">empty hooks: None</text>
+</svg>
+<figcaption>Five lockers, and the one key you start with. Each locker holds a number and up to two more keys.</figcaption>
+</figure>
+
+<p>If you've worked with a list built from <code>Option&lt;Box&lt;ListNode&gt;&gt;</code>, the difference is the copying. A <code>Box</code> is the one and only key to its locker. Fine for walking a list from the front, but a tree gets used in more ways than that. You'll want a line of nodes waiting their turn, a pile of nodes to come back to, a node handed back to whoever asked for it, a struct that keeps hold of nodes between calls. Each of those means someone other than the parent holds a key. <code>Rc</code> lets them.</p>
+
+<p>And once several people hold keys to the same locker, changing what's inside needs a rule they can all check. That's the sign on the door, <code>RefCell</code>.</p>
+
+<p>Most tasks hand you the top of a tree like this:</p>
+
+<p class="short"><code>fn something(root: Option&lt;Rc&lt;RefCell&lt;TreeNode&gt;&gt;&gt;) -&gt; ...</code></p>
+
+<p>You own one key to the top locker. Through it you can reach everything else. Work on trees comes in four kinds:</p>
+<ul>
+<li><strong>Reading.</strong> Walk the tree and come back with an answer. A count, a list of values, a yes or no. Nothing changes.</li>
+<li><strong>Rearranging.</strong> Same lockers, hung in a new shape, or with some thrown away.</li>
+<li><strong>Building.</strong> Rent new lockers and hand back the key to the top one.</li>
+<li><strong>Pointing.</strong> The answer is a node that's already in the tree, so you hand back a key to it.</li>
+</ul>
+<p>Four colors carry through the pictures, and through the words that name them:</p>
+<div class="legend"><span><i class="sw own"></i>a key you hold</span><span><i class="sw tally"></i>a tally, the number of keys to a locker</span><span><i class="sw look"></i>a look, someone peeking inside</span><span><i class="sw work"></i>a working tag, someone changing things</span></div>
+<p>Sections 1 and 2 are the two wrappers. After that, each section adds one way of holding the tree. Read them in order.</p>
+</section>
+
+<section class="chapter" id="s1">
+<div class="ch-head"><span class="door">1</span><h2>Keys you can copy</h2></div>
+
+<p>There's a hardware store down the road that cuts keys. You hand over a key, wait half a minute, walk out with two. Nobody builds you a second locker. The copy opens the same door.</p>
+
+<p><code>Rc</code> works like that, with one addition: a <span class="c-tally">tally</span> sheet taped inside the locker door, counting the keys. Rc stands for <em>reference counted</em>, and the tally is the count.</p>
+
+<ul>
+<li><code>Rc::new(value)</code> rents a locker. One trip to the allocator, for a block big enough to hold the value plus the tally. You get back an address: 8 bytes.</li>
+<li><code>Rc::clone(&amp;key)</code> cuts a copy. No new locker, no trip to the allocator. It adds one to the tally and hands you another 8-byte address, the same one.</li>
+<li>When a key goes away (its variable goes out of scope, or you call <code>drop</code>), the tally goes down by one. When it reaches zero, whoever held the last key empties the locker: the value inside is dropped and the memory goes back.</li>
+</ul>
+
+<pre class="code"><code><span class="hk">let</span> a = <span class="ht">Rc</span>::<span class="hf">new</span>(<span class="ht">String</span>::<span class="hf">from</span>(<span class="hs">"seven"</span>));
+<span class="hm">println!</span>(<span class="hs">"{}"</span>, <span class="ht">Rc</span>::<span class="hf">strong_count</span>(&amp;a)); <span class="hc">// 1</span>
+
+<span class="hk">let</span> b = <span class="ht">Rc</span>::<span class="hf">clone</span>(&amp;a);
+<span class="hk">let</span> c = <span class="ht">Rc</span>::<span class="hf">clone</span>(&amp;a);
+<span class="hm">println!</span>(<span class="hs">"{}"</span>, <span class="ht">Rc</span>::<span class="hf">strong_count</span>(&amp;a)); <span class="hc">// 3</span>
+<span class="hm">println!</span>(<span class="hs">"{} {} {}"</span>, a, b, c); <span class="hc">// seven seven seven</span>
+
+<span class="hf">drop</span>(b);
+<span class="hm">println!</span>(<span class="hs">"{}"</span>, <span class="ht">Rc</span>::<span class="hf">strong_count</span>(&amp;c)); <span class="hc">// 2</span></code></pre>
+
+<p><code>Rc::strong_count</code> reads the tally. (Strong, because there's a second kind of key that doesn't count. Section 14.) Notice <code>a</code>, <code>b</code> and <code>c</code> all print <code>seven</code>: there's only one string, and three ways to reach it.</p>
+
+<p><code>a.clone()</code> does the same thing as <code>Rc::clone(&amp;a)</code>. Both copy the key. This page writes <code>Rc::clone</code> when a single key gets copied, because it says what it does. Nobody reading it will wonder whether the whole string got copied.</p>
+
+<p>Now with tree nodes. Hanging a key on a hook is the same as handing it to a variable. The hook holds it, the tally counts it:</p>
+
+<pre class="code"><code><span class="hk">let</span> leaf = <span class="ht">Rc</span>::<span class="hf">new</span>(<span class="ht">RefCell</span>::<span class="hf">new</span>(<span class="ht">TreeNode</span>::<span class="hf">new</span>(<span class="hn">3</span>)));
+<span class="hk">let</span> <span class="hk">mut</span> top = <span class="ht">TreeNode</span>::<span class="hf">new</span>(<span class="hn">1</span>);
+top.left = <span class="hv">Some</span>(<span class="ht">Rc</span>::<span class="hf">clone</span>(&amp;leaf));
+<span class="hm">println!</span>(<span class="hs">"{}"</span>, <span class="ht">Rc</span>::<span class="hf">strong_count</span>(&amp;leaf)); <span class="hc">// 2: `leaf` and the hook</span>
+
+<span class="hk">let</span> copy = top.left.<span class="hf">clone</span>(); <span class="hc">// cloning an Option&lt;Rc&lt;..&gt;&gt; copies a key</span>
+<span class="hm">println!</span>(<span class="hs">"{}"</span>, <span class="ht">Rc</span>::<span class="hf">strong_count</span>(&amp;leaf)); <span class="hc">// 3</span>
+
+<span class="hf">drop</span>(copy);
+<span class="hf">drop</span>(top); <span class="hc">// dropping a node drops the keys on its hooks</span>
+<span class="hm">println!</span>(<span class="hs">"{}"</span>, <span class="ht">Rc</span>::<span class="hf">strong_count</span>(&amp;leaf)); <span class="hc">// 1</span></code></pre>
+
+<p>Look at the middle line. <code>top.left</code> is an <code>Option&lt;Rc&lt;...&gt;&gt;</code>, and cloning an <code>Option</code> clones what's inside, so <code>top.left.clone()</code> is a key copy too. You'll write <code>something.left.clone()</code> constantly in tree code, and every single time it costs 8 bytes and a tick on a tally. The subtree hanging off that hook isn't touched.</p>
+
+<p>The last line is the other half. Dropping <code>top</code> dropped the node, which dropped the keys on its hooks, which took the tally on <code>leaf</code> down to 1.</p>
+
+<h3>What the machine holds</h3>
+
+<pre class="code"><code><span class="hk">use</span> std::mem::size_of;
+<span class="hm">println!</span>(<span class="hs">"{}"</span>, size_of::&lt;<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;&gt;()); <span class="hc">// 8</span>
+<span class="hm">println!</span>(<span class="hs">"{}"</span>, size_of::&lt;<span class="ht">Option</span>&lt;<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;&gt;&gt;()); <span class="hc">// 8</span>
+<span class="hm">println!</span>(<span class="hs">"{}"</span>, size_of::&lt;<span class="ht">TreeNode</span>&gt;()); <span class="hc">// 24</span></code></pre>
+
+<p><span class="tag fact">fact</span>On a 64-bit machine that prints 8, 8 and 24. An <code>Rc</code> is one address. Wrapping it in <code>Option</code> costs nothing extra, because no real <code>Rc</code> ever holds address zero, so Rust uses zero to mean <code>None</code>. An empty hook weighs exactly as much as a full one. The node is 24 bytes: two 8-byte hooks, a 4-byte number, and 4 bytes of padding so the next node in an array would line up on an 8-byte boundary.</p>
+
+<p><span class="tag fact">fact</span>We counted allocations while building one node with <code>Rc::new(RefCell::new(TreeNode::new(1)))</code>: one allocation, 48 bytes. <code>Rc::clone</code> made zero. Building a seven-node tree made seven allocations, 336 bytes.</p>
+
+<figure class="wide">
+<svg viewBox="0 0 660 260" role="img" aria-labelledby="d1t">
+<title id="d1t">Three 8-byte keys on the stack, a, b and c, all pointing at one 48-byte heap block. The block holds a strong tally of 3, a second counter, the RefCell sign, and the 24-byte node: value with padding, left hook, right hook.</title>
+<defs><marker id="ah1g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="d-ownfill"/></marker></defs>
+<text x="20" y="26" class="d-text" font-size="13">stack</text>
+<rect x="20" y="40" width="100" height="34" rx="3" class="d-own" style="fill:var(--own-pale)"/><text x="34" y="62" class="d-owntext" font-size="14">a</text><text x="108" y="62" class="d-text" font-size="11" text-anchor="end">8 bytes</text>
+<rect x="20" y="86" width="100" height="34" rx="3" class="d-own" style="fill:var(--own-pale)"/><text x="34" y="108" class="d-owntext" font-size="14">b</text><text x="108" y="108" class="d-text" font-size="11" text-anchor="end">8 bytes</text>
+<rect x="20" y="132" width="100" height="34" rx="3" class="d-own" style="fill:var(--own-pale)"/><text x="34" y="154" class="d-owntext" font-size="14">c</text><text x="108" y="154" class="d-text" font-size="11" text-anchor="end">8 bytes</text>
+<path d="M120 57 C 170 57, 180 98, 222 100" class="d-own" marker-end="url(#ah1g)"/>
+<path d="M120 103 C 160 103, 180 103, 222 103" class="d-own" marker-end="url(#ah1g)"/>
+<path d="M120 149 C 170 149, 180 108, 222 106" class="d-own" marker-end="url(#ah1g)"/>
+<text x="226" y="26" class="d-text" font-size="13">heap: one block, 48 bytes</text>
+<rect x="226" y="80" width="68" height="46" class="d-celltally"/><text x="260" y="101" class="d-brass" font-size="14" text-anchor="middle">3</text><text x="260" y="118" class="d-text" font-size="10" text-anchor="middle">strong</text>
+<rect x="294" y="80" width="68" height="46" class="d-cell"/><text x="328" y="101" class="d-mono" font-size="12" text-anchor="middle">·</text><text x="328" y="118" class="d-text" font-size="10" text-anchor="middle">weak</text>
+<rect x="362" y="80" width="68" height="46" class="d-cellflag"/><text x="396" y="101" class="d-looktext" font-size="14" text-anchor="middle">0</text><text x="396" y="118" class="d-text" font-size="10" text-anchor="middle">sign</text>
+<rect x="430" y="80" width="68" height="46" class="d-cell"/><text x="464" y="101" class="d-mono" font-size="14" text-anchor="middle">1</text><text x="464" y="118" class="d-text" font-size="10" text-anchor="middle">val + pad</text>
+<rect x="498" y="80" width="68" height="46" class="d-cell"/><text x="532" y="101" class="d-mono" font-size="12" text-anchor="middle">None</text><text x="532" y="118" class="d-text" font-size="10" text-anchor="middle">left</text>
+<rect x="566" y="80" width="68" height="46" class="d-cell"/><text x="600" y="101" class="d-mono" font-size="12" text-anchor="middle">None</text><text x="600" y="118" class="d-text" font-size="10" text-anchor="middle">right</text>
+<path d="M228 142 L228 150 L360 150 L360 142" class="d-arrow"/><text x="294" y="168" class="d-text" font-size="11" text-anchor="middle">Rc's two counters</text>
+<path d="M364 142 L364 150 L428 150 L428 142" class="d-arrow"/><text x="396" y="168" class="d-text" font-size="11" text-anchor="middle">RefCell</text>
+<path d="M432 142 L432 150 L632 150 L632 142" class="d-arrow"/><text x="532" y="168" class="d-text" font-size="11" text-anchor="middle">the TreeNode, 24 bytes</text>
+<text x="226" y="212" class="d-text" font-size="12">8 bytes per cell. Copying a key adds a cell on the left, and a tick on the tally.</text>
+<text x="226" y="232" class="d-text" font-size="12">The 48 bytes on the right are never copied.</text>
+</svg>
+<figcaption><span class="tag fact">fact</span>Sizes measured. <span class="tag model">model</span>The order of the cells is a drawing: the compiler is free to arrange the node's three fields, and the RefCell's two, however it likes.</figcaption>
+</figure>
+
+<p>A <code>Box</code> tree node would be the 24 bytes on the right and nothing else. This one is twice that. Section 14 shows what the extra costs in time.</p>
+
+<div class="nope-note">
+<p class="nope-head">Change a node through a plain Rc, and it doesn't compile</p>
+<pre class="code nope-code"><code><span class="hk">fn</span> <span class="hf">main</span>() {
+    <span class="hk">let</span> a = <span class="ht">Rc</span>::<span class="hf">new</span>(<span class="ht">TreeNode</span>::<span class="hf">new</span>(<span class="hn">1</span>));
+    <span class="hk">let</span> b = <span class="ht">Rc</span>::<span class="hf">clone</span>(&amp;a);
+    a.val = <span class="hn">5</span>; <span class="hc">// a locker with two keys: nobody gets to just change it</span>
+}</code></pre>
+<p>Several keys, one locker. If any key-holder could just walk in and change things, the others would find their locker rearranged with no warning, maybe in the middle of reading it. So an <code>Rc</code> by itself only ever lets you look. Changing what's inside takes the sign on the door.</p>
+</div>
+</section>
+
+<section class="chapter" id="s2">
+<div class="ch-head"><span class="door">2</span><h2>The sign on the door</h2></div>
+
+<p>Picture a card hanging on every locker door. Anyone may walk up, add a <span class="c-look">tick</span> to the card meaning "looking," and peek inside. Five people can look at once, ten, a hundred. To change something you hang the <span class="c-work">working tag</span> instead, and you may only do that when the card has no ticks at all. Done? Rub out your tick, or take your tag down.</p>
+
+<p>Shared and mutable references follow the same rule: many readers, or one writer. With <code>&amp;</code> and <code>&amp;mut</code>, the compiler checks the rule before the program ever runs. A <code>RefCell</code> checks it while the program runs, every time a door opens. A guard stands at the door and reads the card.</p>
+
+<ul>
+<li><code>.borrow()</code> adds a <span class="c-look">tick</span> and hands you a guard, a <code>Ref</code>. Through it you read the node as if you held a <code>&amp;TreeNode</code>.</li>
+<li><code>.borrow_mut()</code> hangs the <span class="c-work">working tag</span> and hands you a <code>RefMut</code>, which works like a <code>&amp;mut TreeNode</code>.</li>
+<li>When the guard goes away, so does its tick or tag.</li>
+</ul>
+
+<pre class="code"><code><span class="hk">let</span> node = <span class="ht">RefCell</span>::<span class="hf">new</span>(<span class="ht">TreeNode</span>::<span class="hf">new</span>(<span class="hn">1</span>));
+
+node.<span class="hf">borrow_mut</span>().val += <span class="hn">10</span>; <span class="hc">// working tag, taken down at the `;`</span>
+<span class="hk">let</span> v = node.<span class="hf">borrow</span>().val; <span class="hc">// looking tick, erased at the `;`</span>
+<span class="hm">println!</span>(<span class="hs">"{}"</span>, v); <span class="hc">// 11</span>
+
+{
+    <span class="hk">let</span> a = node.<span class="hf">borrow</span>();
+    <span class="hk">let</span> b = node.<span class="hf">borrow</span>(); <span class="hc">// two lookers at once: fine</span>
+    <span class="hm">println!</span>(<span class="hs">"{} {}"</span>, a.val, b.val); <span class="hc">// 11 11</span>
+} <span class="hc">// both ticks erased here</span>
+
+<span class="hk">let</span> <span class="hk">mut</span> w = node.<span class="hf">borrow_mut</span>(); <span class="hc">// nobody is looking now</span>
+w.val = <span class="hn">0</span>;</code></pre>
+
+<p>When does a guard go away? If you never put it in a variable, at the end of its statement, the <code>;</code>. If it's in a <code>let</code>, at the end of the enclosing block, or when you <code>drop</code> it.</p>
+
+<p><span class="tag fact">fact</span>The card is one number inside the <code>RefCell</code>, 8 bytes on this machine. It's 0 when the door is free, the number of lookers while people look, and <code>-1</code> while someone works. We read it straight out of memory around a few guards: 0, then 1, then 2, back to 0, then <code>-1</code>. That one number is the "sign" cell in section 1's picture.</p>
+
+<p>Try it. Open guards, drop them, and see what the card says:</p>
+
+<div class="door-sim" id="doorSim">
+<div class="ds-top">
+<div class="ds-door"></div>
+<div class="ds-side">
+<div class="ds-flag">the sign's number: <code>0</code></div>
+<div class="ds-guards"></div>
+</div>
+</div>
+<pre class="ds-log"><code></code></pre>
+<div class="ds-controls"><button type="button" data-a="look">node.borrow()</button><button type="button" data-a="work">node.borrow_mut()</button><button type="button" data-a="reset">Start over</button></div>
+<div class="ds-msg" aria-live="polite"></div>
+</div>
+
+<h3>When the rule breaks</h3>
+
+<p>With plain references, breaking the rule means the program doesn't compile. Here the program compiles fine, runs, and stops at the line where the card says no. Rust calls this a panic. Think of it as the guard pulling the <span class="c-alarm">alarm</span>.</p>
+
+<div class="alarm-note">
+<p class="alarm-head">Compiles, then stops while running</p>
+<pre class="code alarm-code"><code><span class="hk">let</span> node = <span class="ht">RefCell</span>::<span class="hf">new</span>(<span class="ht">TreeNode</span>::<span class="hf">new</span>(<span class="hn">1</span>));
+<span class="hk">let</span> look = node.<span class="hf">borrow</span>();
+node.<span class="hf">borrow_mut</span>().val = <span class="hn">2</span>; <span class="hc">// stops here</span>
+<span class="hm">println!</span>(<span class="hs">"{}"</span>, look.val);</code></pre>
+<pre class="out alarm-out"><code>RefCell already borrowed</code></pre>
+<p><code>look</code> is still alive (it's used on the last line), so its tick is still on the card when the working tag goes for the door.</p>
+</div>
+
+<p>The other way round gets a different message:</p>
+
+<div class="alarm-note">
+<p class="alarm-head">Compiles, then stops while running</p>
+<pre class="code alarm-code"><code><span class="hk">let</span> node = <span class="ht">RefCell</span>::<span class="hf">new</span>(<span class="ht">TreeNode</span>::<span class="hf">new</span>(<span class="hn">1</span>));
+<span class="hk">let</span> <span class="hk">mut</span> work = node.<span class="hf">borrow_mut</span>();
+work.val = <span class="hn">2</span>;
+<span class="hm">println!</span>(<span class="hs">"{}"</span>, node.<span class="hf">borrow</span>().val); <span class="hc">// stops here</span></code></pre>
+<pre class="out alarm-out"><code>RefCell already mutably borrowed</code></pre>
+</div>
+
+<p>Two messages, one meaning: a guard you forgot about is still open on that door. When you see either one, the question is always the same. Which guard is still alive, and why?</p>
+
+<p>That's the trade <code>RefCell</code> makes. The compiler can't follow copied keys around a running program, so it handed the job to the card. You get freedom to share, and you pay for it with mistakes that show up at runtime instead of compile time.</p>
+
+<p>The fix is nearly always to close a door sooner. Copy out what you need, let the guard go, then do the next thing:</p>
+
+<pre class="code"><code><span class="hk">let</span> v = node.<span class="hf">borrow</span>().val; <span class="hc">// look, copy the number, close the door</span>
+node.<span class="hf">borrow_mut</span>().val = v * <span class="hn">2</span>; <span class="hc">// now the door is free for work</span></code></pre>
+
+<p><span class="tag judgment">judgment</span>This one habit prevents most alarms in tree code: open the door, take what you need (a number, a key copy), close the door, then act. The rest of this page keeps coming back to it.</p>
+
+<p class="aside">There's also <code>try_borrow_mut()</code>, which hands back an error instead of stopping the program. Tree code almost never needs it. If your code can reach a door that's already open, the fix is to change the code so it can't.</p>
+</section>
+
+<section class="chapter" id="s3">
+<div class="ch-head"><span class="door">3</span><h2>Looking</h2></div>
+
+<p>Most tasks only read. You walk through, come back with a number, and the tree is just as you found it. Like a museum: walk through every room, count the paintings, touch nothing. Every room here has two more doors in it.</p>
+
+<p>You're handed a key to the top. The tempting move is to write the recursive function to take keys as well, passing <code>n.left.clone()</code> down each time. That works. It also copies a key on the way into every call and drops it on the way out, which buys nothing. Pass a look at the hook instead:</p>
+
+<pre class="code"><code><span class="hk">fn</span> <span class="hf">count</span>(node: &amp;<span class="ht">Option</span>&lt;<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;&gt;) -&gt; i32 {
+    <span class="hk">match</span> node {
+        <span class="hv">None</span> =&gt; <span class="hn">0</span>,
+        <span class="hv">Some</span>(rc) =&gt; {
+            <span class="hk">let</span> n = rc.<span class="hf">borrow</span>();
+            <span class="hn">1</span> + <span class="hf">count</span>(&amp;n.left) + <span class="hf">count</span>(&amp;n.right)
+        }
+    }
+}
+
+<span class="hk">pub</span> <span class="hk">fn</span> <span class="hf">count_nodes</span>(root: <span class="ht">Option</span>&lt;<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;&gt;) -&gt; i32 {
+    <span class="hf">count</span>(&amp;root)
+}</code></pre>
+
+<p>Slowly, because nearly everything on this page is built from this shape:</p>
+<ul>
+<li><code>node: &amp;Option&lt;Rc&lt;RefCell&lt;TreeNode&gt;&gt;&gt;</code> is a look at a hook. Not a key. Calling <code>count</code> copies 8 bytes of address and touches no tally.</li>
+<li><code>match node</code> on a reference to an <code>Option</code> gives you either <code>None</code> or <code>Some(rc)</code>, and <code>rc</code> is a look at the key, a <code>&amp;Rc&lt;...&gt;</code>. Still nothing copied.</li>
+<li><code>rc.borrow()</code> puts a <span class="c-look">tick</span> on the door and hands back the guard <code>n</code>.</li>
+<li><code>&amp;n.left</code> is a look at the left hook, reached through the guard.</li>
+<li><code>n</code> lives to the end of the arm. So the tick stays on this door while both children get counted, and comes off as the call returns.</li>
+</ul>
+
+<p>The public function takes the key it was given and passes a look at it. One key at the top, looks all the way down.</p>
+
+<figure>
+<svg viewBox="0 0 600 290" role="img" aria-labelledby="d3t">
+<title id="d3t">The same five-locker tree, partway through the count. The walk is at locker 3. Lockers 4, 2 and 3 each carry one blue look tick. Locker 1 is finished and carries none. Locker 7 hasn't been reached.</title>
+<defs><marker id="ah3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="d-arrowhead"/></marker></defs>
+<path d="M286 82 L184 126" class="d-path"/>
+<path d="M184 172 L234 216" class="d-path"/>
+<rect x="272" y="40" width="56" height="42" rx="4" class="d-locker"/><text x="300" y="67" class="d-val" font-size="17" text-anchor="middle">4</text>
+<rect x="268" y="22" width="22" height="14" rx="2" style="fill:var(--look-pale);stroke:var(--look)"/><line x1="279" y1="25" x2="279" y2="33" class="d-lookline"/>
+<path d="M314 82 L416 126" class="d-arrow" marker-end="url(#ah3)"/>
+<rect x="142" y="130" width="56" height="42" rx="4" class="d-locker"/><text x="170" y="157" class="d-val" font-size="17" text-anchor="middle">2</text>
+<rect x="138" y="112" width="22" height="14" rx="2" style="fill:var(--look-pale);stroke:var(--look)"/><line x1="149" y1="115" x2="149" y2="123" class="d-lookline"/>
+<rect x="402" y="130" width="56" height="42" rx="4" class="d-locker"/><text x="430" y="157" class="d-val" font-size="17" text-anchor="middle">7</text>
+<path d="M156 172 L106 216" class="d-arrow" marker-end="url(#ah3)"/>
+<rect x="72" y="220" width="56" height="42" rx="4" class="d-locker"/><text x="100" y="247" class="d-val" font-size="17" text-anchor="middle">1</text>
+<rect x="212" y="220" width="56" height="42" rx="4" class="d-locker" style="stroke:var(--brass);stroke-width:3"/><text x="240" y="247" class="d-val" font-size="17" text-anchor="middle">3</text>
+<rect x="208" y="202" width="22" height="14" rx="2" style="fill:var(--look-pale);stroke:var(--look)"/><line x1="219" y1="205" x2="219" y2="213" class="d-lookline"/>
+<text x="100" y="282" class="d-text" font-size="12" text-anchor="middle">done, tick gone</text>
+<text x="290" y="252" class="d-text" font-size="12">counting here</text>
+<text x="430" y="200" class="d-text" font-size="12" text-anchor="middle">not reached yet</text>
+<text x="380" y="40" class="d-looktext" font-size="12">one look on every</text>
+<text x="380" y="56" class="d-looktext" font-size="12">door down to here</text>
+</svg>
+<figcaption>Midway through the walk. The ticks pile up along the path from the top and come off on the way back.</figcaption>
+</figure>
+
+<p>Looks never get in each other's way, so this costs nothing. It does mean one thing to remember for later: in the middle of a walk, every ancestor of where you are has a tick on its door. Nobody can hang a working tag on any of them until the walk climbs back past.</p>
+
+<p>Same shape with <code>if let</code>:</p>
+
+<pre class="code"><code><span class="hk">fn</span> <span class="hf">sum</span>(node: &amp;<span class="ht">Option</span>&lt;<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;&gt;) -&gt; i64 {
+    <span class="hk">if</span> <span class="hk">let</span> <span class="hv">Some</span>(rc) = node {
+        <span class="hk">let</span> n = rc.<span class="hf">borrow</span>();
+        n.val <span class="hk">as</span> i64 + <span class="hf">sum</span>(&amp;n.left) + <span class="hf">sum</span>(&amp;n.right)
+    } <span class="hk">else</span> {
+        <span class="hn">0</span>
+    }
+}</code></pre>
+
+<p>The <code>as i64</code> is there because values are <code>i32</code>, and a few thousand of them can add up past the two billion an <code>i32</code> holds.</p>
+
+<h3>The copying version</h3>
+
+<pre class="code"><code><span class="hk">fn</span> <span class="hf">count_copying</span>(node: <span class="ht">Option</span>&lt;<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;&gt;) -&gt; i32 {
+    <span class="hk">match</span> node {
+        <span class="hv">None</span> =&gt; <span class="hn">0</span>,
+        <span class="hv">Some</span>(rc) =&gt; {
+            <span class="hk">let</span> n = rc.<span class="hf">borrow</span>();
+            <span class="hn">1</span> + <span class="hf">count_copying</span>(n.left.<span class="hf">clone</span>()) + <span class="hf">count_copying</span>(n.right.<span class="hf">clone</span>())
+        }
+    }
+}</code></pre>
+
+<p><span class="tag judgment">judgment</span>This compiles, and the answer's the same. Each call costs one tally going up and one coming down. Section 14 measured it: on a tree small enough to sit in the cache, this version took about 40 percent longer than <code>count</code>. Not a disaster. Just a cost with nothing bought.</p>
+
+<h3>Two trees at once</h3>
+
+<p>Pairs of hooks get matched together, as a tuple of looks:</p>
+
+<pre class="code"><code><span class="hk">fn</span> <span class="hf">same_shape</span>(
+    a: &amp;<span class="ht">Option</span>&lt;<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;&gt;,
+    b: &amp;<span class="ht">Option</span>&lt;<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;&gt;,
+) -&gt; bool {
+    <span class="hk">match</span> (a, b) {
+        (<span class="hv">None</span>, <span class="hv">None</span>) =&gt; <span class="hk">true</span>,
+        (<span class="hv">Some</span>(x), <span class="hv">Some</span>(y)) =&gt; {
+            <span class="hk">let</span> x = x.<span class="hf">borrow</span>();
+            <span class="hk">let</span> y = y.<span class="hf">borrow</span>();
+            <span class="hf">same_shape</span>(&amp;x.left, &amp;y.left) &amp;&amp; <span class="hf">same_shape</span>(&amp;x.right, &amp;y.right)
+        }
+        _ =&gt; <span class="hk">false</span>,
+    }
+}</code></pre>
+
+<p>Same shape and the values don't matter. Swap which hooks get compared (<code>x.left</code> against <code>y.right</code>) and you're checking whether one tree is the mirror image of the other. Compare values too and you're checking the trees are identical. Passing the same tree as both <code>a</code> and <code>b</code> is fine, by the way: every door gets two ticks at once, and ticks never conflict.</p>
+
+<div class="nope-note">
+<p class="nope-head">Hand back a look from inside a node, and it doesn't compile</p>
+<pre class="code nope-code"><code><span class="hk">fn</span> <span class="hf">left_of</span>(rc: &amp;<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;) -&gt; &amp;<span class="ht">Option</span>&lt;<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;&gt; {
+    &amp;rc.<span class="hf">borrow</span>().left <span class="hc">// a look that outlives the open door</span>
+}</code></pre>
+<p>The guard made by <code>rc.borrow()</code> is gone once the function returns, and a look into the node can't outlast the tick that allowed it. The door would be closed with your hand still inside. Hand back a key copy:</p>
+</div>
+
+<pre class="code"><code><span class="hk">fn</span> <span class="hf">left_of</span>(rc: &amp;<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;) -&gt; <span class="ht">Option</span>&lt;<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;&gt; {
+    rc.<span class="hf">borrow</span>().left.<span class="hf">clone</span>() <span class="hc">// hand back a key copy, not a look</span>
+}</code></pre>
+
+<div class="box">
+<p class="box-head">Older code you'll run into</p>
+<p>Tree code written for the 2021 edition of Rust is full of odd extra lines, like ending a function with <code>let v = n.borrow().val; v</code> instead of just <code>n.borrow().val</code>. That's because the 2021 edition held guards longer in two places.</p>
+<p><span class="tag fact">fact</span>We compiled both editions. Under 2021, a function whose last line was <code>node.borrow().val</code> (with <code>node</code> a local variable) didn't compile, and an <code>if let</code> whose <code>else</code> branch called <code>borrow_mut()</code> on the same node stopped with the alarm. Under 2024 both work: the guard goes before the locals, and before the <code>else</code>.</p>
+<p>Two things did not change. A guard made on the first line of a <code>match</code> or a <code>while let</code> stays alive through the entire body. Write <code>match node.borrow().left.clone() {...}</code> and the tick stays on <code>node</code> until the closing brace. If any arm wants to work on <code>node</code>, take the key copy into a <code>let</code> first, on its own line.</p>
+</div>
+</section>
+
+<section class="chapter" id="s4">
+<div class="ch-head"><span class="door">4</span><h2>Carrying things down</h2></div>
+
+<p>Some answers depend on the path from the top. How deep am I? What do the values above me add up to? Has this value appeared above me already? The node can't see any of that by itself. Whoever calls it has to bring it along.</p>
+
+<p>Think of exploring a cave with two things on you. Some numbers are written on your hand: how deep you are, your running total. Every side passage you go down gets its own copy, so there's nothing to undo when you come back. And there's a bag of breadcrumbs, shared. Drop one as you enter a chamber, pick it back up as you leave, and the bag always holds exactly the path from the entrance to where you're standing.</p>
+
+<p>Numbers on your hand are plain parameters, passed by value. The bag is a <code>&amp;mut</code>. Here are both in one walk:</p>
+
+<pre class="code"><code><span class="hk">fn</span> <span class="hf">best_leaf_sum</span>(
+    node: &amp;<span class="ht">Option</span>&lt;<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;&gt;,
+    above: i64,
+    best: &amp;<span class="hk">mut</span> i64,
+) {
+    <span class="hk">if</span> <span class="hk">let</span> <span class="hv">Some</span>(rc) = node {
+        <span class="hk">let</span> n = rc.<span class="hf">borrow</span>();
+        <span class="hk">let</span> here = above + n.val <span class="hk">as</span> i64;
+        <span class="hk">if</span> n.left.<span class="hf">is_none</span>() &amp;&amp; n.right.<span class="hf">is_none</span>() &amp;&amp; here &gt; *best {
+            *best = here;
+        }
+        <span class="hf">best_leaf_sum</span>(&amp;n.left, here, best);
+        <span class="hf">best_leaf_sum</span>(&amp;n.right, here, best);
+    }
+}
+
+<span class="hk">pub</span> <span class="hk">fn</span> <span class="hf">largest_leaf_sum</span>(root: <span class="ht">Option</span>&lt;<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;&gt;) -&gt; i64 {
+    <span class="hk">let</span> <span class="hk">mut</span> best = i64::<span class="ht">MIN</span>;
+    <span class="hf">best_leaf_sum</span>(&amp;root, <span class="hn">0</span>, &amp;<span class="hk">mut</span> best);
+    best
+}</code></pre>
+
+<p><code>above</code> and <code>here</code> are copied into each call. <code>best</code> is one <code>i64</code>, living in the caller's stack frame, and every call holds a <code>&amp;mut</code> to those same 8 bytes. Starting it at <code>i64::MIN</code> means the first leaf always wins. Decide on purpose what an empty tree should answer; here it's <code>i64::MIN</code>, which may or may not be what you want.</p>
+
+<h3>The path itself</h3>
+
+<pre class="code"><code><span class="hk">fn</span> <span class="hf">walk</span>(
+    node: &amp;<span class="ht">Option</span>&lt;<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;&gt;,
+    path: &amp;<span class="hk">mut</span> <span class="ht">Vec</span>&lt;i32&gt;,
+    out: &amp;<span class="hk">mut</span> <span class="ht">Vec</span>&lt;<span class="ht">Vec</span>&lt;i32&gt;&gt;,
+) {
+    <span class="hk">if</span> <span class="hk">let</span> <span class="hv">Some</span>(rc) = node {
+        <span class="hk">let</span> n = rc.<span class="hf">borrow</span>();
+        path.<span class="hf">push</span>(n.val); <span class="hc">// drop a crumb on the way in</span>
+        <span class="hk">if</span> n.left.<span class="hf">is_none</span>() &amp;&amp; n.right.<span class="hf">is_none</span>() {
+            out.<span class="hf">push</span>(path.<span class="hf">clone</span>()); <span class="hc">// copies numbers, not nodes</span>
+        }
+        <span class="hf">walk</span>(&amp;n.left, path, out);
+        <span class="hf">walk</span>(&amp;n.right, path, out);
+        path.<span class="hf">pop</span>(); <span class="hc">// pick it up on the way out</span>
+    }
+}</code></pre>
+
+<p>Push on the way in, pop on the way out, and the push and the pop sit in the same call, so they can't get out of step. The one clone in there, <code>path.clone()</code>, copies a <code>Vec</code> of numbers when a full path needs keeping. No node is ever copied, and no key either.</p>
+
+<p>Paths as strings work the same way. A <code>String</code> doesn't pop a whole number, so remember the length before you add and cut back to it after:</p>
+
+<pre class="code"><code><span class="hk">fn</span> <span class="hf">spell</span>(
+    node: &amp;<span class="ht">Option</span>&lt;<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;&gt;,
+    s: &amp;<span class="hk">mut</span> <span class="ht">String</span>,
+    out: &amp;<span class="hk">mut</span> <span class="ht">Vec</span>&lt;<span class="ht">String</span>&gt;,
+) {
+    <span class="hk">if</span> <span class="hk">let</span> <span class="hv">Some</span>(rc) = node {
+        <span class="hk">let</span> n = rc.<span class="hf">borrow</span>();
+        <span class="hk">let</span> mark = s.<span class="hf">len</span>();
+        s.<span class="hf">push_str</span>(&amp;n.val.<span class="hf">to_string</span>());
+        <span class="hk">if</span> n.left.<span class="hf">is_none</span>() &amp;&amp; n.right.<span class="hf">is_none</span>() {
+            out.<span class="hf">push</span>(s.<span class="hf">clone</span>());
+        }
+        s.<span class="hf">push</span>(<span class="hs">' '</span>);
+        <span class="hf">spell</span>(&amp;n.left, s, out);
+        <span class="hf">spell</span>(&amp;n.right, s, out);
+        s.<span class="hf">truncate</span>(mark); <span class="hc">// back to exactly what the caller had</span>
+    }
+}</code></pre>
+
+<h3>Undoing a map</h3>
+
+<p>Sometimes the bag is a <code>HashMap</code>: values seen above, how many times each. The undo step is where this goes wrong. Instead of subtracting one on the way out, remember what was there and put that back:</p>
+
+<pre class="code"><code><span class="hc">// How many nodes repeat a value that already appeared above them?</span>
+<span class="hk">fn</span> <span class="hf">repeats</span>(
+    node: &amp;<span class="ht">Option</span>&lt;<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;&gt;,
+    seen: &amp;<span class="hk">mut</span> <span class="ht">HashMap</span>&lt;i32, i32&gt;,
+) -&gt; i32 {
+    <span class="hk">match</span> node {
+        <span class="hv">None</span> =&gt; <span class="hn">0</span>,
+        <span class="hv">Some</span>(rc) =&gt; {
+            <span class="hk">let</span> n = rc.<span class="hf">borrow</span>();
+            <span class="hk">let</span> before = *seen.<span class="hf">get</span>(&amp;n.val).<span class="hf">unwrap_or</span>(&amp;<span class="hn">0</span>);
+            seen.<span class="hf">insert</span>(n.val, before + <span class="hn">1</span>);
+            <span class="hk">let</span> below = <span class="hf">repeats</span>(&amp;n.left, seen) + <span class="hf">repeats</span>(&amp;n.right, seen);
+            seen.<span class="hf">insert</span>(n.val, before); <span class="hc">// undo, exactly as it was</span>
+            <span class="hk">let</span> here = <span class="hk">if</span> before &gt; <span class="hn">0</span> { <span class="hn">1</span> } <span class="hk">else</span> { <span class="hn">0</span> };
+            here + below
+        }
+    }
+}</code></pre>
+
+<p>Restoring <code>before</code> can't drift, even if a value shows up several times on one path. Running totals with a <code>HashMap</code> of sums seen so far work the same way: insert on the way in, restore on the way out.</p>
+
+<h3>A bookmark into a list</h3>
+
+<p>One more thing worth carrying: a position in a list that every call reads from in order. Here, checking whether a tree's preorder (node, then left, then right) matches a given list:</p>
+
+<pre class="code"><code><span class="hk">fn</span> <span class="hf">matches</span>(
+    node: &amp;<span class="ht">Option</span>&lt;<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;&gt;,
+    want: &amp;[i32],
+    pos: &amp;<span class="hk">mut</span> usize,
+) -&gt; bool {
+    <span class="hk">match</span> node {
+        <span class="hv">None</span> =&gt; <span class="hk">true</span>,
+        <span class="hv">Some</span>(rc) =&gt; {
+            <span class="hk">let</span> n = rc.<span class="hf">borrow</span>();
+            <span class="hk">if</span> *pos &gt;= want.<span class="hf">len</span>() || want[*pos] != n.val {
+                <span class="hk">return</span> <span class="hk">false</span>;
+            }
+            *pos += <span class="hn">1</span>;
+            <span class="hf">matches</span>(&amp;n.left, want, pos) &amp;&amp; <span class="hf">matches</span>(&amp;n.right, want, pos)
+        }
+    }
+}
+
+<span class="hk">pub</span> <span class="hk">fn</span> <span class="hf">preorder_is</span>(
+    root: <span class="ht">Option</span>&lt;<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;&gt;,
+    want: <span class="ht">Vec</span>&lt;i32&gt;,
+) -&gt; bool {
+    <span class="hk">let</span> <span class="hk">mut</span> pos = <span class="hn">0</span>;
+    <span class="hf">matches</span>(&amp;root, &amp;want, &amp;<span class="hk">mut</span> pos) &amp;&amp; pos == want.<span class="hf">len</span>()
+}</code></pre>
+
+<p><code>pos</code> only moves forward, and every call shares it, so it's a <code>&amp;mut usize</code>. Section 9 builds trees with it.</p>
+
+<p><span class="tag model">model</span>On the machine side: each call's stack frame holds its own copies of the by-value numbers, plus one 8-byte address for each <code>&amp;mut</code>. (An optimizing compiler may keep some of these in registers instead.) A walk 1,000 levels deep has 1,000 frames on the stack, and still only one path vector on the heap.</p>
+</section>
+
+<section class="chapter" id="s5">
+<div class="ch-head"><span class="door">5</span><h2>Answers that travel up</h2></div>
+
+<p>The other direction. Plenty of questions about a node can't be answered until its children have answered first. How tall is this subtree? What does it add up to? Is everything below in order? The children go first, report back, and the parent combines what it heard.</p>
+
+<p>An org chart works this way. Every manager collects one summary from each person below them, and sends one summary up.</p>
+
+<p>Sometimes one number isn't enough of a summary.</p>
+
+<p>Take this task: choose as many nodes as you can, with the rule that no chosen node may have a chosen child. A node can't decide alone. It needs to know two things about each child: the best that child's subtree can do if the child is chosen, and the best if it isn't. So every call sends up a pair:</p>
+
+<pre class="code"><code><span class="hc">// Choose nodes so that no chosen node has a chosen child.</span>
+<span class="hc">// Returns (most chosen if this node is chosen, most chosen if it is not).</span>
+<span class="hk">fn</span> <span class="hf">pick</span>(node: &amp;<span class="ht">Option</span>&lt;<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;&gt;) -&gt; (i32, i32) {
+    <span class="hk">match</span> node {
+        <span class="hv">None</span> =&gt; (<span class="hn">0</span>, <span class="hn">0</span>),
+        <span class="hv">Some</span>(rc) =&gt; {
+            <span class="hk">let</span> n = rc.<span class="hf">borrow</span>();
+            <span class="hk">let</span> (l_take, l_skip) = <span class="hf">pick</span>(&amp;n.left);
+            <span class="hk">let</span> (r_take, r_skip) = <span class="hf">pick</span>(&amp;n.right);
+            <span class="hk">let</span> take = <span class="hn">1</span> + l_skip + r_skip;
+            <span class="hk">let</span> skip = l_take.<span class="hf">max</span>(l_skip) + r_take.<span class="hf">max</span>(r_skip);
+            (take, skip)
+        }
+    }
+}
+
+<span class="hk">pub</span> <span class="hk">fn</span> <span class="hf">most_chosen</span>(root: <span class="ht">Option</span>&lt;<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;&gt;) -&gt; i32 {
+    <span class="hk">let</span> (take, skip) = <span class="hf">pick</span>(&amp;root);
+    take.<span class="hf">max</span>(skip)
+}</code></pre>
+
+<figure>
+<svg viewBox="0 0 600 300" role="img" aria-labelledby="d5t">
+<title id="d5t">A five-node tree. Leaves 4, 5 and 3 each report the pair 1, 0. Node 2 combines its two leaves into 1, 2. The top node 1 combines 1, 2 and 1, 0 into 3, 3. The answer is the larger of those, 3.</title>
+<defs><marker id="ah5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="d-arrowhead"/></marker></defs>
+<rect x="272" y="40" width="56" height="40" rx="4" class="d-locker"/><text x="300" y="66" class="d-val" font-size="16" text-anchor="middle">1</text>
+<text x="340" y="56" class="d-brass" font-size="15">(3, 3)</text>
+<text x="340" y="74" class="d-text" font-size="11">max is 3</text>
+<rect x="152" y="130" width="56" height="40" rx="4" class="d-locker"/><text x="180" y="156" class="d-val" font-size="16" text-anchor="middle">2</text>
+<text x="96" y="146" class="d-brass" font-size="15">(1, 2)</text>
+<rect x="392" y="130" width="56" height="40" rx="4" class="d-locker"/><text x="420" y="156" class="d-val" font-size="16" text-anchor="middle">3</text>
+<text x="458" y="146" class="d-brass" font-size="15">(1, 0)</text>
+<rect x="82" y="220" width="56" height="40" rx="4" class="d-locker"/><text x="110" y="246" class="d-val" font-size="16" text-anchor="middle">4</text>
+<text x="80" y="284" class="d-brass" font-size="14">(1, 0)</text>
+<rect x="222" y="220" width="56" height="40" rx="4" class="d-locker"/><text x="250" y="246" class="d-val" font-size="16" text-anchor="middle">5</text>
+<text x="222" y="284" class="d-brass" font-size="14">(1, 0)</text>
+<path d="M110 218 L166 174" class="d-arrow" marker-end="url(#ah5)"/>
+<path d="M250 218 L194 174" class="d-arrow" marker-end="url(#ah5)"/>
+<path d="M196 128 L282 84" class="d-arrow" marker-end="url(#ah5)"/>
+<path d="M404 128 L318 84" class="d-arrow" marker-end="url(#ah5)"/>
+<text x="20" y="20" class="d-text" font-size="12">each pair: (best if chosen, best if not)</text>
+<text x="340" y="210" class="d-text" font-size="12">2 chosen: 1 + 0 + 0 = 1</text>
+<text x="340" y="228" class="d-text" font-size="12">2 not chosen: max(1, 0) + max(1, 0) = 2</text>
+</svg>
+<figcaption>Arrows point the way the answers travel: up. Each node waits for both reports before it can send its own.</figcaption>
+</figure>
+
+<p>If this node is chosen, neither child can be, so it adds its children's "not chosen" numbers. If it isn't chosen, each child is free to do whichever is better. Two numbers out of every call, and the whole tree gets solved in one walk. A pair of <code>i32</code>s is 8 bytes, the same size as a key, and it comes back from the call like any other value.</p>
+
+<h3>What the parent can use, and what it can't</h3>
+
+<p>Sometimes the best answer lives somewhere in the middle of the tree and the parent can't use it at all. Take the longest walk between any two nodes:</p>
+
+<pre class="code"><code><span class="hc">// Longest walk between any two nodes, counted in nodes.</span>
+<span class="hk">fn</span> <span class="hf">tall</span>(node: &amp;<span class="ht">Option</span>&lt;<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;&gt;, best: &amp;<span class="hk">mut</span> i32) -&gt; i32 {
+    <span class="hk">match</span> node {
+        <span class="hv">None</span> =&gt; <span class="hn">0</span>,
+        <span class="hv">Some</span>(rc) =&gt; {
+            <span class="hk">let</span> n = rc.<span class="hf">borrow</span>();
+            <span class="hk">let</span> l = <span class="hf">tall</span>(&amp;n.left, best);
+            <span class="hk">let</span> r = <span class="hf">tall</span>(&amp;n.right, best);
+            <span class="hk">if</span> l + r + <span class="hn">1</span> &gt; *best {
+                *best = l + r + <span class="hn">1</span>; <span class="hc">// a walk that bends at this node</span>
+            }
+            <span class="hn">1</span> + l.<span class="hf">max</span>(r) <span class="hc">// what the parent can use: one side only</span>
+        }
+    }
+}</code></pre>
+
+<p>A walk through the tree can only bend once, at its highest node. So each node does two different jobs. It records the walk that bends at itself, left height plus right height plus one, in <code>best</code>. And it hands its parent only something the parent can extend: the taller of its two sides, as a straight line. Two jobs, two channels. The return value goes up, the record goes into the bag from section 4.</p>
+
+<p>Mixing those up is the usual bug here. If a node returns the bent walk, its parent will try to extend a walk that already turns, and the answer comes out too big.</p>
+
+<h3>What should an empty subtree say?</h3>
+
+<p>A height of 0 for an empty subtree is natural. A smallest value isn't: an empty subtree has no smallest value. <code>Option</code> says so honestly:</p>
+
+<pre class="code"><code><span class="hc">// Smallest and largest value below and including this node.</span>
+<span class="hc">// An empty subtree has no values at all, so it answers None.</span>
+<span class="hk">fn</span> <span class="hf">range</span>(
+    node: &amp;<span class="ht">Option</span>&lt;<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;&gt;,
+    best: &amp;<span class="hk">mut</span> i64,
+) -&gt; <span class="ht">Option</span>&lt;(i32, i32)&gt; {
+    <span class="hk">match</span> node {
+        <span class="hv">None</span> =&gt; <span class="hv">None</span>,
+        <span class="hv">Some</span>(rc) =&gt; {
+            <span class="hk">let</span> n = rc.<span class="hf">borrow</span>();
+            <span class="hk">let</span> <span class="hk">mut</span> lo = n.val;
+            <span class="hk">let</span> <span class="hk">mut</span> hi = n.val;
+            <span class="hk">if</span> <span class="hk">let</span> <span class="hv">Some</span>((a, b)) = <span class="hf">range</span>(&amp;n.left, best) {
+                lo = lo.<span class="hf">min</span>(a);
+                hi = hi.<span class="hf">max</span>(b);
+            }
+            <span class="hk">if</span> <span class="hk">let</span> <span class="hv">Some</span>((a, b)) = <span class="hf">range</span>(&amp;n.right, best) {
+                lo = lo.<span class="hf">min</span>(a);
+                hi = hi.<span class="hf">max</span>(b);
+            }
+            <span class="hk">let</span> spread = hi <span class="hk">as</span> i64 - lo <span class="hk">as</span> i64; <span class="hc">// can exceed i32</span>
+            <span class="hk">if</span> spread &gt; *best {
+                *best = spread;
+            }
+            <span class="hv">Some</span>((lo, hi))
+        }
+    }
+}</code></pre>
+
+<p>The other common trick is to have empty subtrees report <code>(i32::MAX, i32::MIN)</code>, chosen so any real value beats both in a <code>min</code> or a <code>max</code>. That works too, with one weak spot: a tree that really contains <code>i32::MAX</code> looks the same as an empty one. The <code>Option</code> version can't be fooled. Either way, pick what "empty" reports before you write the combining step, because everything else follows from it.</p>
+
+<p>And notice the <code>i64</code> in <code>spread</code>. The gap between the largest and smallest <code>i32</code> is about four billion, which no <code>i32</code> can hold.</p>
+</section>
+<section class="chapter" id="s6">
+<div class="ch-head"><span class="door">6</span><h2>Level by level</h2></div>
+
+<p>Recursion goes deep before it goes wide. It finishes everything under the left child before it ever looks right. Some tasks want the opposite order: the top, then everything one step down, then everything two steps down. Anything phrased in levels, rows, or "nearest first" wants this.</p>
+
+<p>Picture a deli counter with a ticket line. Whoever's at the front gets served, and on the way out they hand in <span style="color:var(--ticket);font-weight:600">tickets</span> for their two children, who join the back of the line. The line always serves a whole generation before the next one gets to the front.</p>
+
+<p>The line is a <code>VecDeque</code>, a ring buffer where pushing onto the back and popping off the front are both cheap. The tickets are keys, <code>Rc&lt;RefCell&lt;TreeNode&gt;&gt;</code>. Here, for the first time on this page, copying keys is the point: a node in the queue is held by two things at once, its parent's hook and its place in line.</p>
+
+<div class="tstepper" data-algo="levels">
+<pre class="code"><code><span class="hk">fn</span> <span class="hf">level_sums</span>(root: <span class="ht">Option</span>&lt;<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;&gt;) -&gt; <span class="ht">Vec</span>&lt;i64&gt; {
+    <span class="hk">let</span> <span class="hk">mut</span> out = <span class="ht">Vec</span>::<span class="hf">new</span>();
+    <span class="hk">let</span> <span class="hk">mut</span> q = <span class="ht">VecDeque</span>::<span class="hf">new</span>();
+    <span class="hk">if</span> <span class="hk">let</span> <span class="hv">Some</span>(r) = root {
+        q.<span class="hf">push_back</span>(r);
+    }
+    <span class="hk">while</span> !q.<span class="hf">is_empty</span>() {
+        <span class="hk">let</span> width = q.<span class="hf">len</span>();
+        <span class="hk">let</span> <span class="hk">mut</span> total = <span class="hn">0</span>;
+        <span class="hk">for</span> _ <span class="hk">in</span> <span class="hn">0</span>..width {
+            <span class="hk">let</span> node = q.<span class="hf">pop_front</span>().<span class="hf">unwrap</span>();
+            <span class="hk">let</span> n = node.<span class="hf">borrow</span>();
+            total += n.val <span class="hk">as</span> i64;
+            <span class="hk">if</span> <span class="hk">let</span> <span class="hv">Some</span>(l) = &amp;n.left {
+                q.<span class="hf">push_back</span>(<span class="ht">Rc</span>::<span class="hf">clone</span>(l));
+            }
+            <span class="hk">if</span> <span class="hk">let</span> <span class="hv">Some</span>(r) = &amp;n.right {
+                q.<span class="hf">push_back</span>(<span class="ht">Rc</span>::<span class="hf">clone</span>(r));
+            }
+        }
+        out.<span class="hf">push</span>(total);
+    }
+    out
+}</code></pre>
+</div>
+
+<p>Step through it and watch the brass tallies. Every <code>push_back(Rc::clone(l))</code> takes a tally from 1 to 2. Popping doesn't change anything, because popping moves a key, it doesn't copy one.</p>
+
+<p>This run was handed the only key to the top, which is why lockers get freed as it goes: once a node's turn ends, nothing holds a key to it. Had the caller kept a key of its own, every tally would be one higher and nothing would be freed. Either way the answer is the same. The difference is who's still holding the tree afterward.</p>
+
+<p><code>for _ in 0..width</code> is what keeps the levels apart. At the top of each round the queue holds exactly one level, so count it first, serve that many, and whoever joins during the round waits for the next one. Without <code>width</code> you'd still visit nodes in level order, you just couldn't tell where one level ends.</p>
+
+<p>Same skeleton, other questions. The first node served each round is the leftmost on its level. The last one is the rightmost. Keep a running max instead of a total, or push values into a <code>Vec</code> per level, and you have most level questions covered.</p>
+
+<h3>Numbering the places on a level</h3>
+
+<p>Some questions care where on a level a node sits, empty spots included. Number the places: if a node is at place <code>i</code>, its children go at <code>2i</code> and <code>2i + 1</code>. The queue holds pairs now, a key and a place:</p>
+
+<pre class="code"><code><span class="hc">// For each level: how many places between its first and last node are</span>
+<span class="hc">// empty?</span>
+<span class="hk">fn</span> <span class="hf">gaps</span>(root: <span class="ht">Option</span>&lt;<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;&gt;) -&gt; <span class="ht">Vec</span>&lt;u64&gt; {
+    <span class="hk">let</span> <span class="hk">mut</span> out = <span class="ht">Vec</span>::<span class="hf">new</span>();
+    <span class="hk">let</span> <span class="hk">mut</span> q: <span class="ht">VecDeque</span>&lt;(<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;, u64)&gt; = <span class="ht">VecDeque</span>::<span class="hf">new</span>();
+    <span class="hk">if</span> <span class="hk">let</span> <span class="hv">Some</span>(r) = root {
+        q.<span class="hf">push_back</span>((r, <span class="hn">0</span>));
+    }
+    <span class="hk">while</span> !q.<span class="hf">is_empty</span>() {
+        <span class="hk">let</span> width = q.<span class="hf">len</span>();
+        <span class="hk">let</span> <span class="hk">mut</span> first = <span class="hn">0</span>;
+        <span class="hk">let</span> <span class="hk">mut</span> last = <span class="hn">0</span>;
+        <span class="hk">for</span> k <span class="hk">in</span> <span class="hn">0</span>..width {
+            <span class="hk">let</span> (node, place) = q.<span class="hf">pop_front</span>().<span class="hf">unwrap</span>();
+            <span class="hk">if</span> k == <span class="hn">0</span> {
+                first = place;
+            }
+            last = place;
+            <span class="hk">let</span> i = place - first; <span class="hc">// renumber from zero on every level</span>
+            <span class="hk">let</span> n = node.<span class="hf">borrow</span>();
+            <span class="hk">if</span> <span class="hk">let</span> <span class="hv">Some</span>(l) = &amp;n.left {
+                q.<span class="hf">push_back</span>((<span class="ht">Rc</span>::<span class="hf">clone</span>(l), <span class="hn">2</span> * i));
+            }
+            <span class="hk">if</span> <span class="hk">let</span> <span class="hv">Some</span>(r) = &amp;n.right {
+                q.<span class="hf">push_back</span>((<span class="ht">Rc</span>::<span class="hf">clone</span>(r), <span class="hn">2</span> * i + <span class="hn">1</span>));
+            }
+        }
+        out.<span class="hf">push</span>(last - first + <span class="hn">1</span> - width <span class="hk">as</span> u64);
+    }
+    out
+}</code></pre>
+
+<p>Places double with every level, so on a long thin tree they outgrow even a <code>u64</code> after 64 levels. Renumbering from zero at the start of each level, the <code>place - first</code> line, keeps the numbers small when a level's nodes sit near each other. It can't save you when a level really does span more than 2<sup>64</sup> places, so check the size limits a task gives you before trusting it.</p>
+
+<p class="aside">You can also queue <code>Option</code>s, pushing <code>n.left.clone()</code> whether or not it's <code>None</code>. Then the queue shows where the gaps are, in order. Handy when the question is about shape.</p>
+</section>
+
+<section class="chapter" id="s7">
+<div class="ch-head"><span class="door">7</span><h2>Your own stack</h2></div>
+
+<p>Recursion keeps its to-do list on the call stack: every call waiting for a child to finish is a frame on that stack. You can keep the list yourself, as a pile of bookmarks in a <code>Vec</code>.</p>
+
+<p>Why bother, when recursion is shorter? Two reasons. The pile lives on the heap, which is far larger than the stack, so a very deep tree can't overflow it (section 14 has the numbers). And a loop can stop the moment it has what it needs, or pause between iterations and pick up later. Section 13 depends on that.</p>
+
+<pre class="code"><code><span class="hk">fn</span> <span class="hf">preorder</span>(root: <span class="ht">Option</span>&lt;<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;&gt;) -&gt; <span class="ht">Vec</span>&lt;i32&gt; {
+    <span class="hk">let</span> <span class="hk">mut</span> out = <span class="ht">Vec</span>::<span class="hf">new</span>();
+    <span class="hk">let</span> <span class="hk">mut</span> stack = <span class="ht">Vec</span>::<span class="hf">new</span>();
+    <span class="hk">if</span> <span class="hk">let</span> <span class="hv">Some</span>(r) = root {
+        stack.<span class="hf">push</span>(r);
+    }
+    <span class="hk">while</span> <span class="hk">let</span> <span class="hv">Some</span>(node) = stack.<span class="hf">pop</span>() {
+        <span class="hk">let</span> n = node.<span class="hf">borrow</span>();
+        out.<span class="hf">push</span>(n.val);
+        <span class="hk">if</span> <span class="hk">let</span> <span class="hv">Some</span>(r) = &amp;n.right {
+            stack.<span class="hf">push</span>(<span class="ht">Rc</span>::<span class="hf">clone</span>(r)); <span class="hc">// right goes in first,</span>
+        }
+        <span class="hk">if</span> <span class="hk">let</span> <span class="hv">Some</span>(l) = &amp;n.left {
+            stack.<span class="hf">push</span>(<span class="ht">Rc</span>::<span class="hf">clone</span>(l)); <span class="hc">// so left comes out first</span>
+        }
+    }
+    out
+}</code></pre>
+
+<p>Node first, then left, then right: preorder. A stack hands back the last thing you put on it, so push right before left.</p>
+
+<p>Inorder (left, node, right) needs a cursor as well as the pile. Walk left as far as you can, putting every node you pass on the pile. Then take the top one, use it, step once to its right, and do the same again:</p>
+
+<pre class="code"><code><span class="hk">fn</span> <span class="hf">inorder</span>(root: <span class="ht">Option</span>&lt;<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;&gt;) -&gt; <span class="ht">Vec</span>&lt;i32&gt; {
+    <span class="hk">let</span> <span class="hk">mut</span> out = <span class="ht">Vec</span>::<span class="hf">new</span>();
+    <span class="hk">let</span> <span class="hk">mut</span> stack: <span class="ht">Vec</span>&lt;<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;&gt; = <span class="ht">Vec</span>::<span class="hf">new</span>();
+    <span class="hk">let</span> <span class="hk">mut</span> cur = root;
+    <span class="hk">loop</span> {
+        <span class="hk">while</span> <span class="hk">let</span> <span class="hv">Some</span>(node) = cur {
+            cur = node.<span class="hf">borrow</span>().left.<span class="hf">clone</span>(); <span class="hc">// read the next key first</span>
+            stack.<span class="hf">push</span>(node); <span class="hc">// then hand this one to the stack</span>
+        }
+        <span class="hk">match</span> stack.<span class="hf">pop</span>() {
+            <span class="hv">None</span> =&gt; <span class="hk">break</span>,
+            <span class="hv">Some</span>(node) =&gt; {
+                out.<span class="hf">push</span>(node.<span class="hf">borrow</span>().val);
+                cur = node.<span class="hf">borrow</span>().right.<span class="hf">clone</span>();
+            }
+        }
+    }
+    out
+}</code></pre>
+
+<p>Look at the order of the two lines inside <code>while let</code>. <code>cur = node.borrow().left.clone()</code> reads the next key out of <code>node</code> first. Only then does <code>stack.push(node)</code> hand <code>node</code> over.</p>
+
+<div class="nope-note">
+<p class="nope-head">Swap those two lines, and it doesn't compile</p>
+<pre class="code nope-code"><code><span class="hk">while</span> <span class="hk">let</span> <span class="hv">Some</span>(node) = cur {
+    stack.<span class="hf">push</span>(node); <span class="hc">// the key goes to the stack...</span>
+    cur = node.<span class="hf">borrow</span>().left.<span class="hf">clone</span>(); <span class="hc">// ...so it is not here to use</span>
+}</code></pre>
+<p>Once the key is on the pile it's not in <code>node</code> anymore, so there's nothing to open. Either read first, as above, or push a copy with <code>stack.push(Rc::clone(&amp;node))</code>. Reading first costs nothing.</p>
+</div>
+
+<p>Postorder (left, right, node) is fiddlier without recursion. The usual way out: run the preorder loop with left and right swapped, which gives node, right, left, then reverse the output.</p>
+
+<p>Every key on the pile is a copy, or a key that moved there, so a node on the pile can't be freed while it waits. Same as the queue. Both are just a different order of service.</p>
+</section>
+
+<section class="chapter" id="s8">
+<div class="ch-head"><span class="door">8</span><h2>Ordered trees</h2></div>
+
+<p>Some trees come with a promise: everything hanging off a node's left hook is smaller than it, and everything off its right hook is bigger. At every node, all the way down. A game of higher-or-lower, where each locker tells you which way to go.</p>
+
+<p>Two consequences do almost all the work.</p>
+<p>An inorder walk (section 7, or the recursive version: left, node, right) visits the values in sorted order. And finding a value only ever follows one path from the top, discarding half of what's left at every step.</p>
+
+<h3>Checking the promise</h3>
+
+<p>Comparing each node with its parent isn't enough. A node down in the left half has to be smaller than its parent and smaller than the top as well. So carry the window of allowed values down, section 4 style:</p>
+
+<pre class="code"><code><span class="hk">fn</span> <span class="hf">ordered</span>(node: &amp;<span class="ht">Option</span>&lt;<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;&gt;, lo: i64, hi: i64) -&gt; bool {
+    <span class="hk">match</span> node {
+        <span class="hv">None</span> =&gt; <span class="hk">true</span>,
+        <span class="hv">Some</span>(rc) =&gt; {
+            <span class="hk">let</span> n = rc.<span class="hf">borrow</span>();
+            <span class="hk">let</span> v = n.val <span class="hk">as</span> i64;
+            lo &lt; v
+                &amp;&amp; v &lt; hi
+                &amp;&amp; <span class="hf">ordered</span>(&amp;n.left, lo, v) <span class="hc">// left side: below v</span>
+                &amp;&amp; <span class="hf">ordered</span>(&amp;n.right, v, hi) <span class="hc">// right side: above v</span>
+        }
+    }
+}
+
+<span class="hk">pub</span> <span class="hk">fn</span> <span class="hf">is_ordered</span>(root: <span class="ht">Option</span>&lt;<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;&gt;) -&gt; bool {
+    <span class="hf">ordered</span>(&amp;root, i64::<span class="ht">MIN</span>, i64::<span class="ht">MAX</span>)
+}</code></pre>
+
+<p>Going left shrinks the window from above, going right shrinks it from below. The bounds are <code>i64</code> so that a node holding <code>i32::MIN</code> or <code>i32::MAX</code> still fits strictly inside the starting window. <code>Option&lt;i32&gt;</code> bounds, with <code>None</code> for "no limit," do the same job.</p>
+
+<h3>Walking one path</h3>
+
+<p>No recursion needed when you only go down one path. A cursor will do, holding one key at a time:</p>
+
+<pre class="code"><code><span class="hc">// Smallest value that is at least x, if there is one.</span>
+<span class="hk">fn</span> <span class="hf">ceiling</span>(root: &amp;<span class="ht">Option</span>&lt;<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;&gt;, x: i32) -&gt; <span class="ht">Option</span>&lt;i32&gt; {
+    <span class="hk">let</span> <span class="hk">mut</span> best = <span class="hv">None</span>;
+    <span class="hk">let</span> <span class="hk">mut</span> cur = root.<span class="hf">clone</span>();
+    <span class="hk">while</span> <span class="hk">let</span> <span class="hv">Some</span>(node) = cur {
+        <span class="hk">let</span> n = node.<span class="hf">borrow</span>();
+        <span class="hk">if</span> n.val == x {
+            <span class="hk">return</span> <span class="hv">Some</span>(x);
+        }
+        <span class="hk">if</span> n.val &gt; x {
+            best = <span class="hv">Some</span>(n.val); <span class="hc">// a candidate; anything better is to the left</span>
+            cur = n.left.<span class="hf">clone</span>();
+        } <span class="hk">else</span> {
+            cur = n.right.<span class="hf">clone</span>();
+        }
+    }
+    best
+}</code></pre>
+
+<figure class="wide">
+<svg viewBox="0 0 640 340" role="img" aria-labelledby="d8t">
+<title id="d8t">An ordered tree with 8 at the top. Looking for the smallest value at least 5, the walk goes 8 (bigger, best becomes 8, go left), 3 (smaller, go right), 6 (bigger, best becomes 6, go left), 4 (smaller, go right), then finds an empty hook. The answer is 6.</title>
+<defs><marker id="ah8" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="d-arrowhead"/></marker></defs>
+<path d="M316 62 L198 104" class="d-path"/>
+<path d="M194 146 L246 182" class="d-path"/>
+<path d="M236 226 L208 262" class="d-path"/>
+<path d="M216 304 L228 320" class="d-path" stroke-dasharray="4 3"/>
+<rect x="302" y="20" width="52" height="40" rx="4" class="d-locker" style="stroke:var(--brass);stroke-width:3"/><text x="328" y="46" class="d-val" font-size="16" text-anchor="middle">8</text>
+<path d="M340 60 L466 104" class="d-arrow" marker-end="url(#ah8)"/>
+<rect x="154" y="106" width="52" height="40" rx="4" class="d-locker" style="stroke:var(--brass);stroke-width:3"/><text x="180" y="132" class="d-val" font-size="16" text-anchor="middle">3</text>
+<rect x="454" y="106" width="52" height="40" rx="4" class="d-locker"/><text x="480" y="132" class="d-val" font-size="16" text-anchor="middle">10</text>
+<path d="M168 146 L120 182" class="d-arrow" marker-end="url(#ah8)"/>
+<path d="M494 146 L542 182" class="d-arrow" marker-end="url(#ah8)"/>
+<rect x="84" y="186" width="52" height="40" rx="4" class="d-locker"/><text x="110" y="212" class="d-val" font-size="16" text-anchor="middle">1</text>
+<rect x="224" y="186" width="52" height="40" rx="4" class="d-locker" style="stroke:var(--brass);stroke-width:3"/><text x="250" y="212" class="d-val" font-size="16" text-anchor="middle">6</text>
+<rect x="524" y="186" width="52" height="40" rx="4" class="d-locker"/><text x="550" y="212" class="d-val" font-size="16" text-anchor="middle">14</text>
+<path d="M264 226 L292 262" class="d-arrow" marker-end="url(#ah8)"/>
+<path d="M538 226 L516 262" class="d-arrow" marker-end="url(#ah8)"/>
+<rect x="176" y="264" width="52" height="40" rx="4" class="d-locker" style="stroke:var(--brass);stroke-width:3"/><text x="202" y="290" class="d-val" font-size="16" text-anchor="middle">4</text>
+<rect x="276" y="264" width="52" height="40" rx="4" class="d-locker"/><text x="302" y="290" class="d-val" font-size="16" text-anchor="middle">7</text>
+<rect x="484" y="264" width="52" height="40" rx="4" class="d-locker"/><text x="510" y="290" class="d-val" font-size="16" text-anchor="middle">13</text>
+<circle cx="232" cy="326" r="5" class="d-hook"/>
+<text x="364" y="36" class="d-brass" font-size="13">8 &gt; 5: best = 8, go left</text>
+<text x="20" y="116" class="d-text" font-size="13">3 &lt; 5: go right</text>
+<text x="286" y="196" class="d-brass" font-size="13">6 &gt; 5: best = 6, left</text>
+<text x="20" y="286" class="d-text" font-size="13">4 &lt; 5: go right</text>
+<text x="246" y="334" class="d-text" font-size="12">empty: answer is best, 6</text>
+</svg>
+<figcaption>Looking for the smallest value that's at least 5. Every time the walk turns left, it has just seen a candidate.</figcaption>
+</figure>
+
+<p>Each step copies one key into <code>cur</code> and drops the old one when <code>node</code> goes away at the end of the iteration. Only the current node carries a tick. Notice <code>cur = n.left.clone()</code> runs while <code>n</code> is still open on <code>node</code>: that's fine, because <code>cur</code> is a different variable from <code>node</code>. The key in <code>cur</code> was moved into <code>node</code> at the top of the loop.</p>
+
+<h3>Skipping what can't matter</h3>
+
+<p>When a node is below the range you want, everything on its left is even further below. Skip that side entirely:</p>
+
+<pre class="code"><code><span class="hc">// How many values fall in lo..=hi?</span>
+<span class="hk">fn</span> <span class="hf">within</span>(node: &amp;<span class="ht">Option</span>&lt;<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;&gt;, lo: i32, hi: i32) -&gt; i32 {
+    <span class="hk">match</span> node {
+        <span class="hv">None</span> =&gt; <span class="hn">0</span>,
+        <span class="hv">Some</span>(rc) =&gt; {
+            <span class="hk">let</span> n = rc.<span class="hf">borrow</span>();
+            <span class="hk">if</span> n.val &lt; lo {
+                <span class="hk">return</span> <span class="hf">within</span>(&amp;n.right, lo, hi); <span class="hc">// left side is smaller still</span>
+            }
+            <span class="hk">if</span> n.val &gt; hi {
+                <span class="hk">return</span> <span class="hf">within</span>(&amp;n.left, lo, hi); <span class="hc">// right side is bigger still</span>
+            }
+            <span class="hn">1</span> + <span class="hf">within</span>(&amp;n.left, lo, hi) + <span class="hf">within</span>(&amp;n.right, lo, hi)
+        }
+    }
+}</code></pre>
+
+<h3>The value just before</h3>
+
+<p>An inorder walk visits values in sorted order, so a <code>prev</code> carried across calls (section 4's bag again) always holds the value just below the current one:</p>
+
+<pre class="code"><code><span class="hc">// Largest gap between two neighbors in sorted order.</span>
+<span class="hk">fn</span> <span class="hf">gap</span>(
+    node: &amp;<span class="ht">Option</span>&lt;<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;&gt;,
+    prev: &amp;<span class="hk">mut</span> <span class="ht">Option</span>&lt;i32&gt;,
+    best: &amp;<span class="hk">mut</span> i64,
+) {
+    <span class="hk">if</span> <span class="hk">let</span> <span class="hv">Some</span>(rc) = node {
+        <span class="hk">let</span> n = rc.<span class="hf">borrow</span>();
+        <span class="hf">gap</span>(&amp;n.left, prev, best);
+        <span class="hk">if</span> <span class="hk">let</span> <span class="hv">Some</span>(p) = *prev {
+            <span class="hk">let</span> d = n.val <span class="hk">as</span> i64 - p <span class="hk">as</span> i64;
+            <span class="hk">if</span> d &gt; *best {
+                *best = d;
+            }
+        }
+        *prev = <span class="hv">Some</span>(n.val);
+        <span class="hf">gap</span>(&amp;n.right, prev, best);
+    }
+}</code></pre>
+
+<p>Any question about neighbors in sorted order (closest pairs, gaps, duplicates, runs of equal values) is this walk with a different line in the middle.</p>
+</section>
+
+<section class="chapter" id="s9">
+<div class="ch-head"><span class="door">9</span><h2>Building</h2></div>
+
+<p>A new node takes three wrappings: the node in a <code>RefCell</code>, that in an <code>Rc</code>, that in <code>Some</code>. Typing all three every time gets old fast, so make a helper:</p>
+
+<pre class="code"><code><span class="hk">fn</span> <span class="hf">node</span>(
+    val: i32,
+    left: <span class="ht">Option</span>&lt;<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;&gt;,
+    right: <span class="ht">Option</span>&lt;<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;&gt;,
+) -&gt; <span class="ht">Option</span>&lt;<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;&gt; {
+    <span class="hv">Some</span>(<span class="ht">Rc</span>::<span class="hf">new</span>(<span class="ht">RefCell</span>::<span class="hf">new</span>(<span class="ht">TreeNode</span> { val, left, right })))
+}</code></pre>
+
+<pre class="code"><code><span class="hk">let</span> tree = <span class="hf">node</span>(<span class="hn">4</span>, <span class="hf">node</span>(<span class="hn">2</span>, <span class="hv">None</span>, <span class="hv">None</span>), <span class="hf">node</span>(<span class="hn">7</span>, <span class="hv">None</span>, <span class="hv">None</span>));</code></pre>
+
+<p>Each call to <code>node</code> is one trip to the allocator for 48 bytes.</p>
+
+<p>Look at the order things happen in. The children are built first, then passed straight into the parent's struct. Nothing ever gets changed after it's made, so nothing ever needs a working tag. That's worth aiming for. Build bottom-up and the sign on the door never comes into it.</p>
+
+<h3>Middle on top</h3>
+
+<p>From a sorted list, the shortest tree puts the middle value on top, then does the same with each half. Divide and conquer, children first:</p>
+
+<pre class="code"><code><span class="hc">// A tree of the smallest height from sorted values: middle on top.</span>
+<span class="hk">fn</span> <span class="hf">from_sorted</span>(
+    v: &amp;[i32],
+    lo: usize,
+    hi: usize,
+) -&gt; <span class="ht">Option</span>&lt;<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;&gt; {
+    <span class="hk">if</span> lo &gt;= hi {
+        <span class="hk">return</span> <span class="hv">None</span>; <span class="hc">// the range lo..hi is empty</span>
+    }
+    <span class="hk">let</span> mid = lo + (hi - lo) / <span class="hn">2</span>;
+    <span class="hk">let</span> left = <span class="hf">from_sorted</span>(v, lo, mid);
+    <span class="hk">let</span> right = <span class="hf">from_sorted</span>(v, mid + <span class="hn">1</span>, hi);
+    <span class="hv">Some</span>(<span class="ht">Rc</span>::<span class="hf">new</span>(<span class="ht">RefCell</span>::<span class="hf">new</span>(<span class="ht">TreeNode</span> {
+        val: v[mid],
+        left,
+        right,
+    })))
+}</code></pre>
+
+<p>The range is half-open: <code>lo..hi</code> includes <code>lo</code> and stops just before <code>hi</code>. With that convention, the left half is <code>lo..mid</code>, the right half is <code>mid + 1..hi</code>, and an empty range is simply <code>lo &gt;= hi</code>. No <code>mid - 1</code> anywhere.</p>
+
+<p><span class="tag fact">fact</span>Why avoid <code>mid - 1</code>? Indices are <code>usize</code>, and <code>usize</code> can't go below zero. We ran <code>0usize - 1</code>: a debug build stopped with "attempt to subtract with overflow," and a release build quietly produced 18446744073709551615.</p>
+
+<p>If the values arrive as a linked list, copy them into a <code>Vec</code> first. Building wants to jump straight to the middle, and a list can only walk.</p>
+
+<p>When you keep needing to know where some value sits in a list (say, while rebuilding a tree from two different listings of it), build a <code>HashMap&lt;i32, usize&gt;</code> from value to position once, instead of searching every time.</p>
+
+<h3>Reading a list in order while you build</h3>
+
+<p>Section 4's shared bookmark builds trees too. Here the list is a preorder walk with <code>None</code> wherever a hook was empty:</p>
+
+<pre class="code"><code><span class="hc">// Preorder, with None standing in for every empty hook.</span>
+<span class="hk">fn</span> <span class="hf">rebuild</span>(
+    items: &amp;[<span class="ht">Option</span>&lt;i32&gt;],
+    pos: &amp;<span class="hk">mut</span> usize,
+) -&gt; <span class="ht">Option</span>&lt;<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;&gt; {
+    <span class="hk">let</span> item = items[*pos];
+    *pos += <span class="hn">1</span>;
+    <span class="hk">match</span> item {
+        <span class="hv">None</span> =&gt; <span class="hv">None</span>,
+        <span class="hv">Some</span>(v) =&gt; {
+            <span class="hk">let</span> left = <span class="hf">rebuild</span>(items, pos);
+            <span class="hk">let</span> right = <span class="hf">rebuild</span>(items, pos);
+            <span class="hv">Some</span>(<span class="ht">Rc</span>::<span class="hf">new</span>(<span class="ht">RefCell</span>::<span class="hf">new</span>(<span class="ht">TreeNode</span> {
+                val: v,
+                left,
+                right,
+            })))
+        }
+    }
+}</code></pre>
+
+<p>Each call reads one entry and moves the bookmark on. A <code>Some</code> means "a node here, then its left subtree, then its right." A <code>None</code> means "empty hook, nothing more to read for it." The list's own shape tells every call how much to consume.</p>
+
+<h3>Attaching after the fact</h3>
+
+<p>Sometimes you can't build bottom-up, because pieces arrive in some order you don't control. Then you make nodes first and hang them on hooks later, which means working tags and copied keys.</p>
+
+<div class="nope-note">
+<p class="nope-head">Hang your only key on a hook and keep using it, and it doesn't compile</p>
+<pre class="code nope-code"><code><span class="hk">let</span> child = <span class="ht">Rc</span>::<span class="hf">new</span>(<span class="ht">RefCell</span>::<span class="hf">new</span>(<span class="ht">TreeNode</span>::<span class="hf">new</span>(<span class="hn">2</span>)));
+<span class="hk">let</span> parent = <span class="ht">Rc</span>::<span class="hf">new</span>(<span class="ht">RefCell</span>::<span class="hf">new</span>(<span class="ht">TreeNode</span>::<span class="hf">new</span>(<span class="hn">1</span>)));
+parent.<span class="hf">borrow_mut</span>().left = <span class="hv">Some</span>(child); <span class="hc">// the only key goes on the hook</span>
+child.<span class="hf">borrow_mut</span>().val = <span class="hn">20</span>; <span class="hc">// nothing left in `child`</span></code></pre>
+<p><code>Some(child)</code> moved the key onto the hook. <code>child</code> is empty now. If you still need to reach the child yourself, the hook gets a copy and you keep yours:</p>
+</div>
+
+<pre class="code"><code><span class="hk">let</span> child = <span class="ht">Rc</span>::<span class="hf">new</span>(<span class="ht">RefCell</span>::<span class="hf">new</span>(<span class="ht">TreeNode</span>::<span class="hf">new</span>(<span class="hn">2</span>)));
+<span class="hk">let</span> parent = <span class="ht">Rc</span>::<span class="hf">new</span>(<span class="ht">RefCell</span>::<span class="hf">new</span>(<span class="ht">TreeNode</span>::<span class="hf">new</span>(<span class="hn">1</span>)));
+parent.<span class="hf">borrow_mut</span>().left = <span class="hv">Some</span>(<span class="ht">Rc</span>::<span class="hf">clone</span>(&amp;child)); <span class="hc">// a copy goes on the hook</span>
+child.<span class="hf">borrow_mut</span>().val = <span class="hn">20</span>; <span class="hc">// `child` still holds its own key</span></code></pre>
+
+<h3>Two houses, one wall</h3>
+
+<p>Nothing says a node can only hang in one place. Copy the key, hang it on two hooks:</p>
+
+<pre class="code"><code><span class="hk">let</span> wall = <span class="hf">node</span>(<span class="hn">9</span>, <span class="hv">None</span>, <span class="hv">None</span>);
+<span class="hk">let</span> house_a = <span class="hf">node</span>(<span class="hn">1</span>, wall.<span class="hf">clone</span>(), <span class="hv">None</span>); <span class="hc">// copy of the key</span>
+<span class="hk">let</span> house_b = <span class="hf">node</span>(<span class="hn">2</span>, <span class="hv">None</span>, wall.<span class="hf">clone</span>()); <span class="hc">// another copy</span>
+<span class="hc">// the 9 now has three keys: `wall` and one hook in each house</span>
+
+<span class="hk">if</span> <span class="hk">let</span> <span class="hv">Some</span>(w) = &amp;wall {
+    w.<span class="hf">borrow_mut</span>().val = <span class="hn">0</span>; <span class="hc">// change it once...</span>
+}
+<span class="hc">// ...and both houses see 0 under them</span></code></pre>
+
+<figure>
+<svg viewBox="0 0 600 240" role="img" aria-labelledby="d9t">
+<title id="d9t">Two separate trees, with tops 2 on the left and 1 on the right. Locker 2's right hook and locker 1's left hook both hold keys to one shared locker, 9, drawn in brick red. Its tally is 3: one for each hook, and one for the variable wall.</title>
+<defs><marker id="ah9" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="d-arrowhead"/></marker>
+<marker id="ah9g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="d-ownfill"/></marker></defs>
+<path d="M110 60 L150 28 L190 60" style="fill:none;stroke:var(--brick);stroke-width:2"/>
+<path d="M410 60 L450 28 L490 60" style="fill:none;stroke:var(--brick);stroke-width:2"/>
+<text x="150" y="20" class="d-bricktext" font-size="12" text-anchor="middle">house_b</text>
+<text x="450" y="20" class="d-bricktext" font-size="12" text-anchor="middle">house_a</text>
+<rect x="122" y="62" width="56" height="42" rx="4" class="d-locker"/><text x="150" y="89" class="d-val" font-size="17" text-anchor="middle">2</text>
+<rect x="422" y="62" width="56" height="42" rx="4" class="d-locker"/><text x="450" y="89" class="d-val" font-size="17" text-anchor="middle">1</text>
+<path d="M136 104 L128 118" class="d-hook"/><circle cx="126" cy="124" r="5" class="d-hook"/>
+<path d="M164 104 L270 162" class="d-arrow" marker-end="url(#ah9)"/>
+<path d="M436 104 L330 162" class="d-arrow" marker-end="url(#ah9)"/>
+<path d="M464 104 L472 118" class="d-hook"/><circle cx="474" cy="124" r="5" class="d-hook"/>
+<text x="196" y="122" class="d-text" font-size="11">right</text>
+<text x="404" y="122" class="d-text" font-size="11" text-anchor="end">left</text>
+<rect x="272" y="164" width="56" height="42" rx="4" class="d-brick"/><text x="300" y="191" class="d-val" font-size="17" text-anchor="middle">9</text>
+<circle cx="328" cy="164" r="10" class="d-tally"/><text x="328" y="168" class="d-tallytext" font-size="12" text-anchor="middle">3</text>
+<text x="300" y="130" class="d-owntext" font-size="13" text-anchor="middle">wall</text>
+<path d="M300 136 L300 158" class="d-own" marker-end="url(#ah9g)"/>
+<text x="300" y="228" class="d-bricktext" font-size="12" text-anchor="middle">one locker, hanging in two trees</text>
+</svg>
+<figcaption>Change the 9 through any of its three keys and both houses see the change.</figcaption>
+</figure>
+
+<p>Legal, and sometimes exactly right. When you have to produce many trees that share pieces (every possible shape of a given size, say), building each small piece once and hanging copies of its key saves a great deal of allocating.</p>
+
+<p><span class="tag judgment">judgment</span>It's safe as long as nobody rewires a shared piece afterward. A shared wall belongs to both houses. Knock it down for one and the other loses it too. If anything later on will change the trees, build each one its own pieces.</p>
+</section>
+
+<section class="chapter" id="s10">
+<div class="ch-head"><span class="door">10</span><h2>Rewiring</h2></div>
+
+<p>Now the <span class="c-work">working tag</span> earns its place. Think of a tree surgeon: tag the door so nobody wanders in, lift branches off their hooks, hang them back where they belong, take the tag down on the way out.</p>
+
+<p>The lifting is <code>take()</code>, the same as with lists. It lifts the key off a hook, hands it to you, and leaves an honest <code>None</code> behind. Here's a tree mirrored left to right, in place:</p>
+
+<div class="tstepper" data-algo="mirror">
+<pre class="code"><code><span class="hk">fn</span> <span class="hf">mirror</span>(node: &amp;<span class="ht">Option</span>&lt;<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;&gt;) {
+    <span class="hk">if</span> <span class="hk">let</span> <span class="hv">Some</span>(rc) = node {
+        <span class="hk">let</span> <span class="hk">mut</span> n = rc.<span class="hf">borrow_mut</span>();
+        <span class="hk">let</span> left = n.left.<span class="hf">take</span>();
+        <span class="hk">let</span> right = n.right.<span class="hf">take</span>();
+        n.left = right;
+        n.right = left;
+        <span class="hf">mirror</span>(&amp;n.left);
+        <span class="hf">mirror</span>(&amp;n.right);
+    }
+}</code></pre>
+</div>
+
+<p>Two things to watch in the stepper.</p>
+<p>First, the tallies never change. Every key moves from a hook to your hand and back to a hook. Nothing is copied, nothing allocated, nothing freed.</p>
+<p>Second, the working tags pile up along the path, one on every door from the top down to wherever the walk is, just like the ticks did in section 3. That's allowed. Every tag is on a different door. The call on 2 can't touch 4's door while 4's tag is up, but it doesn't need to.</p>
+
+<div class="nope-note">
+<p class="nope-head">Swap the two hooks directly through the guard, and it doesn't compile</p>
+<pre class="code nope-code"><code><span class="hk">if</span> <span class="hk">let</span> <span class="hv">Some</span>(rc) = node {
+    <span class="hk">let</span> <span class="hk">mut</span> n = rc.<span class="hf">borrow_mut</span>();
+    std::mem::<span class="hf">swap</span>(&amp;<span class="hk">mut</span> n.left, &amp;<span class="hk">mut</span> n.right); <span class="hc">// two loans from one guard</span>
+}</code></pre>
+<p>Every field you reach through a guard goes through the guard itself. So <code>&amp;mut n.left</code> and <code>&amp;mut n.right</code> look to the compiler like two separate <code>&amp;mut</code> borrows of <code>n</code>, at the same time. Turn the guard into one plain <code>&amp;mut TreeNode</code> first. Then the compiler sees two different fields of one struct, which is fine:</p>
+</div>
+
+<pre class="code"><code><span class="hk">fn</span> <span class="hf">mirror_swap</span>(node: &amp;<span class="ht">Option</span>&lt;<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;&gt;) {
+    <span class="hk">if</span> <span class="hk">let</span> <span class="hv">Some</span>(rc) = node {
+        <span class="hk">let</span> <span class="hk">mut</span> guard = rc.<span class="hf">borrow_mut</span>();
+        <span class="hk">let</span> n = &amp;<span class="hk">mut</span> *guard; <span class="hc">// one plain &amp;mut TreeNode from the guard</span>
+        std::mem::<span class="hf">swap</span>(&amp;<span class="hk">mut</span> n.left, &amp;<span class="hk">mut</span> n.right);
+        <span class="hf">mirror_swap</span>(&amp;n.left);
+        <span class="hf">mirror_swap</span>(&amp;n.right);
+    }
+}</code></pre>
+
+<p>Both versions are correct. <code>take()</code> twice is plainer to read, the reborrow is shorter. Pick either.</p>
+
+<h3>Return what should hang here</h3>
+
+<p>Pruning, inserting and deleting all share one shape. The function takes a key and returns a key, or <code>None</code>, meaning "nothing hangs here anymore." The parent takes its hook's key, hands it in, and hangs up whatever comes back:</p>
+
+<p class="short"><code>n.left = cut_negative(n.left.take());</code></p>
+
+<pre class="code"><code><span class="hc">// Remove every subtree in which all values are negative.</span>
+<span class="hk">fn</span> <span class="hf">cut_negative</span>(
+    node: <span class="ht">Option</span>&lt;<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;&gt;,
+) -&gt; <span class="ht">Option</span>&lt;<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;&gt; {
+    <span class="hk">match</span> node {
+        <span class="hv">None</span> =&gt; <span class="hv">None</span>,
+        <span class="hv">Some</span>(rc) =&gt; {
+            <span class="hk">let</span> goes = {
+                <span class="hk">let</span> <span class="hk">mut</span> n = rc.<span class="hf">borrow_mut</span>();
+                n.left = <span class="hf">cut_negative</span>(n.left.<span class="hf">take</span>());
+                n.right = <span class="hf">cut_negative</span>(n.right.<span class="hf">take</span>());
+                n.val &lt; <span class="hn">0</span> &amp;&amp; n.left.<span class="hf">is_none</span>() &amp;&amp; n.right.<span class="hf">is_none</span>()
+            }; <span class="hc">// the working tag comes down here</span>
+            <span class="hk">if</span> goes { <span class="hv">None</span> } <span class="hk">else</span> { <span class="hv">Some</span>(rc) }
+        }
+    }
+}</code></pre>
+
+<p>Read the block in the middle. The guard <code>n</code> is made inside its own <code>{ ... }</code>, the children are re-hung, and the block's value (cut or keep?) is copied out into <code>goes</code>. The block ends, the guard goes, the tag comes down. Only then does <code>Some(rc)</code> hand the key back to the caller.</p>
+
+<div class="nope-note">
+<p class="nope-head">Hand the key back while its door is still open, and it doesn't compile</p>
+<pre class="code nope-code"><code><span class="hk">fn</span> <span class="hf">cut_negative</span>(
+    node: <span class="ht">Option</span>&lt;<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;&gt;,
+) -&gt; <span class="ht">Option</span>&lt;<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;&gt; {
+    <span class="hk">match</span> node {
+        <span class="hv">None</span> =&gt; <span class="hv">None</span>,
+        <span class="hv">Some</span>(rc) =&gt; {
+            <span class="hk">let</span> <span class="hk">mut</span> n = rc.<span class="hf">borrow_mut</span>();
+            n.left = <span class="hf">cut_negative</span>(n.left.<span class="hf">take</span>());
+            n.right = <span class="hf">cut_negative</span>(n.right.<span class="hf">take</span>());
+            <span class="hk">if</span> n.val &lt; <span class="hn">0</span> &amp;&amp; n.left.<span class="hf">is_none</span>() &amp;&amp; n.right.<span class="hf">is_none</span>() {
+                <span class="hv">None</span>
+            } <span class="hk">else</span> {
+                <span class="hv">Some</span>(rc) <span class="hc">// handing the key over while `n` is still open</span>
+            }
+        }
+    }
+}</code></pre>
+<p>Without the inner block, <code>n</code> lives to the end of the arm. It's a guard on <code>rc</code>'s door, so <code>rc</code> can't be given away while <code>n</code> is still around. You'd be handing someone a key to a door you're still standing in.</p>
+</div>
+
+<p>The same shape covers the other two. To insert, walk to the right <code>None</code> hook and return a fresh node there; every other call returns the key it was given. To delete, return whatever should take the deleted node's place. Every parent re-hangs what comes back, so the top of the tree can change too, with no special case.</p>
+
+<h3>Changing values, not shape</h3>
+
+<p>When the shape stays and only numbers change, there's no taking. Just open the door for work and write:</p>
+
+<pre class="code"><code><span class="hc">// Each value becomes the sum of every value at or below it in sorted order.</span>
+<span class="hk">fn</span> <span class="hf">running</span>(node: &amp;<span class="ht">Option</span>&lt;<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;&gt;, total: &amp;<span class="hk">mut</span> i64) {
+    <span class="hk">if</span> <span class="hk">let</span> <span class="hv">Some</span>(rc) = node {
+        <span class="hk">let</span> <span class="hk">mut</span> n = rc.<span class="hf">borrow_mut</span>();
+        <span class="hf">running</span>(&amp;n.left, total);
+        *total += n.val <span class="hk">as</span> i64;
+        n.val = *total <span class="hk">as</span> i32;
+        <span class="hf">running</span>(&amp;n.right, total);
+    }
+}</code></pre>
+
+<p>Visiting in sorted order, keeping a running total in section 4's bag, writing it back into each node. Reverse the walk (right before left) and the total runs from the top down instead.</p>
+
+<h3>Same door, different door</h3>
+
+<div class="alarm-note">
+<p class="alarm-head">Compiles, then stops while running</p>
+<pre class="code alarm-code"><code><span class="hk">let</span> n = node.<span class="hf">borrow</span>();
+<span class="hk">if</span> <span class="hk">let</span> <span class="hv">Some</span>(l) = &amp;n.left {
+    l.<span class="hf">borrow_mut</span>().val = n.val; <span class="hc">// fine: a different door</span>
+}
+node.<span class="hf">borrow_mut</span>().val = <span class="hn">0</span>; <span class="hc">// stops: `n` is still open on this door</span></code></pre>
+<pre class="out alarm-out"><code>RefCell already borrowed</code></pre>
+<p>Working on the child while you look at the parent is fine: different doors. Working on the parent while your own look is still open on it isn't. This happens easily in level walks, where you've got <code>n</code> open on a node and want to change something about that same node. Copy out what you need from <code>n</code>, let it go (<code>drop(n)</code>, or end its block), then open the door again for work.</p>
+</div>
+</section>
+<section class="chapter" id="s11">
+<div class="ch-head"><span class="door">11</span><h2>The same node, not an equal one</h2></div>
+
+<p>Identical twins look the same, sound the same, maybe even answer to the same nickname. They're still two people. Two keys to the same locker are the other situation: one locker, reached two ways.</p>
+
+<p>With keys you can copy, both situations come up, and Rust has a separate question for each:</p>
+
+<pre class="code"><code><span class="hk">let</span> a = <span class="hf">node</span>(<span class="hn">5</span>, <span class="hf">node</span>(<span class="hn">1</span>, <span class="hv">None</span>, <span class="hv">None</span>), <span class="hv">None</span>);
+<span class="hk">let</span> b = <span class="hf">node</span>(<span class="hn">5</span>, <span class="hf">node</span>(<span class="hn">1</span>, <span class="hv">None</span>, <span class="hv">None</span>), <span class="hv">None</span>); <span class="hc">// built separately</span>
+<span class="hk">let</span> c = a.<span class="hf">clone</span>(); <span class="hc">// a second key to a's locker</span>
+
+<span class="hm">println!</span>(<span class="hs">"{} {}"</span>, a == b, a == c); <span class="hc">// true true</span>
+
+<span class="hk">let</span> ka = a.<span class="hf">as_ref</span>().<span class="hf">unwrap</span>(); <span class="hc">// Rc::ptr_eq wants two &amp;Rc</span>
+<span class="hk">let</span> kb = b.<span class="hf">as_ref</span>().<span class="hf">unwrap</span>();
+<span class="hk">let</span> kc = c.<span class="hf">as_ref</span>().<span class="hf">unwrap</span>();
+<span class="hm">println!</span>(<span class="hs">"{} {}"</span>, <span class="ht">Rc</span>::<span class="hf">ptr_eq</span>(ka, kb), <span class="ht">Rc</span>::<span class="hf">ptr_eq</span>(ka, kc)); <span class="hc">// false true</span></code></pre>
+
+<figure>
+<svg viewBox="0 0 620 230" role="img" aria-labelledby="d11t">
+<title id="d11t">Left: keys a and b point to two separate lockers, each holding 5 with a child 1. They are equal, but not the same locker. Right: keys a and c both point to one locker holding 5, tally 2. They are equal and the same locker.</title>
+<defs><marker id="ah11" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="d-arrowhead"/></marker>
+<marker id="ah11g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="d-ownfill"/></marker></defs>
+<text x="150" y="20" class="d-text" font-size="13" text-anchor="middle">twins</text>
+<text x="80" y="48" class="d-owntext" font-size="14" text-anchor="middle">a</text>
+<text x="220" y="48" class="d-owntext" font-size="14" text-anchor="middle">b</text>
+<path d="M80 54 L80 74" class="d-own" marker-end="url(#ah11g)"/>
+<path d="M220 54 L220 74" class="d-own" marker-end="url(#ah11g)"/>
+<rect x="54" y="78" width="52" height="40" rx="4" class="d-locker"/><text x="80" y="104" class="d-val" font-size="16" text-anchor="middle">5</text>
+<rect x="194" y="78" width="52" height="40" rx="4" class="d-locker"/><text x="220" y="104" class="d-val" font-size="16" text-anchor="middle">5</text>
+<path d="M68 118 L56 140" class="d-arrow" marker-end="url(#ah11)"/>
+<path d="M208 118 L196 140" class="d-arrow" marker-end="url(#ah11)"/>
+<rect x="30" y="142" width="40" height="32" rx="4" class="d-locker"/><text x="50" y="163" class="d-val" font-size="14" text-anchor="middle">1</text>
+<rect x="170" y="142" width="40" height="32" rx="4" class="d-locker"/><text x="190" y="163" class="d-val" font-size="14" text-anchor="middle">1</text>
+<text x="150" y="200" class="d-mono" font-size="12" text-anchor="middle">a == b          true</text>
+<text x="150" y="218" class="d-mono" font-size="12" text-anchor="middle">Rc::ptr_eq     false</text>
+<line x1="310" y1="14" x2="310" y2="222" class="d-grid"/>
+<text x="470" y="20" class="d-text" font-size="13" text-anchor="middle">one locker, two keys</text>
+<text x="420" y="48" class="d-owntext" font-size="14" text-anchor="middle">a</text>
+<text x="520" y="48" class="d-owntext" font-size="14" text-anchor="middle">c</text>
+<path d="M424 54 L458 76" class="d-own" marker-end="url(#ah11g)"/>
+<path d="M516 54 L482 76" class="d-own" marker-end="url(#ah11g)"/>
+<rect x="444" y="78" width="52" height="40" rx="4" class="d-locker"/><text x="470" y="104" class="d-val" font-size="16" text-anchor="middle">5</text>
+<circle cx="496" cy="78" r="10" class="d-tally"/><text x="496" y="82" class="d-tallytext" font-size="12" text-anchor="middle">2</text>
+<path d="M458 118 L446 140" class="d-arrow" marker-end="url(#ah11)"/>
+<rect x="420" y="142" width="40" height="32" rx="4" class="d-locker"/><text x="440" y="163" class="d-val" font-size="14" text-anchor="middle">1</text>
+<text x="470" y="200" class="d-mono" font-size="12" text-anchor="middle">a == c          true</text>
+<text x="470" y="218" class="d-mono" font-size="12" text-anchor="middle">Rc::ptr_eq      true</text>
+</svg>
+<figcaption><code>==</code> asks "is everything inside the same?" <code>Rc::ptr_eq</code> asks "is this the same locker?"</figcaption>
+</figure>
+
+<p><code>==</code> on these types compares contents. The <code>#[derive(PartialEq)]</code> on <code>TreeNode</code> compares the value and then both hooks, and comparing hooks compares whatever hangs on them, all the way to the bottom. So <code>a == b</code> opens both doors at every node of both subtrees. For two big trees that's a full walk of each.</p>
+
+<p><span class="tag fact">fact</span>One shortcut is built in. When both sides are keys to the same locker, <code>==</code> notices and answers true without opening anything. We checked: comparing two keys to one node while its working tag was up gave no alarm. The same comparison between two different lockers set it off.</p>
+
+<p><code>Rc::ptr_eq</code> compares two addresses. Two numbers, one comparison, no doors opened.</p>
+
+<p>Which one a task wants depends on what it's asking. "Do these two trees hold the same values in the same shape?" is <code>==</code>, and paying for the full walk is the honest cost of the question. "Is this node the one I was given?" is <code>Rc::ptr_eq</code>.</p>
+
+<h3>Handing back a node that's already there</h3>
+
+<p>When the answer to a task is a node, you hand back a key to the actual locker:</p>
+
+<pre class="code"><code><span class="hc">// A key to the first node, in preorder, that holds x.</span>
+<span class="hk">fn</span> <span class="hf">find</span>(
+    node: &amp;<span class="ht">Option</span>&lt;<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;&gt;,
+    x: i32,
+) -&gt; <span class="ht">Option</span>&lt;<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;&gt; {
+    <span class="hk">match</span> node {
+        <span class="hv">None</span> =&gt; <span class="hv">None</span>,
+        <span class="hv">Some</span>(rc) =&gt; {
+            <span class="hk">let</span> n = rc.<span class="hf">borrow</span>();
+            <span class="hk">if</span> n.val == x {
+                <span class="hk">return</span> <span class="hv">Some</span>(<span class="ht">Rc</span>::<span class="hf">clone</span>(rc)); <span class="hc">// a key to this very node</span>
+            }
+            <span class="hk">let</span> hit = <span class="hf">find</span>(&amp;n.left, x);
+            <span class="hk">if</span> hit.<span class="hf">is_some</span>() {
+                <span class="hk">return</span> hit;
+            }
+            <span class="hf">find</span>(&amp;n.right, x)
+        }
+    }
+}</code></pre>
+
+<p>That key adds one to the node's tally, and that's the whole cost. The node is still hanging in the tree too. Change it through the key you got back and the tree sees the change, because there's only one locker.</p>
+
+<p>Notice the shape of the two lookups. Ask the left side; if it found something, pass that up untouched. Otherwise ask the right side. Many tasks work this way, every child answering "did you find it?" with a key or a <code>None</code>, and the parent deciding from what came back. When the parent needs both answers, ask both first and <code>match</code> on the pair: <code>(Some(_), Some(_))</code>, <code>(Some(x), None)</code>, <code>(None, Some(x))</code>, <code>(None, None)</code>. Each case says something different about where the targets are.</p>
+
+<h3>Given a key, find where it is</h3>
+
+<p>Some tasks hand you keys to nodes inside the tree as well as the top. They're asking about those exact lockers:</p>
+
+<pre class="code"><code><span class="hc">// How deep is the node that `target` is a key to? (root is depth 0)</span>
+<span class="hk">fn</span> <span class="hf">depth_of</span>(
+    node: &amp;<span class="ht">Option</span>&lt;<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;&gt;,
+    target: &amp;<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;,
+    d: i32,
+) -&gt; <span class="ht">Option</span>&lt;i32&gt; {
+    <span class="hk">match</span> node {
+        <span class="hv">None</span> =&gt; <span class="hv">None</span>,
+        <span class="hv">Some</span>(rc) =&gt; {
+            <span class="hk">if</span> <span class="ht">Rc</span>::<span class="hf">ptr_eq</span>(rc, target) {
+                <span class="hk">return</span> <span class="hv">Some</span>(d); <span class="hc">// this very locker, not a lookalike</span>
+            }
+            <span class="hk">let</span> n = rc.<span class="hf">borrow</span>();
+            <span class="hk">let</span> hit = <span class="hf">depth_of</span>(&amp;n.left, target, d + <span class="hn">1</span>);
+            <span class="hk">if</span> hit.<span class="hf">is_some</span>() {
+                <span class="hk">return</span> hit;
+            }
+            <span class="hf">depth_of</span>(&amp;n.right, target, d + <span class="hn">1</span>)
+        }
+    }
+}</code></pre>
+
+<p>The <code>Rc::ptr_eq</code> check comes before <code>rc.borrow()</code>: deciding whether this is the target doesn't need to open the door at all. If the task promises that values are unique, comparing <code>val</code> works too and costs about the same. <code>Rc::ptr_eq</code> works either way.</p>
+</section>
+
+<section class="chapter" id="s12">
+<div class="ch-head"><span class="door">12</span><h2>Trees as graphs</h2></div>
+
+<p>Hooks only point down. That's fine until a task asks about moving up, or sideways. Everything within two steps of some node, say, where a step can go to a parent as easily as to a child. A node has no idea who its parent is.</p>
+
+<p>The fix is to turn the family tree into a phone tree. Write down, for every person, who they can call: parents and children both. Then forget the tree and walk the phone list.</p>
+
+<p>The obvious way to write that down doesn't work:</p>
+
+<div class="nope-note">
+<p class="nope-head">Use a key as a HashMap key, and it doesn't compile</p>
+<pre class="code nope-code"><code><span class="hk">let</span> <span class="hk">mut</span> depth: <span class="ht">HashMap</span>&lt;<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;, i32&gt; = <span class="ht">HashMap</span>::<span class="hf">new</span>();
+depth.<span class="hf">insert</span>(<span class="ht">Rc</span>::<span class="hf">clone</span>(&amp;rc), <span class="hn">0</span>); <span class="hc">// keys can't be filed in a HashMap</span></code></pre>
+<p>A <code>HashMap</code> files every entry under a hash of its key. <code>Rc&lt;RefCell&lt;TreeNode&gt;&gt;</code> doesn't have one, and when you think about it, it couldn't sensibly have one. The obvious hash would come from the node's contents, and those can change any time someone works inside the locker. An entry filed under the old hash would never be found again.</p>
+</div>
+
+<p>So file the phone list under something that doesn't change. If the task promises values are unique, use the value:</p>
+
+<pre class="code"><code><span class="hc">// Every value's neighbors: its parent and its children.</span>
+<span class="hk">fn</span> <span class="hf">link</span>(
+    node: &amp;<span class="ht">Option</span>&lt;<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;&gt;,
+    parent: <span class="ht">Option</span>&lt;i32&gt;,
+    adj: &amp;<span class="hk">mut</span> <span class="ht">HashMap</span>&lt;i32, <span class="ht">Vec</span>&lt;i32&gt;&gt;,
+) {
+    <span class="hk">if</span> <span class="hk">let</span> <span class="hv">Some</span>(rc) = node {
+        <span class="hk">let</span> n = rc.<span class="hf">borrow</span>();
+        <span class="hk">let</span> <span class="hk">mut</span> near = <span class="ht">Vec</span>::<span class="hf">new</span>();
+        <span class="hk">if</span> <span class="hk">let</span> <span class="hv">Some</span>(p) = parent {
+            near.<span class="hf">push</span>(p);
+        }
+        <span class="hk">if</span> <span class="hk">let</span> <span class="hv">Some</span>(l) = &amp;n.left {
+            near.<span class="hf">push</span>(l.<span class="hf">borrow</span>().val);
+        }
+        <span class="hk">if</span> <span class="hk">let</span> <span class="hv">Some</span>(r) = &amp;n.right {
+            near.<span class="hf">push</span>(r.<span class="hf">borrow</span>().val);
+        }
+        adj.<span class="hf">insert</span>(n.val, near);
+        <span class="hf">link</span>(&amp;n.left, <span class="hv">Some</span>(n.val), adj);
+        <span class="hf">link</span>(&amp;n.right, <span class="hv">Some</span>(n.val), adj);
+    }
+}</code></pre>
+
+<p>The map holds only numbers. No keys copied, no tallies touched, and the tree itself is never needed again. Walk the map with the queue from section 6, holding values instead of keys, plus a <code>HashSet</code> of values already reached so the walk doesn't bounce between parent and child forever. Each round of the queue is one more step away from where you started.</p>
+
+<p>If values can repeat, use the locker's address instead. It's a plain number, so it hashes fine:</p>
+
+<pre class="code"><code><span class="hk">let</span> id = <span class="ht">Rc</span>::<span class="hf">as_ptr</span>(rc) <span class="hk">as</span> usize; <span class="hc">// the locker's address, as a number</span></code></pre>
+
+<p><span class="tag fact">fact</span>That address stays the same for as long as any key to the node exists, because an <code>Rc</code>'s block never moves. Once the last key is gone, the address can be handed out again to some other allocation, so only use it while you're holding the tree.</p>
+
+<h3>Building from loose pieces</h3>
+
+<p>The opposite direction comes up too: you're given a pile of "this value's left child is that value" facts, in no useful order, and have to put the tree together. Keep a map from value to key, making each node the first time its value turns up:</p>
+
+<pre class="code"><code><span class="hc">// The node for value v: made on first request, the same one after that.</span>
+<span class="hk">fn</span> <span class="hf">get</span>(
+    map: &amp;<span class="hk">mut</span> <span class="ht">HashMap</span>&lt;i32, <span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;&gt;,
+    v: i32,
+) -&gt; <span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt; {
+    <span class="hk">if</span> !map.<span class="hf">contains_key</span>(&amp;v) {
+        map.<span class="hf">insert</span>(v, <span class="ht">Rc</span>::<span class="hf">new</span>(<span class="ht">RefCell</span>::<span class="hf">new</span>(<span class="ht">TreeNode</span>::<span class="hf">new</span>(v))));
+    }
+    <span class="ht">Rc</span>::<span class="hf">clone</span>(&amp;map[&amp;v])
+}</code></pre>
+
+<pre class="code"><code><span class="hk">let</span> p = <span class="hf">get</span>(&amp;<span class="hk">mut</span> map, <span class="hn">10</span>);
+<span class="hk">let</span> c = <span class="hf">get</span>(&amp;<span class="hk">mut</span> map, <span class="hn">4</span>);
+p.<span class="hf">borrow_mut</span>().left = <span class="hv">Some</span>(c); <span class="hc">// the map still holds its own key to 4</span></code></pre>
+
+<p>The map holds one key to every node it has ever made. Every hook adds another. Once the tree is assembled, the map can go, and the hooks will keep every node alive by themselves. (Except the top one, which nobody hangs. Keep a key to that.)</p>
+</section>
+
+<section class="chapter" id="s13">
+<div class="ch-head"><span class="door">13</span><h2>Nodes that outlive a call</h2></div>
+
+<p>Some tasks aren't a function. They're a struct: built once from a tree, then asked something over and over. <code>next()</code>, then <code>next()</code> again, then <code>has_next()</code>. Between calls, the struct is all there is, so whatever it needs to remember has to be in its fields.</p>
+
+<p>Like a bookmark left in a book between reading sessions. For trees, the bookmarks are keys.</p>
+
+<p>Here's section 7's preorder loop, cut into one step per call:</p>
+
+<pre class="code"><code><span class="hk">struct</span> <span class="ht">Walker</span> {
+    stack: <span class="ht">Vec</span>&lt;<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;&gt;,
+}
+
+<span class="hk">impl</span> <span class="ht">Walker</span> {
+    <span class="hk">fn</span> <span class="hf">new</span>(root: <span class="ht">Option</span>&lt;<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;&gt;) -&gt; <span class="hk">Self</span> {
+        <span class="hk">let</span> <span class="hk">mut</span> stack = <span class="ht">Vec</span>::<span class="hf">new</span>();
+        <span class="hk">if</span> <span class="hk">let</span> <span class="hv">Some</span>(r) = root {
+            stack.<span class="hf">push</span>(r);
+        }
+        <span class="ht">Walker</span> { stack }
+    }
+
+    <span class="hk">fn</span> <span class="hf">next</span>(&amp;<span class="hk">mut</span> <span class="hk">self</span>) -&gt; i32 {
+        <span class="hk">let</span> node = <span class="hk">self</span>.stack.<span class="hf">pop</span>().<span class="hf">unwrap</span>();
+        <span class="hk">let</span> n = node.<span class="hf">borrow</span>();
+        <span class="hk">if</span> <span class="hk">let</span> <span class="hv">Some</span>(r) = &amp;n.right {
+            <span class="hk">self</span>.stack.<span class="hf">push</span>(<span class="ht">Rc</span>::<span class="hf">clone</span>(r));
+        }
+        <span class="hk">if</span> <span class="hk">let</span> <span class="hv">Some</span>(l) = &amp;n.left {
+            <span class="hk">self</span>.stack.<span class="hf">push</span>(<span class="ht">Rc</span>::<span class="hf">clone</span>(l));
+        }
+        n.val
+    }
+
+    <span class="hk">fn</span> <span class="hf">has_next</span>(&amp;<span class="hk">self</span>) -&gt; bool {
+        !<span class="hk">self</span>.stack.<span class="hf">is_empty</span>()
+    }
+}</code></pre>
+
+<p>Each call to <code>next</code> does one round of the loop and returns. The pile of keys waits in <code>self.stack</code> until the next call. This is why section 7 bothered with a loop at all: recursion can't stop halfway and come back later, but a loop's state can sit in a struct.</p>
+
+<pre class="code"><code><span class="hk">let</span> root = <span class="hf">node</span>(<span class="hn">1</span>, <span class="hf">node</span>(<span class="hn">2</span>, <span class="hv">None</span>, <span class="hv">None</span>), <span class="hf">node</span>(<span class="hn">3</span>, <span class="hv">None</span>, <span class="hv">None</span>));
+<span class="hk">let</span> <span class="hk">mut</span> w = <span class="ht">Walker</span>::<span class="hf">new</span>(root.<span class="hf">clone</span>());
+<span class="hf">drop</span>(root); <span class="hc">// the caller lets go of the tree</span>
+
+<span class="hk">while</span> w.<span class="hf">has_next</span>() {
+    <span class="hm">print!</span>(<span class="hs">"{} "</span>, w.<span class="hf">next</span>()); <span class="hc">// 1 2 3</span>
+}</code></pre>
+
+<p><span class="tag fact">fact</span>That prints 1 2 3. The caller dropped its key to the top before the first <code>next()</code>, and nothing was freed: the tally on the top node went from 2 to 1, not to 0, because the walker's stack held the other key. A tree lives exactly as long as somebody holds a key to it. That somebody doesn't have to be whoever built it.</p>
+
+<h3>When the method says &amp;self</h3>
+
+<p>You'll sometimes be given method signatures written <code>fn next(&amp;self)</code>, often with a note saying you may switch to <code>&amp;mut self</code> if you need to. Switching is the simple fix, since <code>next</code> clearly changes the struct. The other fix is a sign on your own door:</p>
+
+<pre class="code"><code><span class="hk">struct</span> <span class="ht">QuietWalker</span> {
+    stack: <span class="ht">RefCell</span>&lt;<span class="ht">Vec</span>&lt;<span class="ht">Rc</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt;&gt;&gt;, <span class="hc">// a sign on our own door</span>
+}
+
+<span class="hk">impl</span> <span class="ht">QuietWalker</span> {
+    <span class="hk">fn</span> <span class="hf">next</span>(&amp;<span class="hk">self</span>) -&gt; i32 {
+        <span class="hk">let</span> <span class="hk">mut</span> stack = <span class="hk">self</span>.stack.<span class="hf">borrow_mut</span>(); <span class="hc">// `&amp;self` is enough now</span>
+        <span class="hk">let</span> node = stack.<span class="hf">pop</span>().<span class="hf">unwrap</span>();
+        <span class="hk">let</span> n = node.<span class="hf">borrow</span>();
+        <span class="hk">if</span> <span class="hk">let</span> <span class="hv">Some</span>(r) = &amp;n.right {
+            stack.<span class="hf">push</span>(<span class="ht">Rc</span>::<span class="hf">clone</span>(r));
+        }
+        <span class="hk">if</span> <span class="hk">let</span> <span class="hv">Some</span>(l) = &amp;n.left {
+            stack.<span class="hf">push</span>(<span class="ht">Rc</span>::<span class="hf">clone</span>(l));
+        }
+        n.val
+    }
+}</code></pre>
+
+<p>Same idea as the nodes, applied to the struct. Through <code>&amp;self</code> you can only look, so the field that changes wears a <code>RefCell</code>, and the method opens it for work. Same rules, same <span class="c-alarm">alarm</span> if two methods ever have it open at once.</p>
+
+<p>Other structs follow the same pattern with different fields. One holds the top of the tree plus a queue of nodes that still have a free hook. Another fills a <code>HashSet</code> of values once in <code>new</code> and only reads it afterward. One has no fields at all, because its methods don't need to remember anything; an empty struct is fine. The rule each time: keys for nodes, plain data for everything else, and a <code>RefCell</code> only if a <code>&amp;self</code> method has to change something.</p>
+</section>
+
+<section class="chapter" id="s14">
+<div class="ch-head"><span class="door">14</span><h2>Costs you didn't write</h2></div>
+
+<p>Every line of tree code on this page does a little more than it says. None of it is hidden. It's in the fine print.</p>
+
+<ul>
+<li><strong>Every node is 48 bytes.</strong> Two counters, the sign, the 24-byte node. The same node behind a <code>Box</code> would be 24.</li>
+<li><strong>Every key copy</strong> adds one to a counter, and every dropped key subtracts one and checks for zero. Plain additions, nothing more. <code>Arc</code>, the version that can be shared between threads, does the same with atomic instructions, which cost more; <code>Rc</code> doesn't pay for that because it can't leave its thread.</li>
+<li><strong>Every look and every working tag</strong> reads the sign, checks it, and writes it. When the guard goes, the sign is written again. So even a read-only walk writes to every node it visits.</li>
+</ul>
+
+<p>Does that add up to anything? We timed six ways of adding up the values in a tree.</p>
+
+<figure class="wide">
+<svg viewBox="0 0 680 420" role="img" aria-labelledby="d14t">
+<title id="d14t">Two bar charts of nanoseconds per node. Small tree, 16,384 nodes: values in a Vec 0.32, Box tree 2.6, Rc tree with reference helper 5.9, copying keys 8.2, own stack 6.0, queue 6.9. Big tree, 1,048,576 nodes, medians with ranges: Vec 0.29, Box tree 8.6, reference helper 32.8, copying keys 30.0, own stack 19.7, queue 26.0, with wide ranges for every tree version.</title>
+<text x="20" y="22" class="d-text" font-size="13">Small tree, 16,384 nodes (fits in cache). Nanoseconds per node.</text>
+<line x1="210" y1="34" x2="210" y2="182" class="d-grid"/>
+<text x="200" y="54" class="d-text" font-size="12" text-anchor="end">values in a Vec</text>
+<rect x="210" y="43" width="12" height="16" class="d-bar"/><text x="228" y="56" class="d-mono" font-size="11">0.32</text>
+<text x="200" y="78" class="d-text" font-size="12" text-anchor="end">Box tree</text>
+<rect x="210" y="67" width="98" height="16" class="d-bar"/><text x="314" y="80" class="d-mono" font-size="11">2.6</text>
+<text x="200" y="102" class="d-text" font-size="12" text-anchor="end">Rc tree, &amp;Option helper</text>
+<rect x="210" y="91" width="223" height="16" class="d-bar3"/><text x="439" y="104" class="d-mono" font-size="11">5.9</text>
+<text x="200" y="126" class="d-text" font-size="12" text-anchor="end">Rc tree, copying keys</text>
+<rect x="210" y="115" width="313" height="16" class="d-bar3"/><text x="529" y="128" class="d-mono" font-size="11">8.2</text>
+<text x="200" y="150" class="d-text" font-size="12" text-anchor="end">Rc tree, own stack</text>
+<rect x="210" y="139" width="228" height="16" class="d-bar3"/><text x="444" y="152" class="d-mono" font-size="11">6.0</text>
+<text x="200" y="174" class="d-text" font-size="12" text-anchor="end">Rc tree, queue</text>
+<rect x="210" y="163" width="263" height="16" class="d-bar3"/><text x="479" y="176" class="d-mono" font-size="11">6.9</text>
+<text x="20" y="226" class="d-text" font-size="13">Big tree, 1,048,576 nodes (does not fit). Median, and range over five runs.</text>
+<line x1="210" y1="238" x2="210" y2="386" class="d-grid"/>
+<text x="200" y="258" class="d-text" font-size="12" text-anchor="end">values in a Vec</text>
+<rect x="210" y="247" width="3" height="16" class="d-bar"/><text x="226" y="260" class="d-mono" font-size="11">0.29</text>
+<text x="200" y="282" class="d-text" font-size="12" text-anchor="end">Box tree</text>
+<rect x="210" y="271" width="80" height="16" class="d-bar"/><line x1="279" y1="279" x2="325" y2="279" class="d-whisker"/><line x1="279" y1="273" x2="279" y2="285" class="d-whisker"/><line x1="325" y1="273" x2="325" y2="285" class="d-whisker"/><text x="333" y="284" class="d-mono" font-size="11">8.6</text>
+<text x="200" y="306" class="d-text" font-size="12" text-anchor="end">Rc tree, &amp;Option helper</text>
+<rect x="210" y="295" width="305" height="16" class="d-bar3"/><line x1="435" y1="303" x2="524" y2="303" class="d-whisker"/><line x1="435" y1="297" x2="435" y2="309" class="d-whisker"/><line x1="524" y1="297" x2="524" y2="309" class="d-whisker"/><text x="532" y="308" class="d-mono" font-size="11">32.8</text>
+<text x="200" y="330" class="d-text" font-size="12" text-anchor="end">Rc tree, copying keys</text>
+<rect x="210" y="319" width="279" height="16" class="d-bar3"/><line x1="436" y1="327" x2="622" y2="327" class="d-whisker"/><line x1="436" y1="321" x2="436" y2="333" class="d-whisker"/><line x1="622" y1="321" x2="622" y2="333" class="d-whisker"/><text x="630" y="332" class="d-mono" font-size="11">30.0</text>
+<text x="200" y="354" class="d-text" font-size="12" text-anchor="end">Rc tree, own stack</text>
+<rect x="210" y="343" width="183" height="16" class="d-bar3"/><line x1="381" y1="351" x2="482" y2="351" class="d-whisker"/><line x1="381" y1="345" x2="381" y2="357" class="d-whisker"/><line x1="482" y1="345" x2="482" y2="357" class="d-whisker"/><text x="490" y="356" class="d-mono" font-size="11">19.7</text>
+<text x="200" y="378" class="d-text" font-size="12" text-anchor="end">Rc tree, queue</text>
+<rect x="210" y="367" width="242" height="16" class="d-bar3"/><line x1="429" y1="375" x2="515" y2="375" class="d-whisker"/><line x1="429" y1="369" x2="429" y2="381" class="d-whisker"/><line x1="515" y1="369" x2="515" y2="381" class="d-whisker"/><text x="523" y="380" class="d-mono" font-size="11">26.0</text>
+<text x="210" y="408" class="d-text" font-size="11">Same scale within each chart, not across them.</text>
+</svg>
+<figcaption><span class="tag fact">fact</span>Release build, one 2-core x86-64 Linux virtual machine. Each run timed 15 passes and kept the median; each chart shows five runs, the bar at the middle one. The big-tree runs swung a lot from run to run, so the ranges matter more than the exact bars there.</figcaption>
+</figure>
+
+<p>Read the small chart first, where the numbers held steady. Moving from a <code>Box</code> tree to an <code>Rc&lt;RefCell&gt;</code> tree cost a bit more than double. How you walked it changed much less: helper, stack and queue all land within about 20 percent of each other. Copying a key into every call was the slowest Rc version, about 40 percent behind the <code>&amp;Option</code> helper.</p>
+
+<p>On the big tree the gap to <code>Box</code> grew to between two and four times, and the walking methods blurred together inside their ranges. And the plain <code>Vec</code> of the same numbers sits far below everything on both charts: about 8 times faster than the <code>Box</code> tree on the small one, 30 times on the big one, and further still past the Rc trees. A tree scatters its values across the heap, and every node visited is a jump to somewhere new.</p>
+
+<p><span class="tag model">model</span>Why the gap grows on the big tree? Our explanation, not something we measured directly: a 48-byte node is twice as much memory to pull through the cache as a 24-byte one, and the sign gets written on every visit, so even a read-only walk dirties every cache line it touches. When the tree fits in the cache, those writes are cheap. When it doesn't, they all have to go back out to memory.</p>
+
+<p><span class="tag judgment">judgment</span>None of this is a reason to avoid the type you're handed. It's a reason to pick the cheap walk when it's equally easy, and to remember that a tree is a slow way to store numbers you could have kept in a <code>Vec</code>.</p>
+
+<h3>Running out of stack</h3>
+
+<p>Recursion keeps one frame per level on the stack, and the stack is small. We built a tree as one long chain, every node hanging on its parent's left hook, and found where the section 3 count stopped working.</p>
+
+<p><span class="tag fact">fact</span>On this machine's 8 MiB main-thread stack: in a debug build, counting overflowed the stack at about 65,000 levels. In a release build it lasted until about 261,000.</p>
+
+<p>Then the surprise. Dropping a tree is recursive too. The last key to the top drops the top node, which drops the keys on its hooks, which drop their nodes, and so on down. Your code never wrote a recursive function, but freeing the tree runs one.</p>
+
+<p><span class="tag fact">fact</span>Dropping that chain overflowed the stack at about 35,000 nodes in a debug build, sooner than counting it did. In release, about 261,000 again.</p>
+
+<p>Most trees are nowhere near that deep: a balanced tree with a million nodes is only 20 levels. But a task that allows a hundred thousand nodes allows them in one long line. If your code runs fine in release and dies in debug on a big test, this is a likely reason. Section 7's own stack fixes the walking; the dropping you'd have to take apart by hand, node by node, the same way.</p>
+
+<h3>When tallies never reach zero</h3>
+
+<p>The tally frees a locker when its last key goes. Now hang a key on a hook that points back up:</p>
+
+<pre class="code"><code><span class="hk">let</span> a = <span class="ht">Rc</span>::<span class="hf">new</span>(<span class="ht">RefCell</span>::<span class="hf">new</span>(<span class="ht">TreeNode</span>::<span class="hf">new</span>(<span class="hn">1</span>)));
+<span class="hk">let</span> b = <span class="ht">Rc</span>::<span class="hf">new</span>(<span class="ht">RefCell</span>::<span class="hf">new</span>(<span class="ht">TreeNode</span>::<span class="hf">new</span>(<span class="hn">2</span>)));
+a.<span class="hf">borrow_mut</span>().left = <span class="hv">Some</span>(<span class="ht">Rc</span>::<span class="hf">clone</span>(&amp;b));
+b.<span class="hf">borrow_mut</span>().left = <span class="hv">Some</span>(<span class="ht">Rc</span>::<span class="hf">clone</span>(&amp;a)); <span class="hc">// a hook pointing back up</span>
+
+<span class="hm">println!</span>(<span class="hs">"{} {}"</span>, <span class="ht">Rc</span>::<span class="hf">strong_count</span>(&amp;a), <span class="ht">Rc</span>::<span class="hf">strong_count</span>(&amp;b)); <span class="hc">// 2 2</span>
+<span class="hf">drop</span>(a);
+<span class="hf">drop</span>(b);
+<span class="hc">// Each locker still holds a key to the other. Neither tally reaches</span>
+<span class="hc">// zero, so neither node is ever freed.</span></code></pre>
+
+<p><span class="tag fact">fact</span>We counted live bytes before and after: 96 bytes were still allocated after both drops. Two nodes of 48 bytes each, unreachable and never freed. Nothing crashed, and nothing warned us. That's a leak: memory that's lost until the program exits.</p>
+
+<p>Trees you're handed never have cycles. Hooks only point down. But the moment you add a hook pointing up (a <code>parent</code> field, say), every parent and child hold keys to each other and no tally can ever reach zero.</p>
+
+<p>The way out is the second kind of key, the one the <code>weak</code> counter in section 1 counts. A <code>Weak</code> key doesn't count toward keeping a locker alive. To use one you ask to upgrade it to a real key, which only works if the locker still exists:</p>
+
+<pre class="code"><code><span class="hk">let</span> child = <span class="ht">Rc</span>::<span class="hf">new</span>(<span class="ht">RefCell</span>::<span class="hf">new</span>(<span class="ht">TreeNode</span>::<span class="hf">new</span>(<span class="hn">2</span>)));
+<span class="hk">let</span> up: <span class="ht">Weak</span>&lt;<span class="ht">RefCell</span>&lt;<span class="ht">TreeNode</span>&gt;&gt; = <span class="ht">Rc</span>::<span class="hf">downgrade</span>(&amp;child); <span class="hc">// not counted</span>
+<span class="hm">println!</span>(<span class="hs">"{}"</span>, up.<span class="hf">upgrade</span>().<span class="hf">is_some</span>()); <span class="hc">// true: still alive</span>
+<span class="hf">drop</span>(child);
+<span class="hm">println!</span>(<span class="hs">"{}"</span>, up.<span class="hf">upgrade</span>().<span class="hf">is_some</span>()); <span class="hc">// false: the locker is gone</span></code></pre>
+
+<p>Parent links made of <code>Weak</code> keys don't keep anything alive, so the tallies work again. That's as far as this page goes with them.</p>
+</section>
+
+<section class="chapter" id="s15">
+<div class="ch-head"><span class="door">15</span><h2>The ledger</h2></div>
+
+<p>Every way of holding a tree from this page, with what it costs. "n" is the number of nodes, "h" the height.</p>
+
+<div class="table-wrap">
+<table>
+<thead><tr><th>Move</th><th>Keys copied</th><th>Doors open at once</th><th>New allocations</th><th>Good for</th><th>Watch out</th></tr></thead>
+<tbody>
+<tr><td>Look, with a <code>&amp;Option</code> helper (§3)</td><td>none</td><td>one look per level, h at most</td><td>0</td><td>counts, sums, yes or no, comparing two trees</td><td>handing back a look from inside</td></tr>
+<tr><td>Carry down (§4)</td><td>none</td><td>looks, h at most</td><td>0, plus copies of numbers you keep</td><td>depth, running totals, paths, bookmarks</td><td>undo on the way out, exactly</td></tr>
+<tr><td>Answer up (§5)</td><td>none</td><td>looks, h at most</td><td>0</td><td>heights, sums, anything a subtree reports</td><td>what an empty subtree says; return vs. record</td></tr>
+<tr><td>Queue (§6)</td><td>one per node</td><td>one look</td><td>the queue, up to one level</td><td>levels, rows, nearest first</td><td>writing to a node while <code>n</code> looks at it</td></tr>
+<tr><td>Own stack (§7)</td><td>one per node</td><td>one look</td><td>the pile, about h</td><td>very deep trees, stopping early, pausing</td><td>read the next key before handing one over</td></tr>
+<tr><td>Cursor down one path (§8)</td><td>one per step</td><td>one look</td><td>0</td><td>ordered trees: search, nearest value</td><td>bounds that need <code>i64</code></td></tr>
+<tr><td>Build bottom-up (§9)</td><td>none</td><td>none</td><td>one 48-byte node each</td><td>new trees from lists or other trees</td><td><code>usize</code> going below zero</td></tr>
+<tr><td>Attach later, share (§9)</td><td>one per extra hook</td><td>one working tag</td><td>one per node</td><td>pieces in any order; many trees sharing parts</td><td>a shared piece rewired for everyone</td></tr>
+<tr><td>Rewire: take, return what hangs (§10)</td><td>none</td><td>working tags, h at most</td><td>0, or one for an insert</td><td>mirror, prune, insert, delete</td><td>handing a key back while its door is open</td></tr>
+<tr><td>Point at a node (§11)</td><td>one</td><td>looks</td><td>0</td><td>answers that are nodes; "is this the one?"</td><td><code>==</code> walks both subtrees</td></tr>
+<tr><td>Graph by value or address (§12)</td><td>none</td><td>looks while building</td><td>the map</td><td>moving up or sideways, distances</td><td>a key can't be a <code>HashMap</code> key</td></tr>
+<tr><td>Struct with keys (§13)</td><td>one per node remembered</td><td>per method call</td><td>the fields</td><td>many calls over time</td><td><code>&amp;self</code> methods that need to change</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>And when a new task shows up, the first question is which grip it needs.</p>
+
+<p>Is the answer about the whole tree? Look (section 3). If a node needs to know what's above it, carry it down (4). If it needs its subtrees' answers first, send answers up (5). A lot of tasks need both at once, and that's fine: numbers come down in the parameters, answers go up in the return value.</p>
+
+<p>Does the task talk about levels, rows, or what's nearest? Queue (6). Is the tree promised to be in order? Then use the order (8), and expect to follow one path instead of all of them.</p>
+
+<p>Does it want a new tree? Build children first (9). The same nodes in a new shape? Take and re-hang (10). Is the answer a node? Hand back a key to it (11). Does it need to move toward the top, or count steps in every direction? Make a map (12). Is it a struct with methods? Keep keys in the fields (13).</p>
+
+<p>One habit under all of them: open a door, take what you need, close it, then act.</p>
+
+<p class="end-note">Every code block on this page was compiled and tested on stable Rust 1.97, edition 2024, and every "doesn't compile" example was checked to fail for the reason given. Every "stops while running" example was run and stopped with the message shown. Sizes are for a 64-bit machine. Timings, allocation counts and stack limits come from one 2-core x86-64 Linux virtual machine with the default system allocator and an 8 MiB main-thread stack; expect your exact numbers to differ.</p>
+</section>
+
+</main>
+</div>
+<script>
+(function () {
+  var root = document.documentElement;
+  var btn = document.getElementById("themeBtn");
+  function isDark() {
+    var t = root.getAttribute("data-theme");
+    if (t) return t === "dark";
+    return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  }
+  function label() { btn.textContent = isDark() ? "Light" : "Dark"; }
+  try {
+    var saved = localStorage.getItem("tr-theme");
+    if (saved === "light" || saved === "dark") root.setAttribute("data-theme", saved);
+  } catch (e) {}
+  label();
+  btn.addEventListener("click", function () {
+    var next = isDark() ? "light" : "dark";
+    root.setAttribute("data-theme", next);
+    try { localStorage.setItem("tr-theme", next); } catch (e) {}
+    label();
+  });
+
+  // contents rail: open the door of the section being read
+  var links = Array.prototype.slice.call(document.querySelectorAll(".rail a"));
+  var byId = {};
+  links.forEach(function (a) { byId[a.getAttribute("href").slice(1)] = a; });
+  if ("IntersectionObserver" in window) {
+    var obs = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (en.isIntersecting && byId[en.target.id]) {
+          links.forEach(function (a) { a.classList.remove("active"); });
+          byId[en.target.id].classList.add("active");
+        }
+      });
+    }, { rootMargin: "-25% 0px -65% 0px" });
+    document.querySelectorAll("section.chapter").forEach(function (s) { obs.observe(s); });
+  }
+
+  // ---------- the sign on the door ----------
+  var sim = document.getElementById("doorSim");
+  if (sim) {
+    var guards = [], made = 0, alarm = null, log = [];
+    var doorBox = sim.querySelector(".ds-door");
+    var flagEl = sim.querySelector(".ds-flag code");
+    var guardEl = sim.querySelector(".ds-guards");
+    var logEl = sim.querySelector(".ds-log code");
+    var msgEl = sim.querySelector(".ds-msg");
+    function looks() { var k = 0; guards.forEach(function (g) { if (g.kind === "look") k++; }); return k; }
+    function working() { return guards.some(function (g) { return g.kind === "work"; }); }
+    function flag() { return working() ? -1 : looks(); }
+    function doorSVG() {
+      var lk = looks(), wk = working();
+      var state = alarm ? "alarm" : wk ? "work" : lk ? "look" : "free";
+      var s = '<svg viewBox="0 0 200 230" role="img" aria-label="A locker door with a sign hanging on it">';
+      s += '<rect x="30" y="10" width="140" height="210" rx="6" class="d-locker"/>';
+      for (var i = 0; i < 4; i++) s += '<line x1="62" x2="138" y1="' + (28 + i * 8) + '" y2="' + (28 + i * 8) + '" class="d-vent"/>';
+      s += '<rect x="154" y="120" width="7" height="34" rx="3" class="ds-handle"/>';
+      s += '<text x="100" y="205" text-anchor="middle" class="d-val" font-size="15">val: 7</text>';
+      s += '<line x1="100" y1="64" x2="74" y2="86" class="ds-string"/><line x1="100" y1="64" x2="126" y2="86" class="ds-string"/>';
+      s += '<circle cx="100" cy="63" r="3" class="ds-nail"/>';
+      s += '<rect x="56" y="84" width="88" height="62" rx="5" class="ds-card ' + state + '"/>';
+      if (state === "free") {
+        s += '<text x="100" y="121" text-anchor="middle" class="ds-cardtext" font-size="15">free</text>';
+      } else if (state === "look") {
+        var w = Math.min(lk, 8);
+        for (var j = 0; j < w; j++) s += '<line x1="' + (70 + j * 8) + '" y1="98" x2="' + (70 + j * 8) + '" y2="116" class="ds-tick"/>';
+        s += '<text x="100" y="137" text-anchor="middle" class="ds-cardtext" font-size="13">' + lk + " looking</text>";
+      } else if (state === "work") {
+        s += '<text x="100" y="121" text-anchor="middle" class="ds-cardtext" font-size="14">working</text>';
+      } else {
+        s += '<text x="100" y="112" text-anchor="middle" class="ds-cardtext" font-size="14">ALARM</text>';
+        s += '<text x="100" y="132" text-anchor="middle" class="ds-cardtext" font-size="12">stopped</text>';
+      }
+      return s + "</svg>";
+    }
+    function draw() {
+      doorBox.innerHTML = doorSVG();
+      flagEl.textContent = String(flag());
+      guardEl.innerHTML = guards.length ? guards.map(function (g) {
+        return '<span class="chip ' + g.kind + '">' + g.name + (g.kind === "look" ? " (looking)" : " (working)") +
+          ' <button type="button" data-drop="' + g.name + '"' + (alarm ? " disabled" : "") + ">drop</button></span>";
+      }).join("") : '<span class="ds-none">no guards open</span>';
+      logEl.innerHTML = log.length ? log.join("\n") : '<span class="hc">// press a button to open the door</span>';
+      sim.querySelectorAll(".ds-controls [data-a=look], .ds-controls [data-a=work]").forEach(function (b) { b.disabled = !!alarm; });
+      msgEl.innerHTML = alarm ? "The program stops here with <code>" + alarm + "</code>. It compiled fine; the sign caught it while running." :
+        working() ? "One working tag, and nobody else may open this door until it comes down." :
+        looks() > 1 ? "Several lookers at once. Any number is fine, as long as nobody is working." :
+        looks() === 1 ? "One looker. Another look is fine; work has to wait." : "Nobody inside. Either kind of guard may open the door.";
+    }
+    sim.addEventListener("click", function (e) {
+      var a = e.target.getAttribute("data-a");
+      var d = e.target.getAttribute("data-drop");
+      if (d) {
+        guards = guards.filter(function (g) { return g.name !== d; });
+        log.push('<span class="hf">drop</span>(' + d + ");");
+      } else if (a === "look" || a === "work") {
+        made++;
+        var name = (a === "look" ? "g" : "w") + made;
+        var call = a === "look" ? "borrow" : "borrow_mut";
+        var line = '<span class="hk">let</span> ' + name + " = node." + call + "();";
+        if (a === "look" && working()) alarm = "RefCell already mutably borrowed";
+        if (a === "work" && guards.length) alarm = "RefCell already borrowed";
+        if (alarm) line += ' <span class="hc">// stops here</span>';
+        else guards.push({ name: name, kind: a });
+        log.push(line);
+      } else if (a === "reset") {
+        guards = []; made = 0; alarm = null; log = [];
+      }
+      draw();
+    });
+    draw();
+  }
+
+  // ---------- tree steppers ----------
+  var NW = 48, NH = 42, DX = 62, DY = 76, TOP = 30;
+  function copyNodes(nodes) {
+    var c = {};
+    for (var k in nodes) c[k] = { v: nodes[k].v, l: nodes[k].l, r: nodes[k].r, freed: !!nodes[k].freed };
+    return c;
+  }
+  function layout(nodes, roots) {
+    var pos = {}, idx = 0;
+    roots.forEach(function (r, k) {
+      if (k > 0) idx += 0.5;
+      (function walk(id, d) {
+        if (id === null || id === undefined) return;
+        var n = nodes[id];
+        walk(n.l, d + 1);
+        pos[id] = { x: idx, y: d };
+        idx++;
+        walk(n.r, d + 1);
+      })(r, 0);
+    });
+    return { pos: pos, cols: idx };
+  }
+  function keyIds(vars) {
+    var ids = [];
+    vars.forEach(function (v) { v.chips.forEach(function (c) { if (c.t === "key") ids.push(c.id); }); });
+    return ids;
+  }
+  function tallies(nodes, vars) {
+    var t = {};
+    for (var k in nodes) t[k] = 0;
+    for (var k2 in nodes) {
+      var n = nodes[k2];
+      if (n.freed) continue;
+      if (n.l !== null) t[n.l]++;
+      if (n.r !== null) t[n.r]++;
+    }
+    keyIds(vars).forEach(function (id) { t[id]++; });
+    return t;
+  }
+  function signs(vars) {
+    var s = {};
+    vars.forEach(function (v) {
+      v.chips.forEach(function (c) {
+        if (c.t === "look") { s[c.id] = s[c.id] || { look: 0, work: false }; s[c.id].look++; }
+        if (c.t === "work") { s[c.id] = s[c.id] || { look: 0, work: false }; s[c.id].work = true; }
+      });
+    });
+    return s;
+  }
+  function drawTree(fr, fixed, dims) {
+    var nodes = fr.nodes;
+    var L = fixed || layout(nodes, fr.roots);
+    var pos = L.pos;
+    var maxD = 0;
+    for (var p in pos) maxD = Math.max(maxD, pos[p].y);
+    var cols = Math.max(dims.cols, L.cols), depth = Math.max(dims.depth, maxD);
+    var width = cols * DX + 24;
+    var height = TOP + (depth + 1) * DY - 10;
+    var shift = (cols - L.cols) * DX / 2;
+    var t = tallies(nodes, fr.vars), sg = signs(fr.vars);
+    function cx(id) { return 12 + shift + pos[id].x * DX + DX / 2; }
+    function cy(id) { return TOP + pos[id].y * DY + NH / 2; }
+    var s = '<svg viewBox="0 0 ' + width + " " + height + '" class="ts-svg" role="img" aria-label="' + (fr.alt || "tree state") + '">';
+    s += '<defs><marker id="tsah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="d-arrowhead"/></marker></defs>';
+    for (var id in pos) {
+      var n = nodes[id];
+      if (n.freed) continue;
+      [["l", -1], ["r", 1]].forEach(function (sd) {
+        var c = n[sd[0]], hx = cx(id) + sd[1] * 13, hy = cy(id) + NH / 2;
+        if (c !== null && pos[c] !== undefined) {
+          s += '<path d="M' + hx + " " + hy + " L" + (cx(c) - sd[1] * 4) + " " + (cy(c) - NH / 2 - 3) + '" class="d-arrow" marker-end="url(#tsah)"/>';
+        } else {
+          s += '<path d="M' + hx + " " + hy + " L" + (hx + sd[1] * 7) + " " + (hy + 11) + '" class="d-hook"/>';
+          s += '<circle cx="' + (hx + sd[1] * 9) + '" cy="' + (hy + 16) + '" r="4.5" class="d-hook"/>';
+        }
+      });
+    }
+    for (var id2 in pos) {
+      var m = nodes[id2];
+      var x = cx(id2) - NW / 2, y = cy(id2) - NH / 2;
+      var cls = "ts-lk" + (m.freed ? " freed" : "") + (fr.mark == id2 ? " mark" : "");
+      var g = sg[id2];
+      if (!m.freed && g && g.work) {
+        cls += " working";
+      } else if (!m.freed && g && g.look) {
+        cls += " looking";
+      }
+      s += '<rect x="' + x + '" y="' + y + '" width="' + NW + '" height="' + NH + '" rx="4" class="' + cls + '"/>';
+      if (!m.freed && g && g.work) {
+        s += '<text x="' + cx(id2) + '" y="' + (y + 11) + '" text-anchor="middle" class="ts-signtext work" font-size="9">work</text>';
+      } else if (!m.freed && g && g.look) {
+        for (var q = 0; q < g.look; q++) s += '<line x1="' + (cx(id2) - (g.look - 1) * 3 + q * 6) + '" y1="' + (y + 4) + '" x2="' + (cx(id2) - (g.look - 1) * 3 + q * 6) + '" y2="' + (y + 11) + '" class="ts-tick"/>';
+      }
+      s += '<text x="' + cx(id2) + '" y="' + (cy(id2) + 9) + '" text-anchor="middle" class="d-val' + (m.freed ? " ts-freedtext" : "") + '" font-size="15">' + m.v + "</text>";
+      if (m.freed) {
+        s += '<text x="' + cx(id2) + '" y="' + (y + NH + 14) + '" text-anchor="middle" class="ts-freedtext" font-size="11">freed</text>';
+      } else {
+        s += '<circle cx="' + (x + NW) + '" cy="' + y + '" r="9" class="ts-tally"/>';
+        s += '<text x="' + (x + NW) + '" y="' + (y + 4) + '" text-anchor="middle" class="ts-tallytext" font-size="11">' + t[id2] + "</text>";
+      }
+    }
+    if (fr.labels) {
+      for (var lid in fr.labels) {
+        if (pos[lid] === undefined) continue;
+        s += '<text x="' + cx(lid) + '" y="' + (cy(lid) - NH / 2 - 18) + '" text-anchor="middle" class="ts-hand" font-size="12">in ' + fr.labels[lid] + "</text>";
+      }
+    }
+    return s + "</svg>";
+  }
+  function chipHTML(c, nodes) {
+    var pre = c.label ? c.label + " = " : "";
+    if (c.t === "key") return '<span class="chip key">' + pre + "key to " + nodes[c.id].v + "</span>";
+    if (c.t === "look") return '<span class="chip look">' + pre + "looking at " + nodes[c.id].v + "</span>";
+    if (c.t === "work") return '<span class="chip work">' + pre + "working on " + nodes[c.id].v + "</span>";
+    if (c.t === "gone") return '<span class="chip gone">' + c.text + "</span>";
+    return '<span class="chip val">' + pre + c.text + "</span>";
+  }
+  function varsHTML(fr) {
+    return fr.vars.map(function (v) {
+      return '<div class="ts-row"><span class="ts-name">' + v.name + '</span><span class="ts-chips">' +
+        v.chips.map(function (c) { return chipHTML(c, fr.nodes); }).join("") + "</span></div>";
+    }).join("");
+  }
+
+  function reachable(nodes, rootId) {
+    var seen = {};
+    (function walk(id) {
+      if (id === null || id === undefined || seen[id]) return;
+      seen[id] = true;
+      walk(nodes[id].l); walk(nodes[id].r);
+    })(rootId);
+    return seen;
+  }
+
+  // The level walk, handed the only key to the top.
+  function framesLevels() {
+    var nodes = { 4: { v: 4, l: 2, r: 7 }, 2: { v: 2, l: 1, r: 3 }, 7: { v: 7, l: null, r: null }, 1: { v: 1, l: null, r: null }, 3: { v: 3, l: null, r: null } };
+    var st = { root: 4, rootMoved: false, q: [], node: null, look: null, width: null, total: null, out: [] };
+    var F = [];
+    function vars() {
+      var v = [];
+      if (st.root !== null) v.push({ name: "root", chips: [{ t: "key", id: st.root }] });
+      else if (st.rootMoved) v.push({ name: "root", chips: [{ t: "gone", text: "moved into q" }] });
+      v.push({ name: "q", chips: st.q.length ? st.q.map(function (id) { return { t: "key", id: id }; }) : [{ t: "val", text: "empty" }] });
+      if (st.width !== null) v.push({ name: "width", chips: [{ t: "val", text: String(st.width) }] });
+      if (st.total !== null) v.push({ name: "total", chips: [{ t: "val", text: String(st.total) }] });
+      if (st.node !== null) v.push({ name: "node", chips: [{ t: "key", id: st.node }] });
+      if (st.look !== null) v.push({ name: "n", chips: [{ t: "look", id: st.look }] });
+      v.push({ name: "out", chips: [{ t: "val", text: "[" + st.out.join(", ") + "]" }] });
+      return v;
+    }
+    function snap(line, cap, mark) { F.push({ line: line, nodes: copyNodes(nodes), roots: [4], vars: vars(), cap: cap, mark: mark }); }
+    function freeIfUnowned(id) {
+      var t = tallies(nodes, vars());
+      if (t[id] === 0 && !nodes[id].freed) {
+        nodes[id].freed = true;
+        var a = nodes[id].l, b = nodes[id].r;
+        if (a !== null) freeIfUnowned(a);
+        if (b !== null) freeIfUnowned(b);
+      }
+    }
+    snap(0, "The function is handed a key to the top locker, and in this run it's the only key there is. The brass number on each locker is its tally: how many keys to it exist right now. Every tally is 1.");
+    st.root = null; st.rootMoved = true; st.q.push(4);
+    snap(4, "The key moves into the queue. Moving a key is not copying it, so the tally on 4 stays at 1.", 4);
+    st.rootMoved = false;
+    var first = true, level = 0;
+    while (st.q.length) {
+      st.width = st.q.length; st.total = 0;
+      snap(7, level === 0 ? "One key in the line, so level 0 has one node. <code>width</code> remembers that before anything new joins." : "The line now holds exactly level " + level + ": " + st.width + " key" + (st.width > 1 ? "s" : "") + ".");
+      for (var k = 0; k < st.width; k++) {
+        var id = st.q.shift();
+        st.node = id;
+        snap(10, first ? "The front key moves out of the line into <code>node</code>. Still no copy: 4's tally is still 1." : "Front of the line: the key to " + id + " moves into <code>node</code>.", id);
+        st.look = id;
+        snap(11, first ? "Open the door to look. A blue tick goes on 4's sign." : "Look inside " + id + ".", id);
+        st.total += nodes[id].v;
+        snap(12, "Add " + nodes[id].v + " to <code>total</code>.", id);
+        var any = false;
+        if (nodes[id].l !== null) {
+          st.q.push(nodes[id].l); any = true;
+          snap(14, first ? "A copy of the key to 2 joins the back of the line. Locker 2 now has two keys: the one on 4's hook and the one in the queue. Its tally says 2." : "A copy of the key to " + nodes[id].l + " joins the line. Tally 2.", id);
+        }
+        if (nodes[id].r !== null) {
+          st.q.push(nodes[id].r); any = true;
+          snap(17, first ? "Same for 7." : "And " + nodes[id].r + ".", id);
+        }
+        st.look = null; st.node = null;
+        freeIfUnowned(id);
+        var cap;
+        if (first) cap = "End of this turn. <code>n</code> goes first and erases the tick, then <code>node</code> goes, and that was the last key to 4. Locker 4 is freed, and the keys on its hooks go with it, so 2 and 7 drop back to a tally of 1. They survive because the line still holds keys to them.";
+        else if (!any) cap = "End of the turn for " + id + ". Its last key is gone, so it's freed. Nothing of it was in the line.";
+        else cap = "End of the turn for " + id + ": freed, and its children are kept alive by their keys in the line.";
+        snap(19, cap, id);
+        first = false;
+      }
+      st.out.push(st.total);
+      snap(20, "Level " + level + " adds up to " + st.total + ".");
+      level++;
+    }
+    st.width = null; st.total = null;
+    snap(6, "The line is empty, so the loop stops.");
+    snap(22, "Hand back <code>out</code>. Every locker was freed on the way, because the function held the only key to the top. Had the caller kept its own key, every tally would have been one higher and nothing would have been freed.");
+    return { frames: F, fixed: layout(nodes, [4]) };
+  }
+
+  // Mirror, recursing with the working tag held on every door along the path.
+  function framesMirror() {
+    var nodes = { 4: { v: 4, l: 2, r: 7 }, 2: { v: 2, l: 1, r: null }, 7: { v: 7, l: null, r: null }, 1: { v: 1, l: null, r: null } };
+    var calls = [];
+    var F = [];
+    function vars() {
+      var v = [{ name: "tree", chips: [{ t: "key", id: 4 }] }];
+      calls.forEach(function (c) {
+        var chips = [];
+        if (c.work) chips.push({ t: "work", id: c.on, label: "n" });
+        if (c.left !== undefined) chips.push(c.left === null ? { t: "val", label: "left", text: "None" } : { t: "key", id: c.left, label: "left" });
+        if (c.right !== undefined) chips.push(c.right === null ? { t: "val", label: "right", text: "None" } : { t: "key", id: c.right, label: "right" });
+        if (!chips.length) chips.push({ t: "val", text: "starting" });
+        v.push({ name: "mirror(" + nodes[c.on].v + ")", chips: chips });
+      });
+      return v;
+    }
+    function snap(line, cap, mark) {
+      var held = [], labels = {};
+      calls.forEach(function (c) {
+        if (c.left) { held.push(c.left); labels[c.left] = "left"; }
+        if (c.right) { held.push(c.right); labels[c.right] = "right"; }
+      });
+      var main = reachable(nodes, 4);
+      var roots = [4];
+      held.forEach(function (h) { if (!main[h]) roots.push(h); });
+      var lab = {};
+      roots.slice(1).forEach(function (r) { lab[r] = labels[r]; });
+      F.push({ line: line, nodes: copyNodes(nodes), roots: roots, labels: lab, vars: vars(), cap: cap, mark: mark });
+    }
+    function top() { return calls[calls.length - 1]; }
+    // call on 4
+    calls.push({ on: 4 });
+    snap(0, "<code>mirror(&amp;tree)</code> passes a look at the caller's hook. Nothing is copied: 4's tally stays at 1.", 4);
+    top().work = true;
+    snap(2, "Hang the working tag on 4's door. Nobody else may open it until this guard, <code>n</code>, goes away.", 4);
+    top().left = nodes[4].l; nodes[4].l = null;
+    snap(3, "<code>take()</code> lifts the key to 2 off its hook and leaves an honest <code>None</code>. The key is in your hand now, with the whole 2 subtree behind it. Its tally is still 1: the key moved, it wasn't copied.", 4);
+    top().right = nodes[4].r; nodes[4].r = null;
+    snap(4, "Same for 7. Locker 4 has two empty hooks.", 4);
+    nodes[4].l = top().right; top().right = undefined;
+    snap(5, "Hang 7 on the left hook.", 4);
+    nodes[4].r = top().left; top().left = undefined;
+    snap(6, "Hang 2 on the right. Swapped, with nothing allocated and nothing freed.", 4);
+    calls.push({ on: 7 });
+    snap(7, "Down into 7. The tag on 4 is still up, because <code>n</code> is still alive in the call above.", 7);
+    top().work = true;
+    snap(2, "Working tag on 7 too. Two tags at once on two different doors: no conflict.", 7);
+    top().left = null; top().right = null;
+    snap(4, "Both of 7's hooks are empty. Each <code>take()</code> hands back <code>None</code>, and swapping two empty hooks changes nothing.", 7);
+    calls.pop();
+    snap(9, "The call on 7 ends. Its guard goes away and the tag on 7 comes down.", 7);
+    calls.push({ on: 2 });
+    snap(8, "Now into 2, which hangs on the right hook.", 2);
+    top().work = true;
+    snap(2, "Tag on 2. Two doors carry tags: 4 and 2.", 2);
+    top().left = nodes[2].l; nodes[2].l = null;
+    snap(3, "Take the key to 1.", 2);
+    top().right = null;
+    snap(4, "The right hook was already empty: <code>None</code>.", 2);
+    nodes[2].l = null; top().right = undefined;
+    snap(5, "The empty one goes on the left.", 2);
+    nodes[2].r = top().left; top().left = undefined;
+    snap(6, "And 1 goes on the right.", 2);
+    snap(7, "<code>mirror(&amp;n.left)</code> finds <code>None</code> and returns at once.", 2);
+    calls.push({ on: 1, work: true, left: null, right: null });
+    snap(8, "Into 1, a leaf. Three tags are up now, one on every door from the top down to here.", 1);
+    calls.pop();
+    snap(9, "Done with 1. Tag down.", 1);
+    calls.pop();
+    snap(9, "Done with 2. Tag down.", 2);
+    calls.pop();
+    snap(9, "Done with 4. Every tag is down.", 4);
+    snap(10, "Mirrored. Same four lockers, same memory. Every key moved and none was copied, so no tally ever changed.");
+    return { frames: F, fixed: null };
+  }
+
+  var MAKERS = { levels: framesLevels, mirror: framesMirror };
+
+  document.querySelectorAll(".tstepper").forEach(function (el) {
+    var pre = el.querySelector("pre");
+    var code = pre.querySelector("code");
+    var lines = code.innerHTML.split("\n");
+    code.innerHTML = lines.map(function (l, i) { return '<span class="st-line" data-l="' + i + '">' + (l || " ") + "</span>"; }).join("");
+    pre.classList.add("st-code");
+    var made = MAKERS[el.getAttribute("data-algo")]();
+    var frames = made.frames;
+    var dims = { cols: 0, depth: 0 };
+    frames.forEach(function (fr) {
+      var L = made.fixed || layout(fr.nodes, fr.roots);
+      dims.cols = Math.max(dims.cols, L.cols);
+      for (var p in L.pos) dims.depth = Math.max(dims.depth, L.pos[p].y);
+    });
+    var stage = document.createElement("div"); stage.className = "ts-stage";
+    var varsBox = document.createElement("div"); varsBox.className = "ts-vars";
+    el.insertBefore(stage, pre.nextSibling);
+    el.insertBefore(varsBox, stage.nextSibling);
+    var cap = document.createElement("div"); cap.className = "st-caption"; cap.setAttribute("aria-live", "polite");
+    var ctr = document.createElement("div"); ctr.className = "st-controls";
+    ctr.innerHTML = '<button type="button" data-a="back">Back</button><button type="button" class="primary" data-a="step">Step</button><button type="button" data-a="reset">Start over</button><span class="st-count"></span>';
+    el.appendChild(cap); el.appendChild(ctr);
+    var count = ctr.querySelector(".st-count");
+    var back = ctr.querySelector('[data-a="back"]'), step = ctr.querySelector('[data-a="step"]');
+    var k = 0;
+    function draw() {
+      var fr = frames[k];
+      code.querySelectorAll(".st-line").forEach(function (s) { s.classList.toggle("on", Number(s.getAttribute("data-l")) === fr.line); });
+      stage.innerHTML = drawTree(fr, made.fixed, dims);
+      varsBox.innerHTML = varsHTML(fr);
+      cap.innerHTML = fr.cap;
+      count.textContent = (k + 1) + " of " + frames.length;
+      back.disabled = k === 0;
+      step.disabled = k === frames.length - 1;
+    }
+    ctr.addEventListener("click", function (e) {
+      var a = e.target.getAttribute("data-a");
+      if (a === "back" && k > 0) k--;
+      if (a === "step" && k < frames.length - 1) k++;
+      if (a === "reset") k = 0;
+      draw();
+    });
+    draw();
+  });
+})();
+
+</script>
+</body>
+</html>
