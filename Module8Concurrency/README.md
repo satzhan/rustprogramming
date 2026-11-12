@@ -5,3 +5,5 @@ https://satzhan.github.io/rustprogramming/Module8Concurrency/arc-two-timelines.h
 https://satzhan.github.io/rustprogramming/Module8Concurrency/arc-who-turns-off-the-lights.html
 
 https://satzhan.github.io/rustprogramming/Module8Concurrency/arc-mutex-sharing-demo.html
+
+https://satzhan.github.io/rustprogramming/Module8Concurrency/fifo_rust_dispatcher_lesson.html
