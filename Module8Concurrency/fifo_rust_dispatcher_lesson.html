@@ -1,0 +1,653 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Building a FIFO Dispatcher in Rust</title>
+<style>
+:root{color-scheme:light;--bg:#f8f8f6;--paper:#fff;--ink:#202824;--muted:#55605a;--line:#d4dcd6;--soft:#eef3ef;--accent:#1b685d;--accent2:#265b83;--warn:#795020;--code:#19241f;--codefg:#e5f0e8;--good:#247251;--bad:#9b4d30;--chip:#e4ebe5}
+@media(prefers-color-scheme:dark){:root{color-scheme:dark;--bg:#131b18;--paper:#1a231f;--ink:#e4eae6;--muted:#aabbb1;--line:#35433b;--soft:#24332b;--accent:#8ad4bc;--accent2:#93c3e4;--warn:#eac187;--code:#0e1512;--codefg:#e5f0e8;--good:#85d5a9;--bad:#f3ad86;--chip:#2a4136}}
+*{box-sizing:border-box} html{scroll-behavior:smooth} body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.65 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+a{color:var(--accent)} .shell{max-width:1260px;margin:0 auto;display:grid;grid-template-columns:220px minmax(0,1fr);gap:46px;padding:0 32px 70px}
+.sidebar{position:sticky;top:0;align-self:start;height:100vh;overflow:auto;padding:30px 14px 25px 0;border-right:1px solid var(--line)}.sidebar .course{font-size:.78rem;text-transform:uppercase;letter-spacing:.14em;color:var(--muted);font-weight:650}.sidebar nav{margin-top:20px;display:grid;gap:2px}.sidebar a{text-decoration:none;color:var(--muted);font-size:.92rem;display:block;padding:7px 9px;border-radius:5px}.sidebar a:hover,.sidebar a:focus{background:var(--soft);color:var(--ink)}
+main{min-width:0;max-width:910px}header.top{padding:48px 0 26px;border-bottom:1px solid var(--line)}h1{font-family:Georgia,serif;font-weight:600;line-height:1.12;letter-spacing:-.025em;font-size:clamp(2.3rem,5vw,3.3rem);margin:0 0 16px}h2{font:600 clamp(1.55rem,2.7vw,2.1rem)/1.25 Georgia,serif;letter-spacing:-.02em;margin:0 0 18px}h3{font-size:1.1rem;line-height:1.35;margin:30px 0 8px}p{margin:12px 0}header.top p{max-width:68ch;font-size:1.08rem}section.chapter{padding:52px 0 25px;border-bottom:1px solid var(--line);scroll-margin-top:16px}.chapter-num{display:block;color:var(--accent);font-weight:700;font-size:.76rem;letter-spacing:.1em;text-transform:uppercase;margin-bottom:9px}.lead{font-size:1.07rem;max-width:74ch}.small{font-size:.87rem;color:var(--muted)}b,strong{font-weight:650}
+.route{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:20px 0}.route span{padding:4px 9px;background:var(--chip);border:1px solid var(--line);border-radius:5px;font-size:.85rem}.route .arr{background:none;border:none;padding:0;color:var(--muted)}
+.experiment{background:var(--paper);border:1px solid var(--line);border-radius:10px;margin:25px 0;padding:19px 20px}.experiment h3{margin:0 0 8px;font-size:1.02rem}.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:14px 0}.btn,button,.select{font:inherit}.btn,button.action{border:1px solid var(--accent);border-radius:6px;background:var(--accent);color:var(--bg);padding:8px 14px;cursor:pointer;font-size:.9rem;font-weight:650}.btn.secondary,button.action.secondary{background:transparent;color:var(--accent)}button:disabled{cursor:not-allowed;opacity:.4}button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--accent2);outline-offset:3px}.control{display:inline-flex;align-items:center;gap:7px;font-size:.92rem}.control select,.control input[type=number]{border:1px solid var(--line);border-radius:5px;padding:7px;background:var(--paper);color:var(--ink)}.control input[type=range]{accent-color:var(--accent)}.readout{border-left:3px solid var(--accent);background:var(--soft);padding:10px 14px;margin:14px 0;font-size:.95rem;min-height:38px}.chips{display:flex;flex-wrap:wrap;gap:6px;min-height:38px}.chip{background:var(--chip);border:1px solid var(--line);border-radius:5px;min-width:40px;padding:5px 10px;text-align:center;font-weight:650;font-variant-numeric:tabular-nums}.chip.first{outline:2px solid var(--accent);outline-offset:1px}.chip.faded{opacity:.43}.table-scroll{overflow:auto}.data{width:100%;border-collapse:collapse;font-size:.92rem;margin:15px 0}.data th,.data td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line)}.data th{background:var(--soft);font-size:.83rem}.code-unit{border-radius:8px;overflow:hidden;background:var(--code);margin:20px 0 23px}.code-head{display:flex;justify-content:space-between;gap:12px;align-items:center;background:#29372f;color:#f0f7f1;padding:7px 14px;font-size:.83rem}.copy-btn{border:1px solid #647b6e;border-radius:5px;background:transparent;color:#f0f7f1;padding:4px 9px;cursor:pointer;font-size:.8rem}.code-unit pre{color:var(--codefg);font:13px/1.6 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;overflow:auto;margin:0;padding:18px;tab-size:4}.code-foot{color:#c4d3c8;padding:8px 14px;background:#25312a;font-size:.8rem}.code-foot code{color:#fff}.note{background:var(--soft);border-left:3px solid var(--accent2);padding:11px 16px;margin:18px 0}.notice{border-left-color:var(--warn)}.try{padding:14px 18px;border:1px solid var(--line);border-radius:7px;margin:18px 0}.try strong{display:block;margin-bottom:4px}.try ol,.try ul{margin:6px 0 0;padding-left:23px}.try li{margin:3px 0}.compact{margin:9px 0;padding-left:23px}.compact li{margin:5px 0}details{border:1px solid var(--line);border-radius:7px;padding:10px 14px;margin:10px 0;background:var(--paper)}details summary{cursor:pointer;font-weight:600}details[open] summary{margin-bottom:8px}details p{margin:6px 0}.worked-bars{display:grid;gap:6px;margin:14px 0}.worker-row{display:grid;grid-template-columns:80px 1fr;align-items:center;gap:10px}.worker-track{min-height:30px;border:1px solid var(--line);border-radius:4px;background:repeating-linear-gradient(90deg,var(--soft),var(--soft) calc(25% - 1px),var(--line) 25%);display:flex;overflow:hidden}.job-segment{font-size:.73rem;border-right:1px solid var(--paper);color:#fff;display:flex;align-items:center;justify-content:center;min-width:0;overflow:hidden;white-space:nowrap}.job-segment:nth-child(odd){background:#377d78}.job-segment:nth-child(even){background:#37648b}.worker-label{font-size:.82rem;color:var(--muted)}.progress{height:13px;background:var(--chip);border-radius:8px;border:1px solid var(--line);overflow:hidden}.progress-fill{height:100%;background:var(--accent);transition:width .15s}.metric-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.metric{background:var(--soft);padding:9px;border-radius:5px}.metric .value{display:block;font-weight:750;font-size:1.3rem;font-variant-numeric:tabular-nums}.metric .key{font-size:.78rem;color:var(--muted)}.scheduler-grid{display:grid;grid-template-columns:1fr 1fr;gap:13px}.pane{border:1px solid var(--line);padding:11px;border-radius:6px}.pane h4{margin:0 0 8px;font-size:.89rem}.ledger{font:13px/1.6 ui-monospace,monospace;padding-left:20px;margin:12px 0;max-height:160px;overflow-y:auto}.legend{font-size:.79rem;color:var(--muted);margin-top:8px}.footer{padding:25px 0;color:var(--muted);font-size:.9rem}
+@media(max-width:860px){.shell{display:block;padding:0 17px 50px}.sidebar{height:auto;position:static;padding:10px 0;border-right:none;border-bottom:1px solid var(--line)}.sidebar nav{display:flex;overflow:auto;gap:5px;margin:6px 0;white-space:nowrap}.sidebar a{padding:5px 8px;font-size:.82rem}header.top{padding-top:26px}section.chapter{padding-top:36px}.scheduler-grid{grid-template-columns:1fr}.experiment{padding:13px}.code-unit pre{font-size:12px}.metric-grid{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:480px){.metric-grid{grid-template-columns:1fr 1fr}.worker-row{grid-template-columns:66px 1fr}}
+@media print{.shell{display:block;max-width:100%;padding:0}.sidebar,.copy-btn,.controls{display:none!important}.experiment,.code-unit,section{break-inside:avoid}.code-unit pre{white-space:pre-wrap}body{font-size:11pt;background:white;color:black}.code-unit{background:#eee!important}.code-unit pre{color:#111!important}.code-head,.code-foot{background:#ddd!important;color:#111!important}}
+</style>
+</head>
+<body>
+<div class="shell">
+<aside class="sidebar"><div class="course">Rust · Systems programming</div><nav aria-label="Lesson chapters">
+<a href="#start">Start</a><a href="#queue">1 · FIFO queue</a><a href="#threads">2 · Threads</a><a href="#mutex">3 · Sharing a queue</a><a href="#waiting">4 · Waiting for work</a><a href="#channel">5 · Handing off work</a><a href="#budget">6 · Resource limits</a><a href="#measure">7 · Measurement</a><a href="#whole">8 · Put it together</a><a href="#investigate">Try changing it</a>
+</nav></aside>
+<main>
+<header class="top" id="start"><h1>Building a FIFO dispatcher in Rust</h1>
+<p>A program receives jobs. Some jobs take longer than others. Several workers can run jobs at the same time, but there are limits to how much work the machine should accept. Who decides what runs next?</p>
+<p>We'll begin with one queue and one worker. Every new piece of Rust will solve a problem that appears along the way.</p>
+<div class="note"><b>Run the examples:</b> Open a Rust project in Codespaces or on your computer. Replace <code>src/main.rs</code> with an example and run <code>cargo run</code>. Each complete example uses only the Rust standard library. The diagrams and controls on this page work without internet access.</div>
+<div class="route"><span>Jobs arrive</span><span class="arr">→</span><span>Queue</span><span class="arr">→</span><span>Manager</span><span class="arr">→</span><span>Workers</span></div>
+</header>
+<section class="chapter" id="queue"><span class="chapter-num">1 · One worker</span><h2>A queue decides the order</h2>
+<p>Imagine three jobs arriving in this order: A, B, C. The rule is simple: take A first. If a new job D arrives while A is running, D goes behind C. That is <b>first in, first out</b> (FIFO).</p>
+<p><code>VecDeque</code> lets us add an item at the back and remove an item from the front. A <code>Vec</code> can remove its first item too, but that operation shifts the remaining elements; <code>VecDeque</code> is built for this use.</p>
+<div class="experiment"><h3>Move the queue yourself</h3><p class="small">The outlined job is next. Taking a job removes it from the queue; finishing the job is a separate event.</p>
+<div id="queue-chips" class="chips" aria-live="polite"></div>
+<div class="controls"><button type="button" class="action" id="q-pop">Take next</button><button type="button" class="action secondary" id="q-add">Add new job</button><button type="button" class="action secondary" id="q-reset">Reset</button></div>
+<div class="readout" id="q-out" aria-live="polite">A is at the front.</div></div>
+<div class="code-unit" id="code-1"><div class="code-head"><strong>1. FIFO, without threads</strong><button type="button" class="copy-btn" aria-label="Copy 1. FIFO, without threads">Copy code</button></div>
+    <pre><code class="language-rust">use std::collections::VecDeque;
+
+fn main() {
+    let mut queue = VecDeque::new();
+    queue.push_back(&quot;A&quot;);
+    queue.push_back(&quot;B&quot;);
+    queue.push_back(&quot;C&quot;);
+
+    while let Some(job) = queue.pop_front() {
+        println!(&quot;Starting {job}&quot;);
+    }
+}</code></pre><div class="code-foot">Copy into <code>src/main.rs</code> and run <code>cargo run</code>.</div></div>
+<details><summary>What does <code>while let Some(job)</code> mean?</summary><p><code>pop_front()</code> returns <code>Some(job)</code> when it finds an item and <code>None</code> when the queue is empty. The loop keeps running while it gets an item. No index is needed.</p></details>
+<div class="try"><strong>Change it</strong>Replace <code>push_back("C")</code> with <code>push_front("C")</code>. Run it. You haven't changed the worker at all. Only the rule for entering the queue has changed.</div>
+<p>Now make processing take time. While A is running, B and C wait. Could another worker help?</p></section>
+<section class="chapter" id="threads"><span class="chapter-num">2 · More than one worker</span><h2>Waiting and working are not the same</h2>
+<p>Suppose a job waits for a response from a disk or a network connection. While it waits, another job could make progress. With one thread, our program processes the jobs in a row. Multiple threads can overlap the waiting.</p>
+<p>The next program starts four threads. It isn't a worker pool yet: it creates one thread per job. That is enough to see what changes.</p>
+<div class="code-unit" id="code-2"><div class="code-head"><strong>2. Four jobs on separate threads</strong><button type="button" class="copy-btn" aria-label="Copy 2. Four jobs on separate threads">Copy code</button></div>
+    <pre><code class="language-rust">use std::thread;
+use std::time::{Duration, Instant};
+
+fn main() {
+    let start = Instant::now();
+    let mut handles = Vec::new();
+
+    for id in 0..4 {
+        handles.push(thread::spawn(move || {
+            println!(&quot;Job {id} starts&quot;);
+            thread::sleep(Duration::from_millis(300));
+            println!(&quot;Job {id} ends&quot;);
+        }));
+    }
+
+    for handle in handles {
+        handle.join().unwrap();
+    }
+    println!(&quot;Elapsed: {:?}&quot;, start.elapsed());
+}</code></pre><div class="code-foot">Copy into <code>src/main.rs</code> and run <code>cargo run</code>.</div></div>
+<p><code>spawn</code> asks the operating system to run a new thread. <code>join</code> waits for that thread to finish. Without the joins, <code>main</code> could end before the others have completed. The order of printed lines can change between runs.</p>
+<div class="experiment"><h3>How many workers?</h3><p class="small">Six equally long waiting jobs. Each colored block is one job; the horizontal width represents elapsed time. This is a scheduling model, not a benchmark.</p>
+<div class="controls"><label class="control">Workers <input id="workers-count" type="range" min="1" max="4" step="1" value="1"><b id="workers-value">1</b></label></div>
+<div id="workers-bars" class="worked-bars"></div><div class="readout" id="workers-readout"></div></div>
+<div class="try"><strong>Change it</strong>Run the program once. Then replace the spawned threads with one ordinary <code>for</code> loop that prints, sleeps, and prints. Compare elapsed times. Finally try doing calculation instead of sleeping. That comparison is different: CPU work needs actual processor time.</div>
+<div class="note">A sleep tells the operating system that this thread does not need to run until later. It does <em>not</em> burn CPU for that duration. Parallel CPU computation behaves differently from overlapping waits.</div>
+</section>
+<section class="chapter" id="mutex"><span class="chapter-num">3 · Sharing jobs</span><h2>Two workers, one queue</h2>
+<p>Creating one thread per job becomes awkward when jobs keep arriving. Instead, keep a fixed number of workers and let each one take the next job from a shared queue.</p>
+<p>Now we have a problem: two workers might try to take the same next job at once. The queue must have one moment when a worker takes an item and everyone else stays out.</p>
+<p><code>Mutex</code> provides that exclusive access. <code>Arc</code> lets multiple threads own handles to the same queue. They do different jobs: <code>Arc</code> shares ownership; <code>Mutex</code> protects mutation.</p>
+<div class="code-unit" id="code-3"><div class="code-head"><strong>3. Two threads share one FIFO queue</strong><button type="button" class="copy-btn" aria-label="Copy 3. Two threads share one FIFO queue">Copy code</button></div>
+    <pre><code class="language-rust">use std::collections::VecDeque;
+use std::sync::{Arc, Mutex};
+use std::thread;
+use std::time::Duration;
+
+fn main() {
+    let queue = Arc::new(Mutex::new(VecDeque::from([
+        300u64, 100, 200, 400,
+    ])));
+    let mut handles = Vec::new();
+
+    for worker in 0..2 {
+        let queue = Arc::clone(&amp;queue);
+        handles.push(thread::spawn(move || loop {
+            let job = {
+                let mut q = queue.lock().unwrap();
+                q.pop_front()
+            }; // lock released here
+
+            match job {
+                Some(ms) =&gt; {
+                    println!(&quot;Worker {worker} took {ms} ms job&quot;);
+                    thread::sleep(Duration::from_millis(ms));
+                }
+                None =&gt; break,
+            }
+        }));
+    }
+
+    for h in handles {
+        h.join().unwrap();
+    }
+}</code></pre><div class="code-foot">Copy into <code>src/main.rs</code> and run <code>cargo run</code>.</div></div>
+<p>Look at the small inner block around <code>pop_front()</code>. The lock is held only while taking a job. The worker releases it before spending time on the job. Another worker can then take the next job.</p>
+<details><summary>Why does <code>Arc::clone(&amp;queue)</code> not copy the queue?</summary><p>It creates another owning handle pointing to the same allocation. <code>Arc</code> keeps a thread-safe count of owners. The queue remains one shared queue.</p></details>
+<details><summary>Who unlocks the mutex?</summary><p>The value returned by <code>lock()</code> is a guard. When <code>q</code> leaves its scope, that guard is dropped and the mutex unlocks. You can also call <code>drop(q)</code> explicitly.</p></details>
+<div class="experiment"><h3>How long should the lock be held?</h3><p class="small">Four jobs, two workers. Each job takes one time unit. Compare locking only while taking a job with locking throughout the job.</p>
+<div class="controls"><button type="button" id="lock-short" class="action">Release before work</button><button type="button" id="lock-long" class="action secondary">Hold during work</button></div>
+<div id="lock-bars" class="worked-bars"></div><div class="readout" id="lock-out"></div></div>
+<div class="try"><strong>Change it</strong>In example 3, move <code>thread::sleep(...)</code> inside the block holding <code>q</code>. You will need to reorganize the loop. Watch what happens when one worker holds the lock while working. Then put the sleep back outside the lock.</div>
+<p>There is still a problem. Our workers stop when the queue is empty. What if a new job arrives a moment later?</p></section>
+<section class="chapter" id="waiting"><span class="chapter-num">4 · Jobs arrive later</span><h2>Wait without repeatedly asking</h2>
+<p>When a queue is empty, a worker has three choices: leave, keep checking, or wait until someone signals that something changed. Leaving misses future jobs. Checking over and over wastes time. A <code>Condvar</code> lets the worker sleep until it is notified.</p>
+<p>The important part is easy to miss: <b>waiting on a condition variable temporarily releases the mutex</b>. Otherwise the producer could not get the lock to add a job.</p>
+<div class="experiment"><h3>Follow the empty queue</h3><div class="controls"><button type="button" class="action" id="cv-next">Next event</button><button type="button" class="action secondary" id="cv-reset">Reset</button></div><div id="cv-state" class="readout" aria-live="polite"></div><ol id="cv-steps" class="ledger"></ol></div>
+<div class="code-unit" id="code-4"><div class="code-head"><strong>4. A producer wakes a waiting consumer</strong><button type="button" class="copy-btn" aria-label="Copy 4. A producer wakes a waiting consumer">Copy code</button></div>
+    <pre><code class="language-rust">use std::collections::VecDeque;
+use std::sync::{Arc, Condvar, Mutex};
+use std::thread;
+use std::time::Duration;
+
+struct State {
+    jobs: VecDeque&lt;u32&gt;,
+    closed: bool,
+}
+
+fn main() {
+    let shared = Arc::new((
+        Mutex::new(State {
+            jobs: VecDeque::new(),
+            closed: false,
+        }),
+        Condvar::new(),
+    ));
+
+    let consumer_shared = Arc::clone(&amp;shared);
+    let consumer = thread::spawn(move || loop {
+        let job = {
+            let (lock, ready) = &amp;*consumer_shared;
+            let mut state = lock.lock().unwrap();
+            while state.jobs.is_empty() &amp;&amp; !state.closed {
+                state = ready.wait(state).unwrap();
+            }
+            state.jobs.pop_front()
+        };
+        match job {
+            Some(n) =&gt; println!(&quot;Processing job {n}&quot;),
+            None =&gt; break, // queue closed and empty
+        }
+    });
+
+    thread::sleep(Duration::from_millis(200));
+    for n in 1..=3 {
+        let (lock, ready) = &amp;*shared;
+        {
+            let mut state = lock.lock().unwrap();
+            state.jobs.push_back(n);
+        }
+        ready.notify_one();
+        thread::sleep(Duration::from_millis(100));
+    }
+    let (lock, ready) = &amp;*shared;
+    lock.lock().unwrap().closed = true;
+    ready.notify_all();
+    consumer.join().unwrap();
+}</code></pre><div class="code-foot">Copy into <code>src/main.rs</code> and run <code>cargo run</code>.</div></div>
+<p>The worker waits in a <code>while</code> loop, not an <code>if</code>. A notification only means it should check again; it is not a promise that a job is available. Another worker may have taken the job first, or a thread can wake without a notification.</p>
+<p>The <code>closed</code> flag is necessary too. An empty queue means “nothing here now.” A closed and empty queue means “nothing else will arrive.” Without that distinction, workers can wait forever at shutdown.</p>
+<div class="try"><strong>Change it</strong>Delete <code>ready.notify_one()</code> after adding a job and run the example. The worker might eventually wake during shutdown, but it no longer responds when jobs arrive. Put the notification back.</div>
+</section>
+<section class="chapter" id="channel"><span class="chapter-num">5 · One thread makes decisions</span><h2>The manager hands work to workers</h2>
+<p>So far each worker chooses its own job. But suppose we need one place to decide whether a job is allowed to start. We can introduce a manager.</p>
+<p>The manager takes the next waiting job, makes a decision, and sends it to a worker. A channel is a way to hand a value from one thread to another. The value moves through the channel; the receiver takes ownership of it.</p>
+<div class="route"><span>Producer</span><span class="arr">→</span><span>Waiting queue</span><span class="arr">→</span><span>Manager</span><span class="arr">→</span><span>Channel</span><span class="arr">→</span><span>Workers</span></div>
+<div class="code-unit" id="code-5"><div class="code-head"><strong>5. Send jobs over a channel</strong><button type="button" class="copy-btn" aria-label="Copy 5. Send jobs over a channel">Copy code</button></div>
+    <pre><code class="language-rust">use std::sync::{mpsc, Arc, Mutex};
+use std::thread;
+use std::time::Duration;
+
+fn main() {
+    let (tx, rx) = mpsc::channel::&lt;u32&gt;();
+    let shared_rx = Arc::new(Mutex::new(rx));
+    let mut handles = Vec::new();
+
+    for worker in 0..2 {
+        let rx = Arc::clone(&amp;shared_rx);
+        handles.push(thread::spawn(move || loop {
+            let next = {
+                let receiver = rx.lock().unwrap();
+                receiver.recv()
+            };
+            let Ok(job) = next else { break };
+            println!(&quot;Worker {worker} runs job {job}&quot;);
+            thread::sleep(Duration::from_millis(150));
+        }));
+    }
+
+    for job in 1..=6 {
+        tx.send(job).unwrap();
+    }
+    drop(tx); // tell receivers no more values will arrive
+
+    for h in handles {
+        h.join().unwrap();
+    }
+}</code></pre><div class="code-foot">Copy into <code>src/main.rs</code> and run <code>cargo run</code>.</div></div>
+<p>Rust's standard <code>mpsc</code> channel has one receiving end. We use <code>Arc&lt;Mutex&lt;Receiver&lt;u32&gt;&gt;&gt;</code> to let workers share that receiver. Only one worker can be inside <code>recv()</code> at a time, and a blocking <code>recv()</code> holds the receiver mutex. Once a worker receives a job, it releases the lock and processes the job independently.</p>
+<p>That arrangement can work, but it is a choice with a cost. A channel also holds sent jobs internally. A job can have been sent but not yet started.</p>
+<div class="experiment"><h3>Sent does not mean running</h3><p class="small">Step through a manager, a channel, and one worker. See which event changes each count.</p>
+<div class="controls"><button type="button" class="action" id="ch-next">Next event</button><button type="button" class="action secondary" id="ch-reset">Reset</button></div>
+<div class="metric-grid"><div class="metric"><span class="key">Not yet sent</span><span id="ch-pending" class="value">3</span></div><div class="metric"><span class="key">Inside channel</span><span id="ch-buffered" class="value">0</span></div><div class="metric"><span class="key">Running</span><span id="ch-running" class="value">0</span></div></div>
+<div class="readout" id="ch-out"></div></div>
+<details><summary>Why is <code>drop(tx)</code> important?</summary><p><code>recv()</code> returns an error when every sender has been dropped and the channel is empty. If a sender is still alive, a worker cannot distinguish “more jobs might arrive” from “we are finished.” It can keep waiting.</p></details>
+</section>
+<section class="chapter" id="budget"><span class="chapter-num">6 · A limit on running work</span><h2>The oldest job may not fit</h2>
+<p>Imagine the machine has a budget of 70 units. One running task is using 40. Another worker is free. The next waiting task asks for 40 units, but only 30 remain.</p>
+<p>The manager must wait if it follows strict FIFO. A smaller job behind the first one could fit, but strict FIFO does not look past the front. This is called <b>head-of-line blocking</b>.</p>
+<div class="experiment"><h3>Dispatch under a resource limit</h3><p class="small">The number called “CPU budget” here is a reservation limit made by the program. It is not a measurement of actual hardware utilization.</p>
+<div class="controls"><label class="control">Running job uses <input id="budget-used" type="range" min="0" max="70" step="10" value="40"><b id="budget-used-label">40</b></label></div>
+<div class="progress" aria-label="Reserved budget"><div class="progress-fill" id="budget-bar" style="width:57.14%"></div></div>
+<p class="small" id="budget-worker-state">Capacity: 70. One worker has the existing job; one is free.</p>
+<div class="controls"><label class="control">Policy <select id="budget-policy"><option value="fifo">Strict FIFO</option><option value="skip">Allow skip-ahead</option></select></label><button type="button" class="action" id="budget-dispatch">Try dispatch</button><button type="button" class="action secondary" id="budget-finish">Finish oldest running job</button><button type="button" class="action secondary" id="budget-reset">Reset</button></div>
+<p class="small">Running / reserved</p><div id="budget-running" class="chips"></div><p class="small">Waiting in the queue</p><div id="budget-jobs" class="chips"></div><div class="readout" id="budget-result">Choose a policy, then dispatch.</div><div class="legend">Waiting jobs: A needs 40; B needs 20; C needs 10. With strict FIFO, the manager cannot skip a blocked front job.</div></div>
+<p>The real difficulty is not the subtraction. It is making the decision safely when several threads can change the counters. Checking the budget and reserving it must happen while holding the <em>same</em> lock. Otherwise two decisions could both see room for one job and both take it.</p>
+<div class="code-unit" id="code-6"><div class="code-head"><strong>6. Resource reservations, without FIFO yet</strong><button type="button" class="copy-btn" aria-label="Copy 6. Resource reservations, without FIFO yet">Copy code</button></div>
+    <pre><code class="language-rust">use std::sync::{Arc, Condvar, Mutex};
+use std::thread;
+use std::time::Duration;
+
+#[derive(Default)]
+struct Usage { cpu: u32, workers: usize }
+
+struct Budget {
+    usage: Mutex&lt;Usage&gt;,
+    changed: Condvar,
+}
+
+impl Budget {
+    fn reserve(&amp;self, cost: u32) {
+        let mut u = self.usage.lock().unwrap();
+        while u.cpu + cost &gt; 70 || u.workers == 2 {
+            u = self.changed.wait(u).unwrap();
+        }
+        u.cpu += cost;
+        u.workers += 1;
+    }
+
+    fn release(&amp;self, cost: u32) {
+        let mut u = self.usage.lock().unwrap();
+        u.cpu -= cost;
+        u.workers -= 1;
+        drop(u);
+        self.changed.notify_all();
+    }
+}
+
+fn main() {
+    let budget = Arc::new(Budget {
+        usage: Mutex::new(Usage::default()),
+        changed: Condvar::new(),
+    });
+    let mut handles = Vec::new();
+
+    for (id, cost) in [40u32, 40, 20, 10].into_iter().enumerate() {
+        let budget = Arc::clone(&amp;budget);
+        handles.push(thread::spawn(move || {
+            budget.reserve(cost);
+            println!(&quot;Job {id} reserved {cost}&quot;);
+            thread::sleep(Duration::from_millis(250));
+            budget.release(cost);
+        }));
+    }
+    for h in handles { h.join().unwrap(); }
+}</code></pre><div class="code-foot">Copy into <code>src/main.rs</code> and run <code>cargo run</code>.</div></div>
+<p>This example protects two counters together: reserved CPU units and reserved worker slots. Notice what it does <em>not</em> guarantee: the threads race to reserve their budgets, so their reservation order is not necessarily FIFO. A single manager will supply that ordering later.</p>
+<details><summary>Why is the resource reservation inside the mutex?</summary><p>Suppose two threads each observe 30 units free and each wants 20. If the check happens outside the lock, both can decide they fit. The combined reservation is 40, which exceeds the 30 available. Locking the check and update as one operation prevents this.</p></details>
+<div class="try"><strong>Change it</strong>Change the worker limit from <code>2</code> to <code>1</code>. Then change the CPU limit from <code>70</code> to <code>50</code> in both places inside <code>reserve</code>. Compare which limit prevents overlap. Keep every job cost at or below the capacity; otherwise a job that can never fit will wait forever.</div>
+</section>
+<section class="chapter" id="measure"><span class="chapter-num">7 · See what happened</span><h2>One number cannot tell the whole story</h2>
+<p>Suppose a job arrives at time 2, starts at time 5, and ends at time 9. It waited for 3 time units, ran for 4, and spent 7 in the system altogether. These are different things worth measuring.</p>
+<div class="experiment"><h3>Move a job through time</h3><div class="controls"><label class="control">Arrival <input id="time-arrival" type="range" min="0" max="9" value="2"><b id="time-arrival-v">2</b></label><label class="control">Start <input id="time-start" type="range" min="0" max="12" value="5"><b id="time-start-v">5</b></label><label class="control">Finish <input id="time-finish" type="range" min="0" max="16" value="9"><b id="time-finish-v">9</b></label></div>
+<div class="metric-grid"><div class="metric"><span class="key">Waiting</span><span class="value" id="metric-wait">3</span></div><div class="metric"><span class="key">Running</span><span class="value" id="metric-service">4</span></div><div class="metric"><span class="key">Turnaround</span><span class="value" id="metric-turn">7</span></div></div><div class="readout" id="time-note">Waiting = start − arrival; turnaround = finish − arrival.</div></div>
+<p>For many jobs, we can record each arrival, start, and finish time, then calculate averages. A monitor can also sample system state at regular intervals and write rows to a CSV file.</p>
+<div class="table-scroll"><table class="data"><thead><tr><th>Measurement</th><th>What it answers</th></tr></thead><tbody><tr><td>Wait time</td><td>How long between arrival and actual start?</td></tr><tr><td>Turnaround</td><td>How long from arrival to completion?</td></tr><tr><td>Queue length</td><td>How many jobs remain in the waiting queue?</td></tr><tr><td>Worker slots reserved</td><td>How much capacity has the manager booked?</td></tr><tr><td>CPU budget reserved</td><td>How much of the program's allowed budget is booked?</td></tr><tr><td>Makespan</td><td>How long until the final job completes?</td></tr></tbody></table></div>
+<div class="note notice"><b>Be precise about what a counter means.</b> A booked worker slot is not necessarily a thread actively executing a job. The manager can reserve a slot before a worker receives the job. Also, if the manager has already removed the head job from the queue while waiting for capacity, that job will not appear in the queue-length count.</div>
+<p>We should also distinguish <b>FIFO dispatch order</b> from <b>FIFO completion order</b>. If A takes 800 ms and B takes 100 ms, B can finish first even when A was sent first.</p></section>
+<section class="chapter" id="whole"><span class="chapter-num">8 · All the parts together</span><h2>A small dispatcher</h2>
+<p>Here is the whole arrangement. The generator adds jobs to a queue. The manager takes them in FIFO order and waits for capacity. Workers receive the admitted jobs through a channel. Another thread samples how the system is doing.</p>
+<p>There are two separate reasons a job might wait: it may still be in the manager's queue, or the manager may have taken it from that queue but be waiting to reserve capacity. Keeping those states separate is important when reading the measurements.</p>
+<details><summary>Open the full Rust program</summary><p>One complete file, using only the standard library. It writes <code>fifo.csv</code> to the working directory. The jobs use <code>sleep</code> to stand in for work; the CPU budget is an accounting rule, not real hardware use.</p>
+<div class="code-unit" id="code-7"><div class="code-head"><strong>8. Generator → FIFO manager → workers → CSV</strong><button type="button" class="copy-btn" aria-label="Copy 8. Generator → FIFO manager → workers → CSV">Copy code</button></div>
+    <pre><code class="language-rust">use std::collections::VecDeque;
+use std::fs::File;
+use std::io::Write;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{mpsc, Arc, Condvar, Mutex};
+use std::thread;
+use std::time::{Duration, Instant};
+
+#[derive(Clone, Copy)]
+struct Job {
+    id: usize,
+    cost: u32,
+    duration_ms: u64,
+    arrival: Instant,
+}
+
+struct QueueState {
+    jobs: VecDeque&lt;Job&gt;,
+    closed: bool,
+}
+struct Queue {
+    state: Mutex&lt;QueueState&gt;,
+    available: Condvar,
+}
+impl Queue {
+    fn new() -&gt; Self {
+        Self {
+            state: Mutex::new(QueueState {
+                jobs: VecDeque::new(), closed: false,
+            }),
+            available: Condvar::new(),
+        }
+    }
+    fn add(&amp;self, job: Job) {
+        self.state.lock().unwrap().jobs.push_back(job);
+        self.available.notify_one();
+    }
+    fn next(&amp;self) -&gt; Option&lt;Job&gt; {
+        let mut s = self.state.lock().unwrap();
+        while s.jobs.is_empty() &amp;&amp; !s.closed {
+            s = self.available.wait(s).unwrap();
+        }
+        s.jobs.pop_front()
+    }
+    fn close(&amp;self) {
+        self.state.lock().unwrap().closed = true;
+        self.available.notify_all();
+    }
+    fn len(&amp;self) -&gt; usize {
+        self.state.lock().unwrap().jobs.len()
+    }
+}
+
+#[derive(Default)]
+struct UseCount { cpu: u32, slots: usize }
+struct Budget {
+    state: Mutex&lt;UseCount&gt;,
+    changed: Condvar,
+    cap: u32,
+    max_workers: usize,
+}
+impl Budget {
+    fn reserve(&amp;self, cost: u32) {
+        assert!(cost &lt;= self.cap);
+        let mut s = self.state.lock().unwrap();
+        while s.cpu + cost &gt; self.cap || s.slots &gt;= self.max_workers {
+            s = self.changed.wait(s).unwrap();
+        }
+        s.cpu += cost;
+        s.slots += 1;
+    }
+    fn release(&amp;self, cost: u32) {
+        let mut s = self.state.lock().unwrap();
+        s.cpu -= cost;
+        s.slots -= 1;
+        drop(s);
+        self.changed.notify_all();
+    }
+    fn snapshot(&amp;self) -&gt; (u32, usize) {
+        let s = self.state.lock().unwrap();
+        (s.cpu, s.slots)
+    }
+}
+
+struct ResultRow { wait_ms: u128, turn_ms: u128 }
+
+fn main() {
+    let start = Instant::now();
+    let queue = Arc::new(Queue::new());
+    let budget = Arc::new(Budget {
+        state: Mutex::new(UseCount::default()),
+        changed: Condvar::new(), cap: 70, max_workers: 3,
+    });
+    let results = Arc::new(Mutex::new(Vec::&lt;ResultRow&gt;::new()));
+    let finished = Arc::new(AtomicBool::new(false));
+
+    let (tx, rx) = mpsc::channel::&lt;Job&gt;();
+    let rx = Arc::new(Mutex::new(rx));
+
+    let mut workers = Vec::new();
+    for worker_id in 0..3 {
+        let rx = Arc::clone(&amp;rx);
+        let budget = Arc::clone(&amp;budget);
+        let results = Arc::clone(&amp;results);
+        workers.push(thread::spawn(move || loop {
+            let task = { rx.lock().unwrap().recv() };
+            let Ok(job) = task else { break };
+            let began = Instant::now();
+            println!(&quot;Worker {worker_id}: job {}&quot;, job.id);
+            thread::sleep(Duration::from_millis(job.duration_ms));
+            let ended = Instant::now();
+            results.lock().unwrap().push(ResultRow {
+                wait_ms: began.duration_since(job.arrival).as_millis(),
+                turn_ms: ended.duration_since(job.arrival).as_millis(),
+            });
+            budget.release(job.cost);
+        }));
+    }
+
+    let monitor_queue = Arc::clone(&amp;queue);
+    let monitor_budget = Arc::clone(&amp;budget);
+    let monitor_finished = Arc::clone(&amp;finished);
+    let monitor = thread::spawn(move || {
+        let mut csv = File::create(&quot;fifo.csv&quot;).unwrap();
+        writeln!(csv, &quot;elapsed_ms,queue,reserved_cpu,reserved_slots&quot;).unwrap();
+        while !monitor_finished.load(Ordering::Relaxed) {
+            let (cpu, slots) = monitor_budget.snapshot();
+            writeln!(csv, &quot;{},{},{},{}&quot;,
+                start.elapsed().as_millis(),
+                monitor_queue.len(), cpu, slots).unwrap();
+            thread::sleep(Duration::from_millis(100));
+        }
+    });
+
+    let manager_queue = Arc::clone(&amp;queue);
+    let manager_budget = Arc::clone(&amp;budget);
+    let manager = thread::spawn(move || {
+        while let Some(job) = manager_queue.next() {
+            manager_budget.reserve(job.cost);
+            tx.send(job).unwrap();
+        }
+        // tx is dropped when this thread ends
+    });
+
+    let generator_queue = Arc::clone(&amp;queue);
+    let generator = thread::spawn(move || {
+        for id in 0..12 {
+            let cost = if id % 3 == 0 { 40 } else { 10 };
+            generator_queue.add(Job {
+                id, cost, duration_ms: 300,
+                arrival: Instant::now(),
+            });
+            thread::sleep(Duration::from_millis(70));
+        }
+        generator_queue.close();
+    });
+
+    generator.join().unwrap();
+    manager.join().unwrap();
+    for h in workers { h.join().unwrap(); }
+    finished.store(true, Ordering::Relaxed);
+    monitor.join().unwrap();
+
+    let results = results.lock().unwrap();
+    let n = results.len() as u128;
+    let wait: u128 = results.iter().map(|r| r.wait_ms).sum();
+    let turn: u128 = results.iter().map(|r| r.turn_ms).sum();
+    println!(&quot;Completed: {}&quot;, results.len());
+    if n &gt; 0 {
+        println!(&quot;Average wait: {} ms&quot;, wait / n);
+        println!(&quot;Average turnaround: {} ms&quot;, turn / n);
+    }
+    println!(&quot;Total elapsed: {:?}&quot;, start.elapsed());
+    println!(&quot;Samples written to fifo.csv&quot;);
+}</code></pre><div class="code-foot">Complete program. Paste into <code>src/main.rs</code>; run <code>cargo run</code>. Open <code>fifo.csv</code> afterward.</div></div>
+</details>
+<div class="table-scroll"><table class="data"><thead><tr><th>Piece</th><th>Where to find it</th><th>Its responsibility</th></tr></thead><tbody>
+<tr><td>Generator</td><td><code>generator</code> thread</td><td>Create arrivals over time</td></tr>
+<tr><td>Queue</td><td><code>Queue</code>, <code>QueueState</code></td><td>Keep waiting jobs in arrival order</td></tr>
+<tr><td>Manager</td><td><code>manager</code> thread</td><td>Take the head, reserve capacity, send</td></tr>
+<tr><td>Workers</td><td><code>workers</code> loop</td><td>Receive, run, record completion, release capacity</td></tr>
+<tr><td>Monitor</td><td><code>monitor</code> thread</td><td>Write periodic snapshots to CSV</td></tr>
+</tbody></table></div>
+<p>Notice the shutdown order. The generator closes the queue; the manager drains it and then drops its sender; the workers finish their jobs and exit; finally the monitor stops. If you change who holds a sender or who waits for whom, shutdown can become a problem even when ordinary job processing works.</p>
+</section>
+<section class="chapter" id="investigate"><span class="chapter-num">After the walkthrough</span><h2>Change the system and watch what moves</h2>
+<p>Start with the complete program. Change one thing, run it again, and look at both the console and <code>fifo.csv</code>. If several settings change at once, it becomes hard to tell which change caused the result.</p>
+<div class="try"><strong>1. Make arrivals faster than processing</strong>Change the generator's 70 ms arrival interval to 20 ms. Compare the queue length and wait time. Then restore 70 ms.</div>
+<div class="try"><strong>2. Change the resource limit</strong>Change <code>cap: 70</code> to <code>cap: 50</code>. Keep the worker count the same. Which kinds of jobs can overlap now?</div>
+<div class="try"><strong>3. Change the number of workers</strong>Change both the number of spawned workers and <code>max_workers</code> from 3 to 1, then to 5. Watch whether the budget or the worker count is the tighter restriction.</div>
+<div class="try"><strong>4. Give different jobs different durations</strong>Change <code>duration_ms: 300</code> to <code>duration_ms: if id % 3 == 0 { 600 } else { 100 }</code>. Watch which job IDs finish first. Sending jobs in order does not force their completion order.</div>
+<div class="try"><strong>5. Inspect the states you cannot yet see</strong>The CSV records the waiting queue and resource reservations. It does not separately count jobs already sent into the channel or workers actually processing them. Work out where you would add those counters without changing what they mean.</div>
+<div class="note"><b>A final distinction:</b> These examples use sleep to represent a task's duration. If you replace that with actual computation, your machine's core count and scheduling begin to matter. The value called <code>cost</code> will still be an artificial reservation unless you separately measure actual CPU use.</div>
+<p>The important question now is not simply whether the program runs. It is whether the measurements support what you claim the program is doing.</p>
+</section>
+<footer class="footer">End of lesson.</footer>
+</main></div>
+<script>
+(function () {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const text = (id, s) => {$(id).textContent = s;};
+  const setButtons = (active, others) => { $(active).classList.remove('secondary'); for (const id of others) $(id).classList.add('secondary'); };
+  for (const b of document.querySelectorAll('.copy-btn')) {
+    b.addEventListener('click', async () => {
+      const src=b.closest('.code-unit').querySelector('pre code').textContent;
+      try {
+        if (navigator.clipboard && window.isSecureContext) await navigator.clipboard.writeText(src);
+        else {
+          const ta=document.createElement('textarea');ta.value=src;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();
+        }
+        const old=b.textContent;b.textContent='Copied';setTimeout(()=>b.textContent=old,1200);
+      } catch (e) {b.textContent='Select text to copy';}
+    });
+  }
+  // 1. Queue
+  let q=['A','B','C'], nextCode=68;
+  function showQueue(message) {
+    $('queue-chips').replaceChildren(...q.map((job,i)=>{const s=document.createElement('span');s.className='chip'+(i===0?' first':'');s.textContent=job;return s;}));
+    text('q-out',message || (q.length ? q[0]+' is at the front.':'Queue is empty.'));
+    $('q-pop').disabled=q.length===0;
+  }
+  $('q-pop').onclick=()=>{const a=q.shift();showQueue('Took '+a+'. '+(q.length?'Next is '+q[0]+'.':'Nothing remains.'));};
+  $('q-add').onclick=()=>{q.push(String.fromCharCode(nextCode++));showQueue('Added '+q[q.length-1]+' at the back.');};
+  $('q-reset').onclick=()=>{q=['A','B','C'];nextCode=68;showQueue();};showQueue();
+  // 2. Timeline for identical waiting jobs
+  function workerTimeline() {
+    const n=+$('workers-count').value; text('workers-value',n);
+    const durations=[1,1,1,1,1,1], rows=Array.from({length:n},()=>[]), t=Array(n).fill(0);
+    durations.forEach((d,i)=>{let w=t.indexOf(Math.min(...t)); rows[w].push({id:i+1,start:t[w],length:d});t[w]+=d;});
+    const max=Math.max(...t), holder=$('workers-bars');holder.replaceChildren();
+    rows.forEach((tasks,i)=>{
+      const row=document.createElement('div');row.className='worker-row';
+      const label=document.createElement('span');label.className='worker-label';label.textContent='Worker '+(i+1);
+      const track=document.createElement('div');track.className='worker-track';
+      tasks.forEach(job=>{const seg=document.createElement('div');seg.className='job-segment';seg.style.width=(job.length/max*100)+'%';seg.textContent='J'+job.id;track.appendChild(seg);});
+      row.append(label,track);holder.appendChild(row);
+    });
+    text('workers-readout','All six jobs finish after '+max+' time '+(max===1?'unit':'units')+'. No job is split between workers.');
+  }
+  $('workers-count').oninput=workerTimeline;workerTimeline();
+  // 3. Lock scope model
+  function lockTimeline(held) {
+    const holder=$('lock-bars');holder.replaceChildren();
+    const byWorker=held?[[1,2,3,4],[]]:[[1,3],[2,4]];
+    byWorker.forEach((jobs,i)=>{const row=document.createElement('div');row.className='worker-row';
+      const label=document.createElement('span');label.className='worker-label';label.textContent='Worker '+(i+1);
+      const track=document.createElement('div');track.className='worker-track';
+      jobs.forEach(id=>{const seg=document.createElement('div');seg.className='job-segment';seg.style.width='25%';seg.textContent='J'+id;track.appendChild(seg);});
+      row.append(label,track);holder.appendChild(row);
+    });
+    // Draw widths against the same 4-time-unit scale; short-lock jobs parallel at width 25% each.
+    text('lock-out',held?'The first worker keeps the lock while working. In this simple schedule the other worker gets no work; total time is 4 units.':'Each worker locks only long enough to take a job, then works independently. Total time is 2 units.');
+    setButtons(held?'lock-long':'lock-short',[held?'lock-short':'lock-long']);
+  }
+  $('lock-short').onclick=()=>lockTimeline(false);$('lock-long').onclick=()=>lockTimeline(true);lockTimeline(false);
+  // 4. Condition variable sequence
+  const cvEvents=[
+    'Queue is empty; producer has not added a job.',
+    'Consumer locks queue, sees it is empty, and calls wait().',
+    'wait() releases the mutex; consumer sleeps.',
+    'Producer locks queue, pushes job A, and unlocks.',
+    'Producer notifies; consumer wakes and reacquires the mutex.',
+    'Consumer checks the condition again, removes A, and unlocks.',
+    'Producer marks the queue closed and notifies again.',
+    'Consumer finds closed and empty; it exits.'
+  ];
+  let cvIndex=0;
+  function drawCv(){text('cv-state',cvEvents[cvIndex]);$('cv-steps').replaceChildren(...cvEvents.slice(0,cvIndex+1).map(t=>{const l=document.createElement('li');l.textContent=t;return l;}));$('cv-next').disabled=cvIndex===cvEvents.length-1;}
+  $('cv-next').onclick=()=>{cvIndex=Math.min(cvIndex+1,cvEvents.length-1);drawCv();};
+  $('cv-reset').onclick=()=>{cvIndex=0;drawCv();};drawCv();
+  // 5. Channel transfer states
+  const channelEvents=[
+    {p:3,b:0,r:0,d:'Three jobs are waiting for the manager.'},
+    {p:2,b:1,r:0,d:'Manager sends A. A is inside the channel, not yet running.'},
+    {p:1,b:2,r:0,d:'Manager sends B. The channel can hold more than one job.'},
+    {p:1,b:1,r:1,d:'Worker receives A and starts it. The receiver mutex is no longer held.'},
+    {p:0,b:2,r:1,d:'Manager sends C while A is running.'},
+    {p:0,b:2,r:0,d:'Worker finishes A. B and C remain in the channel.'},
+    {p:0,b:1,r:1,d:'Worker receives B and starts it.'},
+    {p:0,b:1,r:0,d:'Worker finishes B.'},
+    {p:0,b:0,r:1,d:'Worker receives C and starts it.'},
+    {p:0,b:0,r:0,d:'C finishes; all three jobs are complete.'}
+  ];
+  let ci=0;
+  function drawChannel(){const e=channelEvents[ci];text('ch-pending',e.p);text('ch-buffered',e.b);text('ch-running',e.r);text('ch-out',e.d);$('ch-next').disabled=ci===channelEvents.length-1;}
+  $('ch-next').onclick=()=>{ci=Math.min(ci+1,channelEvents.length-1);drawChannel();};$('ch-reset').onclick=()=>{ci=0;drawChannel();};drawChannel();
+  // 6. Budget — every dispatched job reserves a worker and CPU units
+  const initialBudgetJobs=()=>[{id:'A',cost:40},{id:'B',cost:20},{id:'C',cost:10}];
+  let jobs=initialBudgetJobs(), active=[];
+  function resetBudgetJobs(){
+    jobs=initialBudgetJobs(); const cost=+$('budget-used').value;
+    active=cost>0?[{id:'X',cost}]:[];
+  }
+  function budgetChips(id, rows, first){
+    $(id).replaceChildren(...rows.map((job,i)=>{
+      const s=document.createElement('span');s.className='chip'+(first&&i===0?' first':'');
+      s.textContent=job.id+' · '+job.cost;s.title=job.cost+' units';return s;
+    }));
+  }
+  function drawBudget(msg){
+    const used=active.reduce((n,j)=>n+j.cost,0);
+    text('budget-used-label',+$('budget-used').value);
+    $('budget-bar').style.width=(100*used/70)+'%';
+    budgetChips('budget-jobs',jobs,true);budgetChips('budget-running',active,false);
+    text('budget-worker-state','Capacity 70; '+used+' reserved; '+(2-active.length)+' of 2 worker slots available.');
+    text('budget-result',msg||'Available budget: '+(70-used)+'. Try dispatching.');
+    $('budget-dispatch').disabled=jobs.length===0;
+    $('budget-finish').disabled=active.length===0;
+  }
+  $('budget-used').oninput=()=>{resetBudgetJobs();drawBudget('Starting conditions changed; all waiting jobs restored.');};
+  $('budget-policy').onchange=()=>drawBudget('Policy changed; try dispatching again.');
+  $('budget-dispatch').onclick=()=>{
+    const used=active.reduce((n,j)=>n+j.cost,0), available=70-used,policy=$('budget-policy').value;
+    if(active.length>=2){drawBudget('The manager waits: both worker slots are reserved. Finish a running job first.');return;}
+    const index=policy==='fifo'?(jobs[0].cost<=available?0:-1):jobs.findIndex(j=>j.cost<=available);
+    if(index===-1){drawBudget('Manager waits: '+(policy==='fifo'?'front job '+jobs[0].id+' needs '+jobs[0].cost+', but only '+available+' budget remains.':'none of the waiting jobs fits the remaining '+available+' units.'));return;}
+    const job=jobs.splice(index,1)[0];active.push(job);
+    drawBudget('Dispatched '+job.id+' ('+job.cost+' budget units). The reservation remains until that job finishes.');
+  };
+  $('budget-finish').onclick=()=>{
+    const job=active.shift();
+    drawBudget('Finished '+job.id+'. Its worker slot and '+job.cost+' budget units are now available.');
+  };
+  $('budget-reset').onclick=()=>{$('budget-used').value='40';$('budget-policy').value='fifo';resetBudgetJobs();drawBudget();};
+  resetBudgetJobs();drawBudget();
+  // 7. Timing arithmetic
+  function drawTimes(changed){
+    let a=+$('time-arrival').value,s=+$('time-start').value,f=+$('time-finish').value;
+    if(changed==='arrival' && a>s){s=a;$('time-start').value=s;}
+    if(changed==='start' && s<a){a=s;$('time-arrival').value=a;}
+    if(changed==='start' && s>f){f=s;$('time-finish').value=f;}
+    if(changed==='finish' && f<s){s=f;$('time-start').value=s;if(s<a){a=s;$('time-arrival').value=a;}}
+    text('time-arrival-v',a);text('time-start-v',s);text('time-finish-v',f);
+    text('metric-wait',s-a);text('metric-service',f-s);text('metric-turn',f-a);
+  }
+  for (const [id,changed] of [['time-arrival','arrival'],['time-start','start'],['time-finish','finish']]) $(id).addEventListener('input',()=>drawTimes(changed));drawTimes();
+})();
+</script>
+</body></html>
